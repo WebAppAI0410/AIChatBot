@@ -182,17 +182,7 @@ export default function SubscriptionScreen() {
   
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: 'サブスクリプション',
-          headerStyle: {
-            backgroundColor: colors.primary,
-          },
-          headerTintColor: colors.background,
-          headerBackVisible: true,
-          gestureEnabled: true,
-        }}
-      />
+      {/* Stack.Screen configuration is handled in _layout.tsx */}
       
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.title}>サブスクリプションプラン</Text>

@@ -40,17 +40,7 @@ export default function HelpScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: '使い方',
-          headerStyle: {
-            backgroundColor: colors.primary,
-          },
-          headerTintColor: colors.background,
-          headerBackVisible: true,
-          gestureEnabled: true,
-        }}
-      />
+      {/* Stack.Screen configuration is handled in _layout.tsx */}
 
       <ScrollView style={styles.container}>
         <View style={styles.header}>

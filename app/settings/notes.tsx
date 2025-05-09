@@ -37,17 +37,7 @@ export default function NotesSettingsScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: 'ノート機能設定',
-          headerStyle: {
-            backgroundColor: colors.primary,
-          },
-          headerTintColor: colors.background,
-          headerBackVisible: true,
-          gestureEnabled: true,
-        }}
-      />
+      {/* Stack.Screen configuration is handled in _layout.tsx */}
 
       <ScrollView style={styles.container}>
         <View style={styles.section}>

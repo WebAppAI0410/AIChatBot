@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 
@@ -11,31 +11,31 @@ export default function SettingsScreen() {
     {
       title: 'サブスクリプション',
       icon: 'card-outline',
-      route: '/settings/subscription',
+      route: 'settings/subscription',
       description: 'プランの管理と支払い情報',
     },
     {
       title: 'モデル設定',
       icon: 'server-outline',
-      route: '/settings/local-model',
+      route: 'settings/local-model',
       description: 'AIモデルの管理とダウンロード',
     },
     {
       title: 'ノート機能設定',
       icon: 'document-text-outline',
-      route: '/settings/notes',
+      route: 'settings/notes',
       description: 'ノートの保存と同期の設定',
     },
     {
       title: '画面カスタマイズ',
       icon: 'color-palette-outline',
-      route: '/settings/appearance',
+      route: 'settings/appearance',
       description: 'テーマとカラーの設定',
     },
     {
       title: '使い方',
       icon: 'help-circle-outline',
-      route: '/settings/help',
+      route: 'settings/help',
       description: 'アプリの使い方とヒント',
     },
   ];
@@ -49,20 +49,24 @@ export default function SettingsScreen() {
 
         <View style={styles.optionsContainer}>
           {settingsOptions.map((option, index) => (
-            <TouchableOpacity
+            <Link
               key={index}
-              style={styles.optionItem}
-              onPress={() => router.push(option.route)}
+              href={option.route}
+              asChild
             >
-              <View style={styles.optionIconContainer}>
-                <Ionicons name={option.icon} size={24} color={colors.primary} />
-              </View>
-              <View style={styles.optionTextContainer}>
-                <Text style={styles.optionTitle}>{option.title}</Text>
-                <Text style={styles.optionDescription}>{option.description}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.gray} />
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.optionItem}
+              >
+                <View style={styles.optionIconContainer}>
+                  <Ionicons name={option.icon} size={24} color={colors.primary} />
+                </View>
+                <View style={styles.optionTextContainer}>
+                  <Text style={styles.optionTitle}>{option.title}</Text>
+                  <Text style={styles.optionDescription}>{option.description}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.gray} />
+              </TouchableOpacity>
+            </Link>
           ))}
         </View>
 

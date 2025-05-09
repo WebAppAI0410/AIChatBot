@@ -39,17 +39,7 @@ export default function AppearanceScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: '画面カスタマイズ',
-          headerStyle: {
-            backgroundColor: colors.primary,
-          },
-          headerTintColor: colors.background,
-          headerBackVisible: true,
-          gestureEnabled: true,
-        }}
-      />
+      {/* Stack.Screen configuration is handled in _layout.tsx */}
 
       <ScrollView style={styles.container}>
         <View style={styles.section}>
