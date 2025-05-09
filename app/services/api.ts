@@ -103,7 +103,8 @@ export const fetchChatCompletion = async (
     console.log(`API Request to OpenRouter - Original Model: ${modelId}, Normalized: ${actualModelId}`);
     console.log(`Messages count: ${messages.length}`);
     
-    let processedMessages = [...messages];
+    let processedMessages = JSON.parse(JSON.stringify(messages)) as ChatMessage[];
+    
     const systemMessageIndex = processedMessages.findIndex(m => m.role === 'system');
     
     if (systemMessageIndex === -1) {
@@ -111,13 +112,17 @@ export const fetchChatCompletion = async (
         role: 'system',
         content: 'あなたは親切で役立つAIアシスタントです。ユーザーの質問に日本語で簡潔に答えてください。'
       });
+      console.log('Added default system message');
     } 
     else if (systemMessageIndex > 0) {
       const systemMessage = processedMessages.splice(systemMessageIndex, 1)[0];
       processedMessages.unshift(systemMessage);
+      console.log('Moved system message to first position');
     }
     
-    console.log('First few messages:', JSON.stringify(processedMessages.slice(0, 2)));
+    console.log('First message role:', processedMessages[0].role);
+    console.log('Last message role:', processedMessages[processedMessages.length - 1].role);
+    console.log('Last message content:', processedMessages[processedMessages.length - 1].content.substring(0, 30));
     
     const body: ChatCompletionRequest = {
       messages: processedMessages,
@@ -129,6 +134,7 @@ export const fetchChatCompletion = async (
 
     console.log('Sending request to OpenRouter API...');
     console.log('Request URL:', `${OPENROUTER_BASE_URL}/chat/completions`);
+    console.log('Request body:', JSON.stringify(body).substring(0, 200) + '...');
     
     const headers = {
       'Content-Type': 'application/json',
@@ -138,7 +144,7 @@ export const fetchChatCompletion = async (
     };
     
     console.log('API Request headers:', {
-      'Content-Type': 'application/json',
+      'Content-Type': headers['Content-Type'],
       'Authorization': `Bearer ${OPENROUTER_API_KEY.substring(0, 10)}...`,
       'HTTP-Referer': headers['HTTP-Referer'],
       'X-Title': headers['X-Title'],
@@ -163,6 +169,10 @@ export const fetchChatCompletion = async (
         
         if (response.status === 401) {
           throw new Error(`認証エラー: APIキーが無効または期限切れです。(${errorJson.error?.message || 'No auth credentials found'})`);
+        } else if (response.status === 400) {
+          throw new Error(`リクエストエラー: ${errorJson.error?.message || errorText}`);
+        } else if (response.status === 429) {
+          throw new Error('レート制限に達しました。しばらく待ってから再試行してください。');
         }
       } catch (e) {
         console.error('Error parsing error response:', e);
@@ -172,7 +182,18 @@ export const fetchChatCompletion = async (
     }
 
     const data = await response.json() as ChatCompletionResponse;
+    
+    if (!data || !data.choices || data.choices.length === 0) {
+      console.error('Invalid API response format:', data);
+      throw new Error('APIからの応答が無効です。');
+    }
+    
     const content = data.choices[0]?.message?.content || '';
+    
+    if (!content) {
+      console.error('Empty content in API response:', data);
+      throw new Error('APIからの応答が空です。');
+    }
     
     console.log(`API Response received - Length: ${content.length}`);
     console.log(`Response preview: ${content.substring(0, 50)}...`);
@@ -193,7 +214,10 @@ export const fetchChatCompletion = async (
     });
     
     if (error instanceof Error) {
-      if (error.message.includes('認証エラー')) {
+      if (error.message.includes('認証エラー') || 
+          error.message.includes('リクエストエラー') || 
+          error.message.includes('レート制限') ||
+          error.message.includes('APIからの応答')) {
         return error.message;
       }
     }

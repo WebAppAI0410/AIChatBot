@@ -46,6 +46,70 @@ export default function ChatScreen() {
   useEffect(() => {
     if (chat) {
       markChatAsRead(chat.id);
+      
+      const hasUserMessage = chat.messages.some(m => m.role === 'user');
+      const hasAssistantResponse = chat.messages.some(m => m.role === 'assistant');
+      
+      if (hasUserMessage && !hasAssistantResponse && !isLoading) {
+        console.log('New chat detected with user message but no assistant response. Sending API request...');
+        
+        const lastUserMessage = [...chat.messages]
+          .filter(m => m.role === 'user')
+          .pop();
+          
+        if (lastUserMessage) {
+          const apiMessages: ApiChatMessage[] = chat.messages.map(msg => ({
+            role: msg.role,
+            content: msg.content,
+          }));
+          
+          const hasSystemMessage = apiMessages.some(msg => msg.role === 'system');
+          if (!hasSystemMessage) {
+            apiMessages.unshift({
+              role: 'system',
+              content: 'あなたは親切で役立つAIアシスタントです。ユーザーの質問に日本語で簡潔に答えてください。',
+            });
+          }
+          
+          (async () => {
+            setIsLoading(true);
+            try {
+              console.log('Auto-sending API request for new chat with model:', chat.modelId);
+              console.log('Messages count:', apiMessages.length);
+              
+              const responseContent = await fetchChatCompletion(
+                apiMessages,
+                chat.modelId
+              );
+              
+              console.log('Received auto API response:', responseContent.substring(0, 50) + '...');
+              
+              if (responseContent.includes('認証エラー') || responseContent.includes('API error')) {
+                console.error('API returned an error message:', responseContent);
+                throw new Error(responseContent);
+              }
+              
+              addMessage(chat.id, {
+                role: 'assistant',
+                content: responseContent,
+              });
+              
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }, 100);
+            } catch (error) {
+              console.error('Error in auto API request:', error);
+              
+              addMessage(chat.id, {
+                role: 'assistant',
+                content: 'エラーが発生しました。もう一度お試しください。',
+              });
+            } finally {
+              setIsLoading(false);
+            }
+          })();
+        }
+      }
     }
   }, [chat?.id]);
   
@@ -91,17 +155,29 @@ export default function ChatScreen() {
       console.log('First message role:', apiMessages[0].role);
       console.log('Last message:', apiMessages[apiMessages.length - 1].content.substring(0, 30));
       
-      let responseContent = await fetchChatCompletion(
-        apiMessages,
-        chat.modelId
-      );
+      console.log('Sending API request with model:', chat.modelId);
       
-      console.log('Received response:', responseContent.substring(0, 50) + '...');
-      
-      addMessage(chat.id, {
-        role: 'assistant',
-        content: responseContent,
-      });
+      try {
+        let responseContent = await fetchChatCompletion(
+          apiMessages,
+          chat.modelId
+        );
+        
+        console.log('Received API response:', responseContent.substring(0, 50) + '...');
+        
+        if (responseContent.includes('認証エラー') || responseContent.includes('API error')) {
+          console.error('API returned an error message:', responseContent);
+          throw new Error(responseContent);
+        }
+        
+        addMessage(chat.id, {
+          role: 'assistant',
+          content: responseContent,
+        });
+      } catch (innerError) {
+        console.error('Error in API response handling:', innerError);
+        throw innerError;
+      }
       
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
