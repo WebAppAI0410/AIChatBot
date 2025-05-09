@@ -53,7 +53,7 @@ export function TabsLayout() {
       <Tabs.Screen
         name="chats"
         options={{
-          title: 'Chats',
+          title: 'チャット',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubbles-outline" size={size} color={color} />
           ),
@@ -62,7 +62,7 @@ export function TabsLayout() {
       <Tabs.Screen
         name="new-chat"
         options={{
-          title: 'New Chat',
+          title: '新規',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="add-circle-outline" size={size} color={color} />
           ),
@@ -71,9 +71,18 @@ export function TabsLayout() {
       <Tabs.Screen
         name="notes"
         options={{
-          title: 'Notes',
+          title: 'ノート',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="document-text-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: '設定',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="settings-outline" size={size} color={color} />
           ),
         }}
       />
