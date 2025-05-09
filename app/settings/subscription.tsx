@@ -1,7 +1,17 @@
 import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { 
+  StyleSheet, 
+  Text, 
+  View, 
+  TouchableOpacity, 
+  ScrollView, 
+  Alert, 
+  SafeAreaView, 
+  Platform, 
+  StatusBar 
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useStore } from '../store';
 import { colors } from '../constants/colors';
 
@@ -69,6 +79,7 @@ const PLANS: PlanOption[] = [
 ];
 
 export default function SubscriptionScreen() {
+  const router = useRouter();
   const isAuthenticated = useStore(state => state.isAuthenticated);
   const plan = useStore(state => state.plan);
   const setPlan = useStore(state => state.setPlan);
@@ -182,26 +193,81 @@ export default function SubscriptionScreen() {
   
   return (
     <>
-      {/* Stack.Screen configuration is handled in _layout.tsx */}
+      <Stack.Screen
+        options={{
+          headerShown: false,
+        }}
+      />
       
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>サブスクリプションプラン</Text>
-        <Text style={styles.subtitle}>
-          あなたのニーズに合ったプランを選択してください
-        </Text>
+      <SafeAreaView style={styles.container}>
+        {/* Custom Header with Safe Area for Notch */}
+        <View style={styles.headerContainer}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
+          >
+            <Ionicons name="chevron-back" size={24} color={colors.background} />
+          </TouchableOpacity>
+          
+          <Text style={styles.headerTitle}>
+            サブスクリプション
+          </Text>
+          
+          <View style={styles.headerRight} />
+        </View>
         
-        {PLANS.map(renderPlanCard)}
-        
-        <Text style={styles.disclaimer}>
-          ※ トークン数は毎月1日にリセットされます。画像生成回数は毎日0時にリセットされます。
-        </Text>
-      </ScrollView>
+        <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.content}>
+          <Text style={styles.title}>サブスクリプションプラン</Text>
+          <Text style={styles.subtitle}>
+            あなたのニーズに合ったプランを選択してください
+          </Text>
+          
+          {PLANS.map(renderPlanCard)}
+          
+          <Text style={styles.disclaimer}>
+            ※ トークン数は毎月1日にリセットされます。画像生成回数は毎日0時にリセットされます。
+          </Text>
+        </ScrollView>
+      </SafeAreaView>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.primary,
+    paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    color: colors.background,
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 10,
+  },
+  headerRight: {
+    width: 40,
+  },
+  scrollContainer: {
     flex: 1,
     backgroundColor: colors.background,
   },

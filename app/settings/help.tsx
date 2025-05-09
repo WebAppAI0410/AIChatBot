@@ -1,10 +1,21 @@
 import React from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { Stack } from 'expo-router';
+import { 
+  StyleSheet, 
+  View, 
+  Text, 
+  ScrollView, 
+  TouchableOpacity, 
+  Image,
+  SafeAreaView,
+  Platform,
+  StatusBar
+} from 'react-native';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 
 export default function HelpScreen() {
+  const router = useRouter();
   const helpSections = [
     {
       title: 'チャットの始め方',
@@ -40,13 +51,34 @@ export default function HelpScreen() {
 
   return (
     <>
-      {/* Stack.Screen configuration is handled in _layout.tsx */}
-
-      <ScrollView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>AI ChatBotの使い方</Text>
-          <Text style={styles.headerSubtitle}>基本的な機能と操作方法</Text>
+      <Stack.Screen
+        options={{
+          headerShown: false,
+        }}
+      />
+      
+      <SafeAreaView style={styles.container}>
+        {/* Custom Header with Safe Area for Notch */}
+        <View style={styles.headerContainer}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
+          >
+            <Ionicons name="chevron-back" size={24} color={colors.background} />
+          </TouchableOpacity>
+          
+          <Text style={styles.headerTitle}>
+            使い方
+          </Text>
+          
+          <View style={styles.headerRight} />
         </View>
+        
+        <ScrollView style={styles.scrollContainer}>
+          <View style={styles.header}>
+            <Text style={styles.contentTitle}>AI ChatBotの使い方</Text>
+            <Text style={styles.headerSubtitle}>基本的な機能と操作方法</Text>
+          </View>
 
         {helpSections.map((section, index) => (
           <View key={index} style={styles.section}>
@@ -72,6 +104,7 @@ export default function HelpScreen() {
           <Text style={styles.versionText}>バージョン 1.0.0</Text>
         </View>
       </ScrollView>
+      </SafeAreaView>
     </>
   );
 }
@@ -81,11 +114,44 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.primary,
+    paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    color: colors.background,
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 10,
+  },
+  headerRight: {
+    width: 40,
+  },
+  scrollContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   header: {
     padding: 20,
     paddingBottom: 16,
   },
-  headerTitle: {
+  contentTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.text,

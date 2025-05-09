@@ -1,11 +1,22 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Switch } from 'react-native';
-import { Stack } from 'expo-router';
+import { 
+  StyleSheet, 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  ScrollView, 
+  Switch,
+  SafeAreaView,
+  Platform,
+  StatusBar
+} from 'react-native';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 import { useStore } from '../store';
 
 export default function AppearanceScreen() {
+  const router = useRouter();
   const theme = useStore(state => state.theme);
   const setTheme = useStore(state => state.setTheme);
   const fontSize = useStore(state => state.fontSize);
@@ -39,39 +50,60 @@ export default function AppearanceScreen() {
 
   return (
     <>
-      {/* Stack.Screen configuration is handled in _layout.tsx */}
-
-      <ScrollView style={styles.container}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>テーマ</Text>
-          {themeOptions.map((option) => (
-            <TouchableOpacity
-              key={option.id}
-              style={[
-                styles.optionItem,
-                theme === option.id && styles.selectedOption,
-              ]}
-              onPress={() => setTheme(option.id as 'light' | 'dark' | 'system')}
-            >
-              <Ionicons
-                name={option.icon as any}
-                size={24}
-                color={theme === option.id ? colors.background : colors.text}
-              />
-              <Text
-                style={[
-                  styles.optionText,
-                  theme === option.id && styles.selectedOptionText,
-                ]}
-              >
-                {option.label}
-              </Text>
-              {theme === option.id && (
-                <Ionicons name="checkmark" size={24} color={colors.background} />
-              )}
-            </TouchableOpacity>
-          ))}
+      <Stack.Screen
+        options={{
+          headerShown: false,
+        }}
+      />
+      
+      <SafeAreaView style={styles.container}>
+        {/* Custom Header with Safe Area for Notch */}
+        <View style={styles.headerContainer}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
+          >
+            <Ionicons name="chevron-back" size={24} color={colors.background} />
+          </TouchableOpacity>
+          
+          <Text style={styles.headerTitle}>
+            画面カスタマイズ
+          </Text>
+          
+          <View style={styles.headerRight} />
         </View>
+        
+        <ScrollView style={styles.scrollContainer}>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>テーマ</Text>
+            {themeOptions.map((option) => (
+              <TouchableOpacity
+                key={option.id}
+                style={[
+                  styles.optionItem,
+                  theme === option.id && styles.selectedOption,
+                ]}
+                onPress={() => setTheme(option.id as 'light' | 'dark' | 'system')}
+              >
+                <Ionicons
+                  name={option.icon as any}
+                  size={24}
+                  color={theme === option.id ? colors.background : colors.text}
+                />
+                <Text
+                  style={[
+                    styles.optionText,
+                    theme === option.id && styles.selectedOptionText,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+                {theme === option.id && (
+                  <Ionicons name="checkmark" size={24} color={colors.background} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>カラーテーマ</Text>
@@ -147,12 +179,46 @@ export default function AppearanceScreen() {
           ))}
         </View>
       </ScrollView>
+      </SafeAreaView>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.primary,
+    paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    color: colors.background,
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 10,
+  },
+  headerRight: {
+    width: 40,
+  },
+  scrollContainer: {
     flex: 1,
     backgroundColor: colors.background,
   },
