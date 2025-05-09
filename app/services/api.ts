@@ -47,6 +47,13 @@ export type ChatCompletionChunk = {
   model: string;
 };
 
+/**
+ * Fetches a completion from the OpenRouter API
+ * @param messages Array of chat messages
+ * @param modelId Model ID to use
+ * @param onChunk Optional callback for streaming responses
+ * @returns Promise with the response text
+ */
 export const fetchChatCompletion = async (
   messages: ChatMessage[],
   modelId: string,
@@ -54,22 +61,48 @@ export const fetchChatCompletion = async (
 ): Promise<string> => {
   try {
     if (modelId === 'qwen3-4b-local') {
-      return 'Local model response would be generated here';
+      return 'ローカルモデルの応答がここに表示されます。実際のモデルがインストールされると、リアルタイムで応答が生成されます。';
     }
 
-    const actualModelId = modelId.includes('/') ? modelId : `openai/${modelId}`;
+    let actualModelId = modelId;
+    if (!modelId.includes('/')) {
+      const modelInfo = MODELS.find(m => m.id === modelId || m.name.toLowerCase() === modelId.toLowerCase());
+      if (modelInfo) {
+        actualModelId = modelInfo.id;
+      } else {
+        actualModelId = `openai/${modelId}`;
+      }
+    }
     
-    console.log(`API Request - Model: ${actualModelId}, Messages: ${messages.length}`);
-    console.log(`First few messages:`, JSON.stringify(messages.slice(0, 2)));
+    console.log(`API Request to OpenRouter - Model: ${actualModelId}`);
+    console.log(`Messages count: ${messages.length}`);
+    
+    let processedMessages = [...messages];
+    const systemMessageIndex = processedMessages.findIndex(m => m.role === 'system');
+    
+    if (systemMessageIndex === -1) {
+      processedMessages.unshift({
+        role: 'system',
+        content: 'あなたは親切で役立つAIアシスタントです。ユーザーの質問に日本語で簡潔に答えてください。'
+      });
+    } 
+    else if (systemMessageIndex > 0) {
+      const systemMessage = processedMessages.splice(systemMessageIndex, 1)[0];
+      processedMessages.unshift(systemMessage);
+    }
+    
+    console.log('First few messages:', JSON.stringify(processedMessages.slice(0, 2)));
     
     const body: ChatCompletionRequest = {
-      messages,
+      messages: processedMessages,
       model: actualModelId,
-      stream: false, // Disable streaming for now to simplify response handling
+      stream: false,
       max_tokens: 1000,
       temperature: 0.7,
     };
 
+    console.log('Sending request to OpenRouter API...');
+    
     const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -83,7 +116,14 @@ export const fetchChatCompletion = async (
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`API error response: ${errorText}`);
+      console.error(`OpenRouter API error (${response.status}):`, errorText);
+      
+      try {
+        const errorJson = JSON.parse(errorText);
+        console.error('Parsed error:', errorJson);
+      } catch (e) {
+      }
+      
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
@@ -100,6 +140,7 @@ export const fetchChatCompletion = async (
     return content;
   } catch (error) {
     console.error('Error in fetchChatCompletion:', error);
+    
     console.error('Request details:', {
       modelId,
       messageCount: messages.length,

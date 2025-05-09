@@ -79,22 +79,20 @@ export default function ChatScreen() {
         content: input,
       });
       
-      const systemMessage = {
-        role: 'system' as const,
-        content: 'あなたは親切で役立つAIアシスタントです。ユーザーの質問に日本語で簡潔に答えてください。',
-      };
+      const hasSystemMessage = apiMessages.some(msg => msg.role === 'system');
+      if (!hasSystemMessage) {
+        apiMessages.unshift({
+          role: 'system',
+          content: 'あなたは親切で役立つAIアシスタントです。ユーザーの質問に日本語で簡潔に答えてください。',
+        });
+      }
       
-      const messagesWithSystem = [
-        systemMessage,
-        ...apiMessages.filter(msg => msg.role !== 'system')
-      ];
+      console.log('Prepared messages count:', apiMessages.length);
+      console.log('First message role:', apiMessages[0].role);
+      console.log('Last message:', apiMessages[apiMessages.length - 1].content.substring(0, 30));
       
-      console.log('Prepared messages:', JSON.stringify(messagesWithSystem.length));
-      
-      let responseContent = '';
-      
-      responseContent = await fetchChatCompletion(
-        messagesWithSystem,
+      let responseContent = await fetchChatCompletion(
+        apiMessages,
         chat.modelId
       );
       
