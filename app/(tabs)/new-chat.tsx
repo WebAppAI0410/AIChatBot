@@ -1,5 +1,16 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { 
+  StyleSheet, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  View, 
+  ScrollView, 
+  KeyboardAvoidingView, 
+  Platform,
+  Keyboard,
+  Dimensions
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
@@ -36,9 +47,41 @@ export default function NewChatScreen() {
     router.push(`/chat/${chatId}`);
   };
 
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.suggestionsContainer}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <ScrollView 
+        style={[
+          styles.suggestionsContainer,
+          keyboardHeight > 0 && { marginBottom: keyboardHeight * 0.5 }
+        ]}
+        contentContainerStyle={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight * 0.5 : 0 }}
+      >
         <Text style={styles.suggestionsTitle}>おすすめの質問</Text>
         <View style={styles.chipContainer}>
           {SUGGESTIONS.map((suggestion, index) => (
@@ -69,7 +112,7 @@ export default function NewChatScreen() {
         </View>
       </ScrollView>
       
-      <View style={styles.inputContainer}>
+      <View style={[styles.inputContainer, keyboardHeight > 0 && { paddingBottom: Platform.OS === 'ios' ? 8 : 0 }]}>
         <TextInput
           style={styles.input}
           placeholder="メッセージを入力..."
@@ -85,7 +128,7 @@ export default function NewChatScreen() {
           <Ionicons name="send" size={24} color={input.trim() ? colors.background : colors.gray} />
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
