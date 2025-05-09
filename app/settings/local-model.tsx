@@ -79,7 +79,7 @@ export default function LocalModelScreen() {
         <View style={styles.headerContainer}>
           <TouchableOpacity 
             style={styles.backButton} 
-            onPress={() => router.back()}
+            onPress={() => router.navigate('/(tabs)/settings')}
           >
             <Ionicons name="chevron-back" size={24} color={colors.background} />
           </TouchableOpacity>
