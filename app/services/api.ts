@@ -57,87 +57,47 @@ export const fetchChatCompletion = async (
       return 'Local model response would be generated here';
     }
 
+    const actualModelId = modelId.includes('/') ? modelId : `openai/${modelId}`;
+    
+    console.log(`API Request - Model: ${actualModelId}, Messages: ${messages.length}`);
+    console.log(`First few messages:`, JSON.stringify(messages.slice(0, 2)));
+    
     const body: ChatCompletionRequest = {
       messages,
-      model: modelId,
-      stream: !!onChunk,
+      model: actualModelId,
+      stream: false, // Disable streaming for now to simplify response handling
       max_tokens: 1000,
       temperature: 0.7,
     };
 
-    if (onChunk) {
-      const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-          'HTTP-Referer': 'https://aichatbot.app',
-          'X-Title': 'AI ChatBot App',
-        },
-        body: JSON.stringify(body),
-      });
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'HTTP-Referer': 'https://aichatbot.app',
+        'X-Title': 'AI ChatBot App',
+      },
+      body: JSON.stringify(body),
+    });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API error: ${response.status} - ${errorText}`);
-      }
-
-      if (!response.body) {
-        throw new Error('Response body is null');
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let result = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk
-          .split('\n')
-          .filter(line => line.trim() !== '' && line.trim() !== 'data: [DONE]');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const jsonStr = line.slice(6);
-              const json = JSON.parse(jsonStr) as ChatCompletionChunk;
-              const content = json.choices[0]?.delta?.content || '';
-              
-              if (content) {
-                result += content;
-                onChunk(content);
-              }
-            } catch (e) {
-              console.error('Error parsing chunk:', e);
-            }
-          }
-        }
-      }
-
-      return result;
-    } else {
-      const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-          'HTTP-Referer': 'https://aichatbot.app',
-          'X-Title': 'AI ChatBot App',
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json() as ChatCompletionResponse;
-      return data.choices[0]?.message?.content || '';
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`API error response: ${errorText}`);
+      throw new Error(`API error: ${response.status} - ${errorText}`);
     }
+
+    const data = await response.json() as ChatCompletionResponse;
+    const content = data.choices[0]?.message?.content || '';
+    
+    console.log(`API Response received - Length: ${content.length}`);
+    console.log(`Response preview: ${content.substring(0, 50)}...`);
+    
+    if (onChunk && content) {
+      onChunk(content);
+    }
+    
+    return content;
   } catch (error) {
     console.error('Error in fetchChatCompletion:', error);
     console.error('Request details:', {
