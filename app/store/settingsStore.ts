@@ -22,3 +22,5 @@ export const createSettingsSlice: StateCreator<
   setFontSize: (fontSize) => set({ fontSize }),
   setLanguage: (language) => set({ language }),
 });
+
+export default createSettingsSlice;

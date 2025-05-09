@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from './store';
 import { colors } from './constants/colors';
+import config from '../tamagui.config';
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -22,7 +23,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <TamaguiProvider>
+        <TamaguiProvider config={config}>
           <Theme name={theme === 'system' ? 'light' : theme}>
             <StatusBar style="auto" />
             <Slot />

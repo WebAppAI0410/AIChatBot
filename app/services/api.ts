@@ -143,3 +143,5 @@ export const fetchChatCompletion = async (
     throw error;
   }
 };
+
+export default { fetchChatCompletion };

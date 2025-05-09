@@ -99,3 +99,5 @@ export const MODELS: ModelType[] = [
     tier: 'heavy'
   }
 ];
+
+export default MODELS;

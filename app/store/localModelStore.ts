@@ -28,3 +28,5 @@ export const createLocalModelSlice: StateCreator<
   setDownloadProgress: (progress) => set({ downloadProgress: progress }),
   setLocalModelPath: (path) => set({ localModelPath: path }),
 });
+
+export default createLocalModelSlice;

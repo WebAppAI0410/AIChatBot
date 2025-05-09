@@ -62,3 +62,5 @@ export const createUserSlice: StateCreator<
   })),
   resetImageGenCount: () => set({ dailyImageGenCount: 0 }),
 });
+
+export default createUserSlice;

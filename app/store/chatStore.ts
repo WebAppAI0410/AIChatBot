@@ -116,3 +116,5 @@ export const createChatSlice: StateCreator<
     }));
   },
 });
+
+export default createChatSlice;

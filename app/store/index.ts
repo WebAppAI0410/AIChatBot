@@ -26,3 +26,5 @@ export const useStore = create<StoreState>()(
     }
   )
 );
+
+export default useStore;
