@@ -10,7 +10,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Alert
+  Alert,
+  SafeAreaView,
+  StatusBar
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -195,54 +197,72 @@ export default function ChatScreen() {
     <>
       <Stack.Screen
         options={{
-          title: chat.title,
-          headerRight: () => (
-            <TouchableOpacity onPress={handleModelSelect} style={styles.modelButton}>
-              <Text style={styles.modelButtonText}>{currentModel.name}</Text>
-              <Ionicons name="chevron-down" size={16} color={colors.background} />
-            </TouchableOpacity>
-          ),
+          headerShown: false,
         }}
       />
       
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        <FlatList
-          ref={flatListRef}
-          data={chat.messages}
-          renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.messageList}
-          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
-        />
-        
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="メッセージを入力..."
-            value={input}
-            onChangeText={setInput}
-            multiline
-            editable={!isLoading}
-          />
-          {isLoading ? (
-            <View style={styles.loadingButton}>
-              <ActivityIndicator color={colors.background} />
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
-              onPress={handleSend}
-              disabled={!input.trim()}
-            >
-              <Ionicons name="send" size={24} color={input.trim() ? colors.background : colors.gray} />
-            </TouchableOpacity>
-          )}
+      <SafeAreaView style={styles.container}>
+        {/* Custom Header with Safe Area for Notch */}
+        <View style={styles.headerContainer}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
+          >
+            <Ionicons name="chevron-back" size={24} color={colors.background} />
+          </TouchableOpacity>
+          
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {chat.title}
+          </Text>
+          
+          <TouchableOpacity 
+            onPress={handleModelSelect} 
+            style={styles.modelButton}
+          >
+            <Text style={styles.modelButtonText}>{currentModel.name}</Text>
+            <Ionicons name="chevron-down" size={16} color={colors.background} />
+          </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+        
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        >
+          <FlatList
+            ref={flatListRef}
+            data={chat.messages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.messageList}
+            onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          />
+          
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="メッセージを入力..."
+              value={input}
+              onChangeText={setInput}
+              multiline
+              editable={!isLoading}
+            />
+            {isLoading ? (
+              <View style={styles.loadingButton}>
+                <ActivityIndicator color={colors.background} />
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
+                onPress={handleSend}
+                disabled={!input.trim()}
+              >
+                <Ionicons name="send" size={24} color={input.trim() ? colors.background : colors.gray} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
       
       {/* Modals */}
       <ModelSelectModal
@@ -267,6 +287,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.primary,
+    paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    color: colors.background,
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: 10,
+  },
+  keyboardAvoidingContainer: {
+    flex: 1,
   },
   messageList: {
     padding: 16,
