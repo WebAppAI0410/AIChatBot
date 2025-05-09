@@ -46,6 +46,8 @@ export default function AppearanceScreen() {
             backgroundColor: colors.primary,
           },
           headerTintColor: colors.background,
+          headerBackVisible: true,
+          gestureEnabled: true,
         }}
       />
 

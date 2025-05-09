@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Stack } from 'expo-router';
 import * as FileSystem from 'expo-file-system';
 import { useStore } from '../store';
 import { colors } from '../constants/colors';
@@ -55,14 +56,27 @@ export default function LocalModelScreen() {
   };
   
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Ionicons name="save-outline" size={48} color={colors.primary} />
-        <Text style={styles.title}>ローカルモデル管理</Text>
-        <Text style={styles.subtitle}>
-          ローカルモデルをインストールすると、インターネット接続なしでAIチャットを使用できます。
-        </Text>
-      </View>
+    <>
+      <Stack.Screen
+        options={{
+          title: 'ローカルモデル管理',
+          headerStyle: {
+            backgroundColor: colors.primary,
+          },
+          headerTintColor: colors.background,
+          headerBackVisible: true,
+          gestureEnabled: true,
+        }}
+      />
+      
+      <ScrollView style={styles.container}>
+        <View style={styles.header}>
+          <Ionicons name="save-outline" size={48} color={colors.primary} />
+          <Text style={styles.title}>ローカルモデル管理</Text>
+          <Text style={styles.subtitle}>
+            ローカルモデルをインストールすると、インターネット接続なしでAIチャットを使用できます。
+          </Text>
+        </View>
       
       <View style={styles.modelCard}>
         <View style={styles.modelInfo}>
@@ -168,6 +182,7 @@ export default function LocalModelScreen() {
         onClose={() => setShowInstallModal(false)}
       />
     </ScrollView>
+    </>
   );
 }
 

@@ -44,6 +44,8 @@ export default function NotesSettingsScreen() {
             backgroundColor: colors.primary,
           },
           headerTintColor: colors.background,
+          headerBackVisible: true,
+          gestureEnabled: true,
         }}
       />
 

@@ -47,6 +47,8 @@ export default function HelpScreen() {
             backgroundColor: colors.primary,
           },
           headerTintColor: colors.background,
+          headerBackVisible: true,
+          gestureEnabled: true,
         }}
       />
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Stack } from 'expo-router';
 import { useStore } from '../store';
 import { colors } from '../constants/colors';
 
@@ -180,18 +181,32 @@ export default function SubscriptionScreen() {
   };
   
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>サブスクリプションプラン</Text>
-      <Text style={styles.subtitle}>
-        あなたのニーズに合ったプランを選択してください
-      </Text>
+    <>
+      <Stack.Screen
+        options={{
+          title: 'サブスクリプション',
+          headerStyle: {
+            backgroundColor: colors.primary,
+          },
+          headerTintColor: colors.background,
+          headerBackVisible: true,
+          gestureEnabled: true,
+        }}
+      />
       
-      {PLANS.map(renderPlanCard)}
-      
-      <Text style={styles.disclaimer}>
-        ※ トークン数は毎月1日にリセットされます。画像生成回数は毎日0時にリセットされます。
-      </Text>
-    </ScrollView>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text style={styles.title}>サブスクリプションプラン</Text>
+        <Text style={styles.subtitle}>
+          あなたのニーズに合ったプランを選択してください
+        </Text>
+        
+        {PLANS.map(renderPlanCard)}
+        
+        <Text style={styles.disclaimer}>
+          ※ トークン数は毎月1日にリセットされます。画像生成回数は毎日0時にリセットされます。
+        </Text>
+      </ScrollView>
+    </>
   );
 }
 
