@@ -48,6 +48,40 @@ export type ChatCompletionChunk = {
 };
 
 /**
+ * Normalizes model ID to the format expected by OpenRouter
+ * @param modelId Raw model ID
+ * @returns Normalized model ID
+ */
+const normalizeModelId = (modelId: string): string => {
+  if (modelId.includes('/')) {
+    return modelId;
+  }
+  
+  const modelInfo = MODELS.find(m => 
+    m.id === modelId || 
+    m.name.toLowerCase() === modelId.toLowerCase()
+  );
+  
+  if (modelInfo && modelInfo.id.includes('/')) {
+    return modelInfo.id;
+  }
+  
+  if (modelId.startsWith('gpt-')) {
+    return `openai/${modelId}`;
+  }
+  
+  if (modelId === '4o-mini' || modelId === 'gpt-4o-mini') {
+    return 'openai/gpt-4o-mini';
+  }
+  
+  if (modelId === '4.1-mini' || modelId === 'gpt-4.1-mini') {
+    return 'openai/gpt-4.1-mini';
+  }
+  
+  return `openai/${modelId}`;
+};
+
+/**
  * Fetches a completion from the OpenRouter API
  * @param messages Array of chat messages
  * @param modelId Model ID to use
@@ -64,17 +98,9 @@ export const fetchChatCompletion = async (
       return 'ローカルモデルの応答がここに表示されます。実際のモデルがインストールされると、リアルタイムで応答が生成されます。';
     }
 
-    let actualModelId = modelId;
-    if (!modelId.includes('/')) {
-      const modelInfo = MODELS.find(m => m.id === modelId || m.name.toLowerCase() === modelId.toLowerCase());
-      if (modelInfo) {
-        actualModelId = modelInfo.id;
-      } else {
-        actualModelId = `openai/${modelId}`;
-      }
-    }
+    const actualModelId = normalizeModelId(modelId);
     
-    console.log(`API Request to OpenRouter - Model: ${actualModelId}`);
+    console.log(`API Request to OpenRouter - Original Model: ${modelId}, Normalized: ${actualModelId}`);
     console.log(`Messages count: ${messages.length}`);
     
     let processedMessages = [...messages];
@@ -102,24 +128,31 @@ export const fetchChatCompletion = async (
     };
 
     console.log('Sending request to OpenRouter API...');
+    console.log('Request URL:', `${OPENROUTER_BASE_URL}/chat/completions`);
+    
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+      'HTTP-Referer': 'https://aichatbot.app',
+      'X-Title': 'AI ChatBot App',
+    };
+    
+    console.log('API Request headers:', {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${OPENROUTER_API_KEY.substring(0, 10)}...`,
+      'HTTP-Referer': headers['HTTP-Referer'],
+      'X-Title': headers['X-Title'],
+    });
     
     const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'HTTP-Referer': 'https://aichatbot.app',
-        'X-Title': 'AI ChatBot App',
-      },
+      headers,
       body: JSON.stringify(body),
     });
     
-    console.log('API Request sent with headers:', {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY.substring(0, 10)}...`,
-      'Content-Type': 'application/json',
-    });
-    console.log('API Request body:', JSON.stringify(body, null, 2).substring(0, 500));
-
+    console.log('API Response status:', response.status);
+    
+    // Handle error responses
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`OpenRouter API error (${response.status}):`, errorText);
@@ -127,7 +160,12 @@ export const fetchChatCompletion = async (
       try {
         const errorJson = JSON.parse(errorText);
         console.error('Parsed error:', errorJson);
+        
+        if (response.status === 401) {
+          throw new Error(`認証エラー: APIキーが無効または期限切れです。(${errorJson.error?.message || 'No auth credentials found'})`);
+        }
       } catch (e) {
+        console.error('Error parsing error response:', e);
       }
       
       throw new Error(`API error: ${response.status} - ${errorText}`);
@@ -149,9 +187,16 @@ export const fetchChatCompletion = async (
     
     console.error('Request details:', {
       modelId,
+      normalizedModelId: normalizeModelId(modelId),
       messageCount: messages.length,
       firstUserMessage: messages.find(m => m.role === 'user')?.content.substring(0, 50),
     });
+    
+    if (error instanceof Error) {
+      if (error.message.includes('認証エラー')) {
+        return error.message;
+      }
+    }
     
     return 'エラーが発生しました。ネットワーク接続を確認して、もう一度お試しください。';
   }
