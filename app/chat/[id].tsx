@@ -67,6 +67,8 @@ export default function ChatScreen() {
     setIsLoading(true);
     
     try {
+      console.log('Sending message to API with model:', chat.modelId);
+      
       const apiMessages: ApiChatMessage[] = chat.messages.map(msg => ({
         role: msg.role,
         content: msg.content,
@@ -77,31 +79,35 @@ export default function ChatScreen() {
         content: input,
       });
       
-      if (apiMessages.length === 1) {
-        apiMessages.unshift({
-          role: 'system',
-          content: 'あなたは親切で役立つAIアシスタントです。ユーザーの質問に日本語で簡潔に答えてください。',
-        });
-      }
+      const systemMessage = {
+        role: 'system' as const,
+        content: 'あなたは親切で役立つAIアシスタントです。ユーザーの質問に日本語で簡潔に答えてください。',
+      };
+      
+      const messagesWithSystem = [
+        systemMessage,
+        ...apiMessages.filter(msg => msg.role !== 'system')
+      ];
+      
+      console.log('Prepared messages:', JSON.stringify(messagesWithSystem.length));
       
       let responseContent = '';
       
-      await fetchChatCompletion(
-        apiMessages,
-        chat.modelId,
-        (chunk) => {
-          responseContent += chunk;
-          
-          addMessage(chat.id, {
-            role: 'assistant',
-            content: responseContent,
-          });
-          
-          setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-          }, 100);
-        }
+      responseContent = await fetchChatCompletion(
+        messagesWithSystem,
+        chat.modelId
       );
+      
+      console.log('Received response:', responseContent.substring(0, 50) + '...');
+      
+      addMessage(chat.id, {
+        role: 'assistant',
+        content: responseContent,
+      });
+      
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
       
       if (chat.messages.filter(m => m.role === 'user').length === 1) {
         const title = input.slice(0, 30) + (input.length > 30 ? '...' : '');

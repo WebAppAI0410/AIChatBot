@@ -140,7 +140,13 @@ export const fetchChatCompletion = async (
     }
   } catch (error) {
     console.error('Error in fetchChatCompletion:', error);
-    throw error;
+    console.error('Request details:', {
+      modelId,
+      messageCount: messages.length,
+      firstUserMessage: messages.find(m => m.role === 'user')?.content.substring(0, 50),
+    });
+    
+    return 'エラーが発生しました。ネットワーク接続を確認して、もう一度お試しください。';
   }
 };
 
