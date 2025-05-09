@@ -11,6 +11,11 @@ export default function SettingsLayout() {
         },
         headerTintColor: colors.background,
         headerBackTitle: '戻る',
+        headerBackVisible: true,
+        animation: 'slide_from_right',
+        presentation: 'card',
+        gestureEnabled: true,
+        gestureDirection: 'horizontal',
       }}
     >
       <Stack.Screen
@@ -29,6 +34,24 @@ export default function SettingsLayout() {
         name="local-model"
         options={{
           title: 'ローカルモデル管理',
+        }}
+      />
+      <Stack.Screen
+        name="notes"
+        options={{
+          title: 'ノート機能設定',
+        }}
+      />
+      <Stack.Screen
+        name="appearance"
+        options={{
+          title: '画面カスタマイズ',
+        }}
+      />
+      <Stack.Screen
+        name="help"
+        options={{
+          title: '使い方',
         }}
       />
     </Stack>
