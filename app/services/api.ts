@@ -1,6 +1,6 @@
 import { MODELS } from '../constants/models';
 
-const OPENROUTER_API_KEY = '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';
+const OPENROUTER_API_KEY = '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';
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 export type ChatMessage = {
@@ -113,6 +113,12 @@ export const fetchChatCompletion = async (
       },
       body: JSON.stringify(body),
     });
+    
+    console.log('API Request sent with headers:', {
+      'Authorization': `Bearer ${OPENROUTER_API_KEY.substring(0, 10)}...`,
+      'Content-Type': 'application/json',
+    });
+    console.log('API Request body:', JSON.stringify(body, null, 2).substring(0, 500));
 
     if (!response.ok) {
       const errorText = await response.text();
