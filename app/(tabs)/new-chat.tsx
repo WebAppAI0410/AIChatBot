@@ -49,23 +49,31 @@ export default function NewChatScreen() {
 
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   
+  // Create a ref for the ScrollView
+  const scrollViewRef = React.useRef(null);
+
+  const scrollToBottom = () => {
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollToEnd({ animated: true });
+    }
+  };
+
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
-      (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
-      }
-    );
-    const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
-      () => {
-        setKeyboardHeight(0);
-      }
-    );
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    
+    const keyboardWillShowListener = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+      setTimeout(scrollToBottom, 200);
+    });
+
+    const keyboardWillHideListener = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
 
     return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
     };
   }, []);
 
@@ -76,11 +84,13 @@ export default function NewChatScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <ScrollView 
-        style={[
-          styles.suggestionsContainer,
-          keyboardHeight > 0 && { marginBottom: keyboardHeight * 0.5 }
-        ]}
-        contentContainerStyle={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight * 0.5 : 0 }}
+        ref={scrollViewRef}
+        style={styles.suggestionsContainer}
+        contentContainerStyle={{ 
+          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : 20 
+        }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <Text style={styles.suggestionsTitle}>おすすめの質問</Text>
         <View style={styles.chipContainer}>
