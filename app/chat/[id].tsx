@@ -111,7 +111,7 @@ export default function ChatScreen() {
         }
       }
     }
-  }, [chat?.id]);
+  }, [chat, isLoading, markChatAsRead, addMessage, fetchChatCompletion]);
   
   const handleSend = async () => {
     if (!input.trim() || !chat) return;
