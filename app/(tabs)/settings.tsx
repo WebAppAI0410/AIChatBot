@@ -4,37 +4,40 @@ import { Link, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../constants/colors';
 
+// アイコン名の型を定義
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
 export default function SettingsScreen() {
   const router = useRouter();
 
   const settingsOptions = [
     {
       title: 'サブスクリプション',
-      icon: 'card-outline',
+      icon: 'card-outline' as IconName,
       route: 'settings/subscription',
       description: 'プランの管理と支払い情報',
     },
     {
       title: 'モデル設定',
-      icon: 'server-outline',
+      icon: 'server-outline' as IconName,
       route: 'settings/local-model',
       description: 'AIモデルの管理とダウンロード',
     },
     {
       title: 'ノート機能設定',
-      icon: 'document-text-outline',
+      icon: 'document-text-outline' as IconName,
       route: 'settings/notes',
       description: 'ノートの保存と同期の設定',
     },
     {
       title: '画面カスタマイズ',
-      icon: 'color-palette-outline',
+      icon: 'color-palette-outline' as IconName,
       route: 'settings/appearance',
       description: 'テーマとカラーの設定',
     },
     {
       title: '使い方',
-      icon: 'help-circle-outline',
+      icon: 'help-circle-outline' as IconName,
       route: 'settings/help',
       description: 'アプリの使い方とヒント',
     },

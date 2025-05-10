@@ -58,14 +58,16 @@ export const createChatSlice: StateCreator<
   },
   addMessage: (chatId, message) => {
     set((state) => {
-      const chats = state.chats.map((chat) => {
+      console.log(`Adding message - ChatID: ${chatId}, Role: ${message.role}`);
+      
+      const newMessage: Message = {
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        ...message,
+        timestamp: Date.now(),
+      };
+      
+      const updatedChats = state.chats.map((chat) => {
         if (chat.id === chatId) {
-          const newMessage: Message = {
-            id: Date.now().toString(),
-            ...message,
-            timestamp: Date.now(),
-          };
-          
           const updatedChat: Chat = {
             ...chat,
             messages: [...chat.messages, newMessage],
@@ -82,7 +84,11 @@ export const createChatSlice: StateCreator<
         return chat;
       });
       
-      return { chats };
+      console.log(`Message added - ChatID: ${chatId}, Total messages: ${
+        updatedChats.find(c => c.id === chatId)?.messages.length || 0
+      }`);
+      
+      return { chats: updatedChats };
     });
   },
   updateChatTitle: (chatId, title) => {

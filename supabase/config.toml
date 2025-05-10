@@ -1,0 +1,3 @@
+[functions]
+[functions.openrouter-proxy]
+verify_jwt = false 

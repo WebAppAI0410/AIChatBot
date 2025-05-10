@@ -10,6 +10,8 @@ export const colors = {
   error: '#FF3B30',
   success: '#34C759',
   warning: '#FFCC00',
+  secondaryText: '#666666',
+  card: '#F2F2F7',
 };
 
 export default colors;

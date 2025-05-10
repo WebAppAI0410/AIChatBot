@@ -45,13 +45,31 @@ export default function ChatScreen() {
   
   useEffect(() => {
     if (chat) {
+      console.log('====== CHAT STATE ======');
+      console.log('Chat ID:', chat.id);
+      console.log('Messages:', chat.messages.length);
+      if (chat.messages.length > 0) {
+        const lastMsg = chat.messages[chat.messages.length - 1];
+        console.log('Last message:', lastMsg.role, lastMsg.content.substring(0, 30));
+      }
+      console.log('=======================');
+    }
+  }, [chat?.messages.length]);
+  
+  useEffect(() => {
+    if (chat) {
       markChatAsRead(chat.id);
+    }
+  }, [chat?.id, markChatAsRead]);
+  
+  useEffect(() => {
+    if (isLoading || !chat) return;
       
       const hasUserMessage = chat.messages.some(m => m.role === 'user');
       const hasAssistantResponse = chat.messages.some(m => m.role === 'assistant');
       
-      if (hasUserMessage && !hasAssistantResponse && !isLoading) {
-        console.log('New chat detected with user message but no assistant response. Sending API request...');
+    if (hasUserMessage && !hasAssistantResponse) {
+      console.log('New chat detected with user message but no assistant response');
         
         const lastUserMessage = [...chat.messages]
           .filter(m => m.role === 'user')
@@ -74,20 +92,10 @@ export default function ChatScreen() {
           (async () => {
             setIsLoading(true);
             try {
-              console.log('Auto-sending API request for new chat with model:', chat.modelId);
-              console.log('Messages count:', apiMessages.length);
-              
               const responseContent = await fetchChatCompletion(
                 apiMessages,
                 chat.modelId
               );
-              
-              console.log('Received auto API response:', responseContent.substring(0, 50) + '...');
-              
-              if (responseContent.includes('認証エラー') || responseContent.includes('API error')) {
-                console.error('API returned an error message:', responseContent);
-                throw new Error(responseContent);
-              }
               
               addMessage(chat.id, {
                 role: 'assistant',
@@ -110,19 +118,18 @@ export default function ChatScreen() {
           })();
         }
       }
-    }
-  }, [chat, isLoading, markChatAsRead, addMessage, fetchChatCompletion]);
+  }, [chat?.id, chat?.messages, chat?.modelId, isLoading]);
   
   const handleSend = async () => {
     if (!input.trim() || !chat) return;
     
-    const userMessage: Omit<Message, 'id' | 'timestamp'> = {
-      role: 'user',
-      content: input,
-    };
-    
-    addMessage(chat.id, userMessage);
+    const trimmedInput = input.trim();
     setInput('');
+    
+    addMessage(chat.id, {
+      role: 'user',
+      content: trimmedInput,
+    });
     
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
@@ -133,15 +140,16 @@ export default function ChatScreen() {
     try {
       console.log('Sending message to API with model:', chat.modelId);
       
-      const apiMessages: ApiChatMessage[] = chat.messages.map(msg => ({
+      const apiMessages: ApiChatMessage[] = [
+        ...chat.messages.map(msg => ({
         role: msg.role,
         content: msg.content,
-      }));
-      
-      apiMessages.push({
+        })),
+        {
         role: 'user',
-        content: input,
-      });
+          content: trimmedInput,
+        }
+      ];
       
       const hasSystemMessage = apiMessages.some(msg => msg.role === 'system');
       if (!hasSystemMessage) {
@@ -151,51 +159,40 @@ export default function ChatScreen() {
         });
       }
       
-      console.log('Prepared messages count:', apiMessages.length);
-      console.log('First message role:', apiMessages[0].role);
-      console.log('Last message:', apiMessages[apiMessages.length - 1].content.substring(0, 30));
-      
       console.log('Sending API request with model:', chat.modelId);
       
-      try {
-        let responseContent = await fetchChatCompletion(
+      const responseContent = await fetchChatCompletion(
           apiMessages,
           chat.modelId
         );
         
         console.log('Received API response:', responseContent.substring(0, 50) + '...');
         
-        if (responseContent.includes('認証エラー') || responseContent.includes('API error')) {
-          console.error('API returned an error message:', responseContent);
-          throw new Error(responseContent);
-        }
-        
+      // エラーメッセージまたは正常な応答をアシスタントメッセージとして追加
         addMessage(chat.id, {
           role: 'assistant',
           content: responseContent,
         });
-      } catch (innerError) {
-        console.error('Error in API response handling:', innerError);
-        throw innerError;
-      }
       
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-      
+      // 最初のメッセージならチャットタイトルを更新
       if (chat.messages.filter(m => m.role === 'user').length === 1) {
-        const title = input.slice(0, 30) + (input.length > 30 ? '...' : '');
+        const title = trimmedInput.slice(0, 30) + (trimmedInput.length > 30 ? '...' : '');
         updateChatTitle(chat.id, title);
       }
+      
     } catch (error) {
       console.error('Error sending message:', error);
       
       addMessage(chat.id, {
         role: 'assistant',
-        content: 'エラーが発生しました。もう一度お試しください。',
+        content: '通信エラーが発生しました。ネットワーク接続を確認して、もう一度お試しください。',
       });
     } finally {
       setIsLoading(false);
+      
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 300);
     }
   };
   
@@ -316,6 +313,12 @@ export default function ChatScreen() {
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.messageList}
             onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+            extraData={chat.messages.length}
+            removeClippedSubviews={false}
+            maxToRenderPerBatch={10}
+            windowSize={10}
+            initialNumToRender={15}
+            scrollEventThrottle={16}
           />
           
           <View style={styles.inputContainer}>
