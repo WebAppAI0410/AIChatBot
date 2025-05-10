@@ -290,6 +290,7 @@ export default function ChatScreen() {
           <TouchableOpacity 
             style={styles.backButton} 
             onPress={() => router.back()}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
             <Ionicons name="chevron-back" size={24} color={colors.background} />
           </TouchableOpacity>
@@ -353,6 +354,7 @@ export default function ChatScreen() {
           <TouchableOpacity 
             onPress={handleModelSelect} 
             style={styles.modelButton}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
             <Text style={styles.modelButtonText}>{currentModel.name}</Text>
             <Ionicons name="chevron-down" size={16} color={colors.background} />

@@ -205,6 +205,7 @@ export default function SubscriptionScreen() {
           <TouchableOpacity 
             style={styles.backButton} 
             onPress={() => router.navigate('/(tabs)/settings')}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
             <Ionicons name="chevron-back" size={24} color={colors.background} />
           </TouchableOpacity>
