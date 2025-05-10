@@ -16,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import { colors } from '../constants/colors';
 import { MODELS } from '../constants/models';
+import ModelSelectModal from '../components/ModelSelectModal';
+import LocalModelInstallModal from '../components/LocalModelInstallModal';
 
 const SUGGESTIONS = [
   'AIについて教えてください',
@@ -31,13 +33,19 @@ export default function NewChatScreen() {
   const createChat = useStore(state => state.createChat);
   const addMessage = useStore(state => state.addMessage);
   const localModelStatus = useStore(state => state.localModelStatus);
+  const plan = useStore(state => state.plan);
   
   const defaultModel = MODELS.find(model => !model.isPremium && !model.isLocal);
+  const [selectedModelId, setSelectedModelId] = useState<string>(defaultModel?.id || 'openai/gpt-4o-mini');
+  const [showModelSelect, setShowModelSelect] = useState(false);
+  const [showLocalModelInstall, setShowLocalModelInstall] = useState(false);
+
+  const selectedModel = MODELS.find(m => m.id === selectedModelId) || defaultModel;
 
   const handleSendMessage = (content: string) => {
     if (!content.trim()) return;
     
-    const chatId = createChat(defaultModel?.id || 'openai/gpt-4o-mini');
+    const chatId = createChat(selectedModelId);
     
     addMessage(chatId, {
       role: 'user',
@@ -50,7 +58,7 @@ export default function NewChatScreen() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   
   // Create a ref for the ScrollView
-  const scrollViewRef = React.useRef(null);
+  const scrollViewRef = React.useRef<ScrollView | null>(null);
 
   const scrollToBottom = () => {
     if (scrollViewRef.current) {
@@ -77,12 +85,44 @@ export default function NewChatScreen() {
     };
   }, []);
 
+  const handleSelectModel = (modelId: string) => {
+    const model = MODELS.find(m => m.id === modelId);
+    if (!model) return;
+    if (model.isLocal && localModelStatus !== 'ready') {
+      setSelectedModelId(modelId);
+      setShowLocalModelInstall(true);
+      return;
+    }
+    if (model.isPremium && plan === 'free') {
+      setSelectedModelId(modelId);
+      return;
+    }
+    setSelectedModelId(modelId);
+  };
+
   return (
     <KeyboardAvoidingView 
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      {/* 上部固定モデル選択バー */}
+      <TouchableOpacity
+        style={styles.fixedModelBar}
+        onPress={() => setShowModelSelect(true)}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.fixedModelBarTitle}>現在のモデル: {selectedModel?.name}</Text>
+        <Text style={styles.fixedModelBarDesc}>タップしてモデルを選択</Text>
+        {localModelStatus !== 'ready' && (
+          <View style={styles.localModelBanner}>
+            <Ionicons name="information-circle-outline" size={20} color={colors.accentBlue} />
+            <Text style={styles.localModelText}>
+              ローカルモデル (Qwen3:4B) をインストールすると、オフラインでも使用できます
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
       <ScrollView 
         ref={scrollViewRef}
         style={styles.suggestionsContainer}
@@ -104,24 +144,7 @@ export default function NewChatScreen() {
             </TouchableOpacity>
           ))}
         </View>
-        
-        <View style={styles.modelInfoContainer}>
-          <Text style={styles.modelInfoTitle}>現在のモデル: {defaultModel?.name}</Text>
-          <Text style={styles.modelInfoDescription}>
-            チャットルームでモデルを変更できます
-          </Text>
-          
-          {localModelStatus !== 'ready' && (
-            <View style={styles.localModelBanner}>
-              <Ionicons name="information-circle-outline" size={20} color={colors.accentBlue} />
-              <Text style={styles.localModelText}>
-                ローカルモデル (Qwen3:4B) をインストールすると、オフラインでも使用できます
-              </Text>
-            </View>
-          )}
-        </View>
       </ScrollView>
-      
       <View style={[styles.inputContainer, keyboardHeight > 0 && { paddingBottom: Platform.OS === 'ios' ? 8 : 0 }]}>
         <TextInput
           style={styles.input}
@@ -138,6 +161,18 @@ export default function NewChatScreen() {
           <Ionicons name="send" size={24} color={input.trim() ? colors.background : colors.gray} />
         </TouchableOpacity>
       </View>
+      {/* モデル選択モーダル */}
+      <ModelSelectModal
+        visible={showModelSelect}
+        onClose={() => setShowModelSelect(false)}
+        onSelectModel={handleSelectModel}
+        currentModelId={selectedModelId}
+      />
+      {/* ローカルモデルインストールモーダル */}
+      <LocalModelInstallModal
+        visible={showLocalModelInstall}
+        onClose={() => setShowLocalModelInstall(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -177,15 +212,23 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
   },
-  modelInfoTitle: {
+  fixedModelBar: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lightGray,
+    zIndex: 10,
+  },
+  fixedModelBarTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  modelInfoDescription: {
-    fontSize: 14,
+  fixedModelBarDesc: {
+    fontSize: 13,
     color: colors.darkGray,
-    marginBottom: 12,
+    marginBottom: 4,
   },
   localModelBanner: {
     flexDirection: 'row',

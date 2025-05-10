@@ -32,11 +32,14 @@ export default function ChatScreen() {
   const [showModelSelect, setShowModelSelect] = useState(false);
   const [showLocalModelInstall, setShowLocalModelInstall] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
   
   const chats = useStore(state => state.chats);
   const addMessage = useStore(state => state.addMessage);
   const markChatAsRead = useStore(state => state.markChatAsRead);
   const updateChatTitle = useStore(state => state.updateChatTitle);
+  const updateChatModel = useStore(state => state.updateChatModel);
   const localModelStatus = useStore(state => state.localModelStatus);
   const plan = useStore(state => state.plan);
   
@@ -65,60 +68,66 @@ export default function ChatScreen() {
   useEffect(() => {
     if (isLoading || !chat) return;
       
-      const hasUserMessage = chat.messages.some(m => m.role === 'user');
-      const hasAssistantResponse = chat.messages.some(m => m.role === 'assistant');
+    // 最新のユーザーメッセージと応答状態を確認
+    const messages = chat.messages;
+    const userMessages = messages.filter(m => m.role === 'user');
+    
+    if (userMessages.length === 0) return;
+    
+    // 最後のユーザーメッセージに対する応答があるか確認
+    const lastUserMessageIndex = messages.lastIndexOf(userMessages[userMessages.length - 1]);
+    const hasAssistantResponseAfterLastUser = messages
+      .slice(lastUserMessageIndex + 1)
+      .some(m => m.role === 'assistant');
+    
+    // 最後のユーザーメッセージに対する応答がない場合のみAPIリクエスト
+    if (!hasAssistantResponseAfterLastUser) {
+      console.log('新しいユーザーメッセージに対する応答を生成します');
       
-    if (hasUserMessage && !hasAssistantResponse) {
-      console.log('New chat detected with user message but no assistant response');
-        
-        const lastUserMessage = [...chat.messages]
-          .filter(m => m.role === 'user')
-          .pop();
+      const lastUserMessage = userMessages[userMessages.length - 1];
           
-        if (lastUserMessage) {
-          const apiMessages: ApiChatMessage[] = chat.messages.map(msg => ({
-            role: msg.role,
-            content: msg.content,
-          }));
-          
-          const hasSystemMessage = apiMessages.some(msg => msg.role === 'system');
-          if (!hasSystemMessage) {
-            apiMessages.unshift({
-              role: 'system',
-              content: 'あなたは親切で役立つAIアシスタントです。ユーザーの質問に日本語で簡潔に答えてください。',
-            });
-          }
-          
-          (async () => {
-            setIsLoading(true);
-            try {
-              const responseContent = await fetchChatCompletion(
-                apiMessages,
-                chat.modelId
-              );
-              
-              addMessage(chat.id, {
-                role: 'assistant',
-                content: responseContent,
-              });
-              
-              setTimeout(() => {
-                flatListRef.current?.scrollToEnd({ animated: true });
-              }, 100);
-            } catch (error) {
-              console.error('Error in auto API request:', error);
-              
-              addMessage(chat.id, {
-                role: 'assistant',
-                content: 'エラーが発生しました。もう一度お試しください。',
-              });
-            } finally {
-              setIsLoading(false);
-            }
-          })();
-        }
+      const apiMessages: ApiChatMessage[] = chat.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+      
+      const hasSystemMessage = apiMessages.some(msg => msg.role === 'system');
+      if (!hasSystemMessage) {
+        apiMessages.unshift({
+          role: 'system',
+          content: 'あなたは親切で役立つAIアシスタントです。ユーザーの質問に日本語で簡潔に答えてください。',
+        });
       }
-  }, [chat?.id, chat?.messages, chat?.modelId, isLoading]);
+      
+      (async () => {
+        setIsLoading(true);
+        try {
+          const responseContent = await fetchChatCompletion(
+            apiMessages,
+            chat.modelId
+          );
+          
+          addMessage(chat.id, {
+            role: 'assistant',
+            content: responseContent,
+          });
+          
+          setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }, 100);
+        } catch (error) {
+          console.error('Error in auto API request:', error);
+          
+          addMessage(chat.id, {
+            role: 'assistant',
+            content: 'エラーが発生しました。もう一度お試しください。',
+          });
+        } finally {
+          setIsLoading(false);
+        }
+      })();
+    }
+  }, [chat?.id, isLoading]);
   
   const handleSend = async () => {
     if (!input.trim() || !chat) return;
@@ -228,12 +237,9 @@ export default function ChatScreen() {
       return;
     }
     
-    if (chat) {
-      const updatedChats = chats.map(c => 
-        c.id === chat.id ? { ...c, modelId } : c
-      );
-      
-      useStore.setState({ chats: updatedChats });
+    // 現在のモデルと同じ場合は更新しない（無駄なレンダリング防止）
+    if (chat && chat.modelId !== modelId) {
+      updateChatModel(chat.id, modelId);
     }
   };
   
@@ -288,10 +294,62 @@ export default function ChatScreen() {
             <Ionicons name="chevron-back" size={24} color={colors.background} />
           </TouchableOpacity>
           
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {chat.title}
-          </Text>
-          
+          {isEditingTitle ? (
+            <View style={styles.editTitleContainer}>
+              <TextInput
+                style={styles.editTitleInput}
+                value={editTitle}
+                onChangeText={setEditTitle}
+                multiline
+                numberOfLines={2}
+                maxLength={50}
+                autoFocus
+                onSubmitEditing={() => {
+                  if (editTitle.trim()) {
+                    updateChatTitle(chat.id, editTitle.trim());
+                    setIsEditingTitle(false);
+                  }
+                }}
+                blurOnSubmit={true}
+                returnKeyType="done"
+              />
+              <TouchableOpacity
+                style={styles.titleEditIcon}
+                onPress={() => {
+                  if (editTitle.trim()) {
+                    updateChatTitle(chat.id, editTitle.trim());
+                    setIsEditingTitle(false);
+                  }
+                }}
+              >
+                <Ionicons name="checkmark" size={22} color={colors.background} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.titleEditIcon}
+                onPress={() => setIsEditingTitle(false)}
+              >
+                <Ionicons name="close" size={22} color={colors.background} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.titleTouchable}
+              onPress={() => {
+                setEditTitle(chat.title);
+                setIsEditingTitle(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={styles.headerTitle}
+                numberOfLines={2}
+                ellipsizeMode="tail"
+              >
+                {chat.title}
+              </Text>
+              <Ionicons name="pencil" size={18} color={colors.background} style={styles.titleEditIcon} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity 
             onPress={handleModelSelect} 
             style={styles.modelButton}
@@ -396,6 +454,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     marginHorizontal: 10,
+    paddingVertical: 2,
   },
   keyboardAvoidingContainer: {
     flex: 1,
@@ -487,5 +546,35 @@ const styles = StyleSheet.create({
     marginRight: 4,
     fontSize: 14,
     fontWeight: '500',
+  },
+  titleTouchable: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  titleEditIcon: {
+    marginLeft: 6,
+    marginRight: 6,
+  },
+  editTitleContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  editTitleInput: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    color: colors.background,
+    fontSize: 18,
+    fontWeight: '600',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginRight: 4,
+    maxHeight: 48,
   },
 });

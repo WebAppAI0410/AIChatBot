@@ -8,7 +8,12 @@
 | localModelStore | `status`, `progress`, `path` | Zustand Slice |
 | Settings | ローカルモデル管理 (DL,削除,更新) | Storage 残量チェック |
 | Chats | 未読バッジ Realtime | Supabase Subscriptions |
+| Chats | スワイプ削除機能 | `react-native-gesture-handler` |
+| Chats | タイトル編集（インライン） | FlatList, TextInput, Zustand |
+| Chats | サムネ編集（デフォルト20種＋画像選択） | expo-image-picker, Zustand |
 | Notes | MD/Text Editor | Remark plugins |
+| NewChat | モデル名タップでモデル選択モーダル | ModelSelectModal, Zustand |
+| ChatRoom | タイトル編集（ヘッダー部インライン・2行まで表示） | Stackヘッダー、TextInput、Zustand |
 
 ## 2. サーバー
 - 追加なし（Qwen3 DL は CDN 直）
@@ -18,11 +23,13 @@
 |----------|------------|
 | `/chat/stream` | ローカルモデル時は呼ばない |
 | `/chat/read` | 既読更新 |
+| `/chat/delete` | チャット削除（履歴含む） |
 
 ## 4. 状態管理 Slices
 | Slice | 追加 |
 |-------|------|
 | `localModelStore` | status, progress, startDownload |
+| `chatStore` | deleteChat, confirmDelete |
 
 ## 5. テスト項目
 | ケース | 内容 |

@@ -3,11 +3,8 @@ import { MODELS } from '../constants/models';
 // Supabase Edge FunctionのURL
 const SUPABASE_FUNCTION_URL = 'https://alperyqhdtpnivxfnqdi.supabase.co/functions/v1/openrouter-proxy';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFscGVyeXFoZHRwbml2eGZucWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY4MDc5OTcsImV4cCI6MjA2MjM4Mzk5N30.0gTXgFtD2uIhGdSB4twConRJPF_0Ccz5zePqa0hD8B0';
-const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
-// テスト用の一時的なAPIキー - 本番環境では使用しないでください！
-// 警告: こちらは一時的な対処法であり、本来はサーバーサイドで管理すべきです
-const TEMP_OPENROUTER_API_KEY = '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';
+// 直接APIキーを保持しない - すべてEdge Function経由で処理
 
 export type ChatMessage = {
   role: 'user' | 'assistant' | 'system';
@@ -143,9 +140,8 @@ export const fetchChatCompletion = async (
     
     try {
       console.log('Sending request to Supabase Edge Function...');
-      console.log('Authorization header being sent:', `Bearer ${SUPABASE_ANON_KEY.substring(0, 10)}...`);
       
-      // Edge Functionを使った方法を試す
+      // Edge Functionを使った方法を試す（JWT認証なし）
       const response = await fetch(SUPABASE_FUNCTION_URL, {
         method: 'POST',
         headers: {
@@ -165,24 +161,22 @@ export const fetchChatCompletion = async (
         const errorText = await response.text();
         console.error(`API error (${response.status}):`, errorText);
         
-        // 認証エラー（401）の場合、直接OpenRouterにリクエストを試みる
-        if (response.status === 401) {
-          console.log('Authentication error. Trying direct OpenRouter API as fallback...');
-          return await tryDirectOpenRouterAPI(processedMessages, actualModelId);
-        }
-        
         let errorMessage = `API error: ${response.status}`;
         
         try {
           const errorJson = JSON.parse(errorText);
           console.error('Parsed error:', errorJson);
           
-          if (response.status === 401) {
+          if (errorJson.error) {
+            errorMessage = `エラー: ${errorJson.error}`;
+          } else if (response.status === 401) {
             errorMessage = `認証エラー: APIキーが無効または期限切れです。`;
           } else if (response.status === 400) {
             errorMessage = `リクエストエラー: ${errorJson.error?.message || errorText}`;
           } else if (response.status === 429) {
             errorMessage = 'レート制限に達しました。しばらく待ってから再試行してください。';
+          } else if (response.status === 500) {
+            errorMessage = 'サーバーエラーが発生しました。しばらくしてからもう一度お試しください。';
           }
         } catch (e) {
           console.error('Error parsing error response:', e);
@@ -220,9 +214,8 @@ export const fetchChatCompletion = async (
         return 'APIリクエストがタイムアウトしました。ネットワーク接続を確認してください。';
       }
       
-      // フォールバック: 直接OpenRouterを呼び出す
-      console.log('Error when calling Edge Function. Trying direct OpenRouter API as fallback...');
-      return await tryDirectOpenRouterAPI(processedMessages, actualModelId);
+      console.error('Error when calling Edge Function:', fetchError);
+      return 'サーバーとの通信に問題が発生しました。しばらくしてからもう一度お試しください。';
     }
   } catch (error) {
     console.error('Error in fetchChatCompletion:', error);
@@ -232,63 +225,6 @@ export const fetchChatCompletion = async (
     }
     
     return 'エラーが発生しました。ネットワーク接続を確認して、もう一度お試しください。';
-  }
-};
-
-/**
- * Edge Functionの代わりに直接OpenRouterのAPIを呼び出す（フォールバックとして利用）
- * 警告: これは一時的な解決策です。本来ならサーバーサイドでAPIキーを管理すべきです。
- */
-const tryDirectOpenRouterAPI = async (messages: ChatMessage[], model: string): Promise<string> => {
-  try {
-    console.log('Attempting direct OpenRouter API call as fallback...');
-    console.log('Using API key (first 10 chars):', TEMP_OPENROUTER_API_KEY.substring(0, 10));
-    
-    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${TEMP_OPENROUTER_API_KEY}`,
-        'HTTP-Referer': 'https://aichatbot.app',
-        'X-Title': 'AI ChatBot App',
-      },
-      body: JSON.stringify({
-        messages,
-        model,
-        stream: false,
-        max_tokens: 1000,
-        temperature: 0.7,
-      }),
-    });
-    
-    console.log('Direct OpenRouter API response status:', response.status);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Direct OpenRouter API error (${response.status}):`, errorText);
-      return `OpenRouterへの直接リクエストがエラーを返しました: ${response.status}`;
-    }
-    
-    const data = await response.json() as ChatCompletionResponse;
-    
-    if (!data || !data.choices || data.choices.length === 0) {
-      console.error('Invalid direct API response format:', data);
-      return 'OpenRouterからの応答が無効です。';
-    }
-    
-    const content = data.choices[0]?.message?.content || '';
-    
-    if (!content) {
-      console.error('Empty content in direct API response:', data);
-      return 'OpenRouterからの応答が空です。';
-    }
-    
-    console.log(`Direct API Response received - Length: ${content.length}`);
-    
-    return content;
-  } catch (error) {
-    console.error('Error in direct OpenRouter API call:', error);
-    return 'OpenRouterへの直接アクセス中にエラーが発生しました。';
   }
 };
 

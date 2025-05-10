@@ -3,21 +3,16 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-// 環境変数からAPIキーを取得（Supabase管理画面でセット）
-const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY')
+// 環境変数からAPIキーを取得
+const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY');
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
 
 // デバッグログ追加
-console.log('Edge Function starting...')
+console.log('Edge Function starting with JWT Verification: Off')
 console.log('OPENROUTER_API_KEY present:', OPENROUTER_API_KEY ? 'Yes' : 'No')
-console.log('OPENROUTER_API_KEY length:', OPENROUTER_API_KEY?.length || 0)
 
 serve(async (req) => {
   try {
-    // リクエストヘッダーの確認（デバッグ用）
-    const authHeader = req.headers.get('Authorization')
-    console.log('Auth header:', authHeader ? 'present' : 'missing')
-    
     // CORSヘッダー設定
     if (req.method === 'OPTIONS') {
       return new Response(null, {
@@ -43,7 +38,7 @@ serve(async (req) => {
     // APIキーが設定されていることを確認
     if (!OPENROUTER_API_KEY) {
       console.error('OPENROUTER_API_KEY is not set');
-      return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+      return new Response(JSON.stringify({ error: 'Server configuration error: API key missing' }), {
         status: 500,
         headers: {
           'Content-Type': 'application/json',
@@ -76,8 +71,34 @@ serve(async (req) => {
       }),
     })
 
-    // レスポンスステータスの確認
+    // ステータスコードとヘッダーの確認
     console.log('OpenRouter Response status:', openRouterResponse.status);
+    
+    if (!openRouterResponse.ok) {
+      const errorText = await openRouterResponse.text();
+      console.error(`OpenRouter API error (${openRouterResponse.status}):`, errorText);
+      
+      try {
+        // JSONとしてパースできるか試みる
+        const errorJson = JSON.parse(errorText);
+        return new Response(JSON.stringify(errorJson), {
+          status: openRouterResponse.status,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        });
+      } catch (e) {
+        // プレーンテキストのエラーとして返す
+        return new Response(JSON.stringify({ error: errorText || 'Unknown error' }), {
+          status: openRouterResponse.status,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        });
+      }
+    }
     
     // レスポンスを転送
     const responseData = await openRouterResponse.json()

@@ -16,9 +16,6 @@ export type Chat = {
   createdAt: number;
   updatedAt: number;
   unreadCount: number;
-  iconType: 'default' | 'custom';
-  iconId?: string;
-  iconUri?: string;
 };
 
 export interface ChatState {
@@ -29,8 +26,6 @@ export interface ChatState {
   createChat: (modelId: string) => string;
   addMessage: (chatId: string, message: Omit<Message, 'id' | 'timestamp'>) => void;
   updateChatTitle: (chatId: string, title: string) => void;
-  updateChatModel: (chatId: string, modelId: string) => void;
-  updateChatIcon: (chatId: string, icon: { iconType: 'default' | 'custom'; iconId?: string; iconUri?: string }) => void;
   deleteChat: (chatId: string) => void;
   confirmDeleteChat: (chatId: string) => void;
   cancelDeleteChat: () => void;
@@ -58,8 +53,6 @@ export const createChatSlice: StateCreator<
       createdAt: Date.now(),
       updatedAt: Date.now(),
       unreadCount: 0,
-      iconType: 'default',
-      iconId: 'chatbubble',
     };
     
     set((state) => ({
@@ -108,20 +101,6 @@ export const createChatSlice: StateCreator<
     set((state) => ({
       chats: state.chats.map((chat) =>
         chat.id === chatId ? { ...chat, title } : chat
-      ),
-    }));
-  },
-  updateChatModel: (chatId, modelId) => {
-    set((state) => ({
-      chats: state.chats.map((chat) =>
-        chat.id === chatId ? { ...chat, modelId } : chat
-      ),
-    }));
-  },
-  updateChatIcon: (chatId, icon) => {
-    set((state) => ({
-      chats: state.chats.map((chat) =>
-        chat.id === chatId ? { ...chat, ...icon } : chat
       ),
     }));
   },
