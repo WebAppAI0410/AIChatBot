@@ -1,0 +1,46 @@
+diff --git a/app/components/Header.tsx b/app/components/Header.tsx
+index cee73b4..e3bcb0a 100644
+--- a/app/components/Header.tsx
++++ b/app/components/Header.tsx
+@@ -145,13 +145,13 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+     justifyContent: 'space-between',
+     paddingTop: theme.safeArea.top,
+-    paddingBottom: theme.spacing.xs,
++    paddingBottom: 0,
+     paddingHorizontal: theme.spacing.md,
+-    height: 40 + theme.safeArea.top,
++    height: 32 + theme.safeArea.top,
+   },
+   backButton: {
+-    width: 40,
+-    height: 40,
++    width: 32,
++    height: 32,
+     borderRadius: theme.radius.round,
+     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+     justifyContent: 'center',
+@@ -162,10 +162,11 @@ const styles = StyleSheet.create({
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'center',
+-    minHeight: 32,
++    minHeight: 28,
++    paddingBottom: 2, // Slight adjustment to center text perfectly
+   },
+   title: {
+-    fontSize: theme.fontSizes.lg,
++    fontSize: theme.fontSizes.md,
+     fontWeight: '600',
+     textAlign: 'center',
+     marginHorizontal: theme.spacing.sm,
+@@ -179,7 +180,8 @@ const styles = StyleSheet.create({
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'center',
+-    minHeight: 32,
++    minHeight: 28,
++    paddingBottom: 2, // Slight adjustment to center text perfectly
+   },
+   editTitleInput: {
+     flex: 1,

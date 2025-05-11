@@ -13,7 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { useStore } from '../store';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
+import Header from '../components/Header';
 
 type PlanOption = {
   id: 'free' | 'lite' | 'heavy';
@@ -80,9 +81,160 @@ const PLANS: PlanOption[] = [
 
 export default function SubscriptionScreen() {
   const router = useRouter();
+  const colors = useColors();
   const isAuthenticated = useStore(state => state.isAuthenticated);
   const plan = useStore(state => state.plan);
   const setPlan = useStore(state => state.setPlan);
+  
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    headerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.primary,
+      paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
+      paddingBottom: 12,
+      paddingHorizontal: 16,
+      height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      color: colors.textOnPrimary,
+      fontSize: 18,
+      fontWeight: '600',
+      flex: 1,
+      textAlign: 'center',
+      marginHorizontal: 10,
+    },
+    headerRight: {
+      width: 40,
+    },
+    scrollContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    content: {
+      padding: 16,
+      paddingBottom: 40,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginBottom: 8,
+      textAlign: 'center',
+      color: colors.text,
+    },
+    subtitle: {
+      fontSize: 16,
+      textAlign: 'center',
+      marginBottom: 24,
+      color: colors.secondaryText,
+    },
+    planCard: {
+      marginBottom: 20,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.lightGray,
+      backgroundColor: colors.card,
+      overflow: 'hidden',
+      shadowColor: colors.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    currentPlanCard: {
+      borderColor: colors.primary,
+      borderWidth: 2,
+    },
+    planHeader: {
+      padding: 16,
+      backgroundColor: colors.lightGray,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    planName: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      marginBottom: 4,
+      color: colors.text,
+    },
+    planPrice: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.primary,
+    },
+    planFeatures: {
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    featureItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    featureText: {
+      marginLeft: 8,
+      fontSize: 16,
+      color: colors.text,
+    },
+    modelAccess: {
+      padding: 16,
+      backgroundColor: `${colors.primary}10`,
+    },
+    modelAccessTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 8,
+      color: colors.text,
+    },
+    modelAccessItem: {
+      fontSize: 14,
+      marginBottom: 4,
+      color: colors.secondaryText,
+      paddingLeft: 8,
+    },
+    selectButton: {
+      margin: 16,
+      padding: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    selectPlanButton: {
+      backgroundColor: colors.primary,
+    },
+    currentPlanButton: {
+      backgroundColor: `${colors.primary}30`,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    selectButtonText: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: colors.textOnPrimary,
+    },
+    currentPlanButtonText: {
+      color: colors.primary,
+    },
+    disclaimer: {
+      fontSize: 12,
+      textAlign: 'center',
+      marginTop: 16,
+      color: colors.secondaryText,
+    },
+  });
   
   const handleSelectPlan = (planId: 'free' | 'lite' | 'heavy') => {
     if (!isAuthenticated && planId !== 'free') {
@@ -200,21 +352,12 @@ export default function SubscriptionScreen() {
       />
       
       <SafeAreaView style={styles.container}>
-        {/* Custom Header with Safe Area for Notch */}
-        <View style={styles.headerContainer}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => router.navigate('/(tabs)/settings')}
-          >
-            <Ionicons name="chevron-back" size={24} color={colors.background} />
-          </TouchableOpacity>
-          
-          <Text style={styles.headerTitle}>
-            サブスクリプション
-          </Text>
-          
-          <View style={styles.headerRight} />
-        </View>
+        {/* Use Header component for consistent styling */}
+        <Header
+          title="サブスクリプション"
+          showBack={true}
+          onTitleEdit={undefined}
+        />
         
         <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.content}>
           <Text style={styles.title}>サブスクリプションプラン</Text>
@@ -232,142 +375,3 @@ export default function SubscriptionScreen() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.primary,
-    paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    color: colors.background,
-    fontSize: 18,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'center',
-    marginHorizontal: 10,
-  },
-  headerRight: {
-    width: 40,
-  },
-  scrollContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.darkGray,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  planCard: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.lightGray,
-    shadowColor: colors.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  currentPlanCard: {
-    borderColor: colors.primary,
-    borderWidth: 2,
-  },
-  planHeader: {
-    marginBottom: 16,
-  },
-  planName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  planPrice: {
-    fontSize: 24,
-    color: colors.primary,
-    fontWeight: 'bold',
-  },
-  planFeatures: {
-    marginBottom: 16,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  featureText: {
-    fontSize: 16,
-    marginLeft: 8,
-  },
-  modelAccess: {
-    marginBottom: 16,
-    padding: 12,
-    backgroundColor: colors.lightGray,
-    borderRadius: 8,
-  },
-  modelAccessTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  modelAccessItem: {
-    fontSize: 14,
-    marginBottom: 4,
-    paddingLeft: 8,
-  },
-  selectButton: {
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  selectPlanButton: {
-    backgroundColor: colors.primary,
-  },
-  currentPlanButton: {
-    backgroundColor: colors.lightGray,
-  },
-  selectButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.background,
-  },
-  currentPlanButtonText: {
-    color: colors.darkGray,
-  },
-  disclaimer: {
-    fontSize: 12,
-    color: colors.darkGray,
-    textAlign: 'center',
-    marginTop: 16,
-  },
-});

@@ -32,6 +32,18 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
+.env.*
+!.env.example
 
 # typescript
 *.tsbuildinfo
+
+# API Keys and Secrets
+**/api-keys.ts
+**/secrets.ts
+**/credentials.*
+
+# Supabase
+supabase/.branches/
+supabase/.temp/

@@ -1,8 +1,10 @@
 import React from 'react';
 import { Stack } from 'expo-router';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
 
 export default function SettingsLayout() {
+  const colors = useColors(); // 動的カラーを使用
+  
   return (
     <Stack
       screenOptions={{

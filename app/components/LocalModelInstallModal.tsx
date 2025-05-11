@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import { useStore } from '../store';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
 
 type LocalModelInstallModalProps = {
   visible: boolean;
@@ -30,6 +30,7 @@ export default function LocalModelInstallModal({
   const [isDownloading, setIsDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
   
+  const colors = useColors();
   const localModelStatus = useStore(state => state.localModelStatus);
   const startDownload = useStore(state => state.startDownload);
   const cancelDownload = useStore(state => state.cancelDownload);
@@ -46,6 +47,124 @@ export default function LocalModelInstallModal({
       setDownloadProgress(useStore.getState().downloadProgress);
     }
   }, [visible, localModelStatus]);
+  
+  const styles = StyleSheet.create({
+    modalContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      padding: 24,
+    },
+    modalContent: {
+      backgroundColor: colors.background,
+      borderRadius: 16,
+      width: '100%',
+      maxWidth: 400,
+      overflow: 'hidden',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.lightGray,
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    closeButton: {
+      padding: 4,
+    },
+    content: {
+      padding: 24,
+      alignItems: 'center',
+    },
+    modelName: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      marginTop: 16,
+      marginBottom: 8,
+      color: colors.text,
+    },
+    modelInfo: {
+      fontSize: 16,
+      color: colors.secondaryText,
+      marginBottom: 16,
+    },
+    description: {
+      fontSize: 16,
+      textAlign: 'center',
+      marginBottom: 24,
+      lineHeight: 22,
+      color: colors.text,
+    },
+    buttonContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      width: '100%',
+    },
+    button: {
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      borderRadius: 8,
+      minWidth: 120,
+      alignItems: 'center',
+    },
+    primaryButton: {
+      backgroundColor: colors.primary,
+    },
+    primaryButtonText: {
+      color: colors.textOnPrimary,
+      fontWeight: 'bold',
+      fontSize: 16,
+    },
+    secondaryButton: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    secondaryButtonText: {
+      color: colors.primary,
+      fontWeight: 'bold',
+      fontSize: 16,
+    },
+    cancelButton: {
+      backgroundColor: colors.error,
+      marginTop: 24,
+    },
+    cancelButtonText: {
+      color: colors.textOnPrimary,
+      fontWeight: 'bold',
+      fontSize: 16,
+    },
+    progressContainer: {
+      width: '100%',
+      height: 8,
+      backgroundColor: colors.lightGray,
+      borderRadius: 4,
+      marginVertical: 24,
+      overflow: 'hidden',
+    },
+    progressBar: {
+      height: '100%',
+      backgroundColor: colors.primary,
+    },
+    progressText: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      marginBottom: 8,
+      color: colors.text,
+    },
+    downloadingText: {
+      fontSize: 16,
+      color: colors.secondaryText,
+      marginBottom: 24,
+    },
+  });
   
   const checkStorageSpace = async () => {
     try {
@@ -129,37 +248,13 @@ export default function LocalModelInstallModal({
             
             <Text style={styles.modelName}>Qwen3:4B (ローカル)</Text>
             <Text style={styles.modelInfo}>
-              サイズ: {MODEL_SIZE_FORMATTED} / Wi-Fi推奨
+              サイズ: {MODEL_SIZE_FORMATTED} • コンテキスト長: 8,192トークン
             </Text>
             
-            {isDownloading ? (
-              <>
-                <View style={styles.progressContainer}>
-                  <View 
-                    style={[
-                      styles.progressBar, 
-                      { width: `${progress * 100}%` }
-                    ]} 
-                  />
-                </View>
-                <Text style={styles.progressText}>
-                  {Math.round(progress * 100)}%
-                </Text>
-                <Text style={styles.downloadingText}>
-                  ダウンロード中...
-                </Text>
-                
-                <TouchableOpacity
-                  style={[styles.button, styles.cancelButton]}
-                  onPress={handleCancelDownload}
-                >
-                  <Text style={styles.cancelButtonText}>キャンセル</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
+            {!isDownloading ? (
               <>
                 <Text style={styles.description}>
-                  ローカルモデルをインストールすると、インターネット接続なしでAIチャットを使用できます。
+                  このモデルをダウンロードすると、インターネット接続なしでAIチャットを使用できます。ダウンロードには約10GBの空き容量とWi-Fi接続が必要です。
                 </Text>
                 
                 <View style={styles.buttonContainer}>
@@ -178,6 +273,32 @@ export default function LocalModelInstallModal({
                   </TouchableOpacity>
                 </View>
               </>
+            ) : (
+              <>
+                <Text style={styles.progressText}>
+                  {Math.round(progress * 100)}%
+                </Text>
+                
+                <View style={styles.progressContainer}>
+                  <View
+                    style={[
+                      styles.progressBar,
+                      { width: `${progress * 100}%` }
+                    ]}
+                  />
+                </View>
+                
+                <Text style={styles.downloadingText}>
+                  ダウンロード中... このまましばらくお待ちください
+                </Text>
+                
+                <TouchableOpacity
+                  style={[styles.button, styles.cancelButton]}
+                  onPress={handleCancelDownload}
+                >
+                  <Text style={styles.cancelButtonText}>キャンセル</Text>
+                </TouchableOpacity>
+              </>
             )}
           </View>
         </View>
@@ -185,114 +306,3 @@ export default function LocalModelInstallModal({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 24,
-  },
-  modalContent: {
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    width: '100%',
-    maxWidth: 400,
-    overflow: 'hidden',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  content: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  modelName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  modelInfo: {
-    fontSize: 16,
-    color: colors.darkGray,
-    marginBottom: 16,
-  },
-  description: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 22,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  button: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    minWidth: 120,
-    alignItems: 'center',
-  },
-  primaryButton: {
-    backgroundColor: colors.primary,
-  },
-  primaryButtonText: {
-    color: colors.background,
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  secondaryButton: {
-    backgroundColor: colors.lightGray,
-  },
-  secondaryButtonText: {
-    color: colors.text,
-    fontSize: 16,
-  },
-  cancelButton: {
-    backgroundColor: colors.error,
-    marginTop: 16,
-  },
-  cancelButtonText: {
-    color: colors.background,
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  progressContainer: {
-    width: '100%',
-    height: 12,
-    backgroundColor: colors.lightGray,
-    borderRadius: 6,
-    overflow: 'hidden',
-    marginVertical: 16,
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: colors.primary,
-  },
-  progressText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  downloadingText: {
-    fontSize: 14,
-    color: colors.darkGray,
-    marginBottom: 16,
-  },
-});

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   Modal, 
   View, 
@@ -10,8 +10,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
-import { colors } from '../constants/colors';
-import { MODELS, ModelType } from '../constants/models';
+import useColors from '../constants/colors';
+import { MODELS, ModelType, MODEL_TIERS } from '../constants/models';
+import { PLANS } from '../constants/plans';
+import { useTheme } from '../ui/ThemeProvider';
+import Badge from './Badge';
+import LocalModelStatusBadge from './LocalModelStatusBadge';
 
 type ModelSelectModalProps = {
   visible: boolean;
@@ -28,11 +32,11 @@ export default function ModelSelectModal({
 }: ModelSelectModalProps) {
   const localModelStatus = useStore(state => state.localModelStatus);
   const plan = useStore(state => state.plan);
+  const colors = useColors();
+  const { theme } = useTheme();
   
   const handleModelSelect = (model: ModelType) => {
     if (model.isLocal && localModelStatus !== 'ready') {
-      onSelectModel(model.id);
-    } else if (model.isPremium && plan === 'free') {
       onSelectModel(model.id);
     } else {
       onSelectModel(model.id);
@@ -41,36 +45,235 @@ export default function ModelSelectModal({
     onClose();
   };
   
-  const getModelStatusBadge = (model: ModelType) => {
-    if (!model.isLocal) return null;
-    
-    switch (localModelStatus) {
-      case 'not_installed':
-        return (
-          <View style={[styles.badge, styles.notInstalledBadge]}>
-            <Text style={styles.badgeText}>未DL</Text>
-          </View>
-        );
-      case 'downloading':
-        return (
-          <View style={[styles.badge, styles.downloadingBadge]}>
-            <Text style={styles.badgeText}>DL中</Text>
-          </View>
-        );
-      case 'ready':
-        return (
-          <View style={[styles.badge, styles.readyBadge]}>
-            <Text style={styles.badgeText}>使用可</Text>
-          </View>
-        );
+  const getAvailableTiers = () => {
+    switch (plan) {
+      case 'premium':
+        return PLANS.PREMIUM.modelTiers;
+      case 'lite':
+        return PLANS.LITE.modelTiers;
+      case 'free':
       default:
-        return null;
+        return PLANS.FREE.modelTiers;
     }
   };
   
+  const isModelAvailableForPlan = (model: ModelType) => {
+    const availableTiers = getAvailableTiers();
+    return availableTiers.includes(model.tier);
+  };
+  
+  const getModelTierBadge = (model: ModelType) => {
+    if (model.isAuto) {
+      return (
+        <Badge
+          label="Auto"
+          variant="primary"
+          size="small"
+          style={styles.tierBadge}
+        />
+      );
+    }
+    
+    if (model.isLocal) {
+      return (
+        <LocalModelStatusBadge
+          status={localModelStatus}
+          compact={true}
+        />
+      );
+    }
+    
+    if (model.dailyLimit) {
+      return (
+        <Badge
+          label={`${model.dailyLimit}/日`}
+          variant="warning"
+          size="small"
+          style={styles.tierBadge}
+        />
+      );
+    }
+    
+    if (!isModelAvailableForPlan(model)) {
+      const tierName = model.tier === 1 ? 'Lite' : 'Premium';
+      return (
+        <Badge
+          label={tierName}
+          variant="info"
+          size="small"
+          style={styles.tierBadge}
+        />
+      );
+    }
+    
+    return null;
+  };
+  
+  const groupedModels = useMemo(() => {
+    const groups: { [key: string]: ModelType[] } = {
+      'auto': MODELS.filter(m => m.isAuto),
+      'local': MODELS.filter(m => m.isLocal),
+      'tier0': MODELS.filter(m => m.tier === 0 && !m.isAuto && !m.isLocal),
+      'tier1': MODELS.filter(m => m.tier === 1),
+      'tier2': MODELS.filter(m => m.tier === 2),
+    };
+    
+    return groups;
+  }, [MODELS]);
+  
+  const filteredModels = useMemo(() => {
+    const autoModels = groupedModels.auto;
+    
+    const localModels = groupedModels.local;
+    
+    const freeModels = groupedModels.tier0;
+    
+    let availableModels: ModelType[] = [];
+    
+    const availableTiers = getAvailableTiers();
+    
+    if (availableTiers.includes(1)) {
+      availableModels = [...availableModels, ...groupedModels.tier1];
+    } else if (plan === 'free') {
+      const tier1Models = groupedModels.tier1.filter(m => m.dailyLimit);
+      if (tier1Models.length > 0) {
+        availableModels = [...availableModels, tier1Models[0]];
+      }
+    }
+    
+    if (availableTiers.includes(2)) {
+      if (plan === 'premium') {
+        availableModels = [...availableModels, ...groupedModels.tier2];
+      } else {
+        const tier2Models = groupedModels.tier2.filter(m => m.dailyLimit);
+        availableModels = [...availableModels, ...tier2Models];
+      }
+    }
+    
+    return [...autoModels, ...localModels, ...freeModels, ...availableModels];
+  }, [groupedModels, plan]);
+  
+  const styles = StyleSheet.create({
+    modalContainer: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    modalContent: {
+      backgroundColor: colors.background,
+      borderTopLeftRadius: theme.radius.lg,
+      borderTopRightRadius: theme.radius.lg,
+      maxHeight: '80%',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: theme.spacing.md,
+      borderBottomWidth: theme.borderWidth.thin,
+      borderBottomColor: colors.border,
+    },
+    title: {
+      fontSize: theme.fontSizes.lg,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    closeButton: {
+      padding: theme.spacing.xs,
+    },
+    modelList: {
+      padding: theme.spacing.md,
+    },
+    modelItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.md,
+      borderRadius: theme.radius.md,
+      marginBottom: theme.spacing.sm,
+      backgroundColor: colors.card,
+    },
+    selectedModelItem: {
+      backgroundColor: `${colors.primary}20`,
+      borderWidth: theme.borderWidth.thin,
+      borderColor: colors.primary,
+    },
+    disabledModelItem: {
+      opacity: 0.7,
+    },
+    modelInfo: {
+      flex: 1,
+      marginRight: theme.spacing.sm,
+    },
+    modelName: {
+      fontSize: theme.fontSizes.md,
+      fontWeight: 'bold',
+      marginBottom: theme.spacing.xs,
+      color: colors.text,
+    },
+    selectedModelName: {
+      color: colors.primary,
+    },
+    disabledModelName: {
+      color: colors.secondaryText,
+    },
+    modelDescription: {
+      fontSize: theme.fontSizes.sm,
+      color: colors.secondaryText,
+    },
+    selectedModelDescription: {
+      color: colors.secondaryText,
+    },
+    disabledModelDescription: {
+      color: colors.secondaryText,
+    },
+    modelRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    radioOuter: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: theme.borderWidth.thin,
+      borderColor: colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    radioInner: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: colors.primary,
+    },
+    tierBadge: {
+      marginRight: theme.spacing.sm,
+    },
+    sectionHeader: {
+      fontSize: theme.fontSizes.md,
+      fontWeight: '600',
+      color: colors.text,
+      marginTop: theme.spacing.md,
+      marginBottom: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.xs,
+    },
+    providerBadge: {
+      marginRight: theme.spacing.sm,
+      backgroundColor: colors.lightGray,
+      paddingHorizontal: theme.spacing.xs,
+      paddingVertical: 2,
+      borderRadius: theme.radius.sm,
+    },
+    providerText: {
+      fontSize: theme.fontSizes.xs,
+      color: colors.secondaryText,
+    },
+  });
+  
   const renderModelItem = ({ item }: { item: ModelType }) => {
     const isSelected = item.id === currentModelId;
-    const isDisabled = item.isPremium && plan === 'free';
+    const isDisabled = !isModelAvailableForPlan(item) && !item.dailyLimit;
     
     return (
       <TouchableOpacity
@@ -80,7 +283,7 @@ export default function ModelSelectModal({
           isDisabled && styles.disabledModelItem
         ]}
         onPress={() => handleModelSelect(item)}
-        disabled={false} // We handle restrictions in handleModelSelect
+        disabled={false} // 制限はhandleModelSelectで処理
       >
         <View style={styles.modelInfo}>
           <Text style={[
@@ -100,7 +303,13 @@ export default function ModelSelectModal({
         </View>
         
         <View style={styles.modelRight}>
-          {getModelStatusBadge(item)}
+          {item.provider && !item.isLocal && !item.isAuto && (
+            <View style={styles.providerBadge}>
+              <Text style={styles.providerText}>{item.provider}</Text>
+            </View>
+          )}
+          
+          {getModelTierBadge(item)}
           
           {isSelected ? (
             <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
@@ -109,26 +318,10 @@ export default function ModelSelectModal({
               {isSelected && <View style={styles.radioInner} />}
             </View>
           )}
-          
-          {item.isPremium && plan === 'free' && (
-            <View style={styles.premiumBadge}>
-              <Text style={styles.premiumBadgeText}>
-                {item.tier === 'lite' ? 'Lite' : 'Heavy'}
-              </Text>
-            </View>
-          )}
         </View>
       </TouchableOpacity>
     );
   };
-  
-  const filteredModels = MODELS.filter(model => {
-    if (plan !== 'free') return true;
-    
-    return !model.isPremium || 
-      (model.tier === 'lite' && MODELS.filter(m => m.tier === 'lite').indexOf(model) === 0) ||
-      (model.tier === 'heavy' && MODELS.filter(m => m.tier === 'heavy').indexOf(model) === 0);
-  });
   
   return (
     <Modal
@@ -157,129 +350,3 @@ export default function ModelSelectModal({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  modelList: {
-    padding: 16,
-  },
-  modelItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: colors.lightGray,
-  },
-  selectedModelItem: {
-    backgroundColor: `${colors.primary}20`,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  disabledModelItem: {
-    opacity: 0.7,
-  },
-  modelInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  modelName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  selectedModelName: {
-    color: colors.primary,
-  },
-  disabledModelName: {
-    color: colors.gray,
-  },
-  modelDescription: {
-    fontSize: 14,
-    color: colors.darkGray,
-  },
-  selectedModelDescription: {
-    color: colors.darkGray,
-  },
-  disabledModelDescription: {
-    color: colors.gray,
-  },
-  modelRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  radioOuter: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.gray,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.primary,
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 8,
-  },
-  notInstalledBadge: {
-    backgroundColor: colors.gray,
-  },
-  downloadingBadge: {
-    backgroundColor: colors.warning,
-  },
-  readyBadge: {
-    backgroundColor: colors.success,
-  },
-  badgeText: {
-    color: colors.background,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  premiumBadge: {
-    backgroundColor: colors.accentBlue,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 8,
-  },
-  premiumBadgeText: {
-    color: colors.background,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-});

@@ -1,7 +1,10 @@
 import { MODELS } from '../constants/models';
 
-const OPENROUTER_API_KEY = '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';
-const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+// Supabase Edge FunctionのURL
+const SUPABASE_FUNCTION_URL = 'https://alperyqhdtpnivxfnqdi.supabase.co/functions/v1/openrouter-proxy';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFscGVyeXFoZHRwbml2eGZucWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY4MDc5OTcsImV4cCI6MjA2MjM4Mzk5N30.0gTXgFtD2uIhGdSB4twConRJPF_0Ccz5zePqa0hD8B0';
+
+// 直接APIキーを保持しない - すべてEdge Function経由で処理
 
 export type ChatMessage = {
   role: 'user' | 'assistant' | 'system';
@@ -82,7 +85,7 @@ const normalizeModelId = (modelId: string): string => {
 };
 
 /**
- * Fetches a completion from the OpenRouter API
+ * Fetches a completion from the OpenRouter API via Supabase Edge Function
  * @param messages Array of chat messages
  * @param modelId Model ID to use
  * @param onChunk Optional callback for streaming responses
@@ -100,8 +103,7 @@ export const fetchChatCompletion = async (
 
     const actualModelId = normalizeModelId(modelId);
     
-    console.log(`API Request to OpenRouter - Original Model: ${modelId}, Normalized: ${actualModelId}`);
-    console.log(`Messages count: ${messages.length}`);
+    console.log(`API Request via Supabase - Original Model: ${modelId}, Normalized: ${actualModelId}`);
     
     let processedMessages = JSON.parse(JSON.stringify(messages)) as ChatMessage[];
     
@@ -124,7 +126,7 @@ export const fetchChatCompletion = async (
     console.log('Last message role:', processedMessages[processedMessages.length - 1].role);
     console.log('Last message content:', processedMessages[processedMessages.length - 1].content.substring(0, 30));
     
-    const body: ChatCompletionRequest = {
+    const body = {
       messages: processedMessages,
       model: actualModelId,
       stream: false,
@@ -132,94 +134,94 @@ export const fetchChatCompletion = async (
       temperature: 0.7,
     };
 
-    console.log('Sending request to OpenRouter API...');
-    console.log('Request URL:', `${OPENROUTER_BASE_URL}/chat/completions`);
-    console.log('Request body:', JSON.stringify(body).substring(0, 200) + '...');
+    // タイムアウト処理を追加
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒タイムアウト
     
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-      'HTTP-Referer': 'https://aichatbot.app',
-      'X-Title': 'AI ChatBot App',
-    };
-    
-    console.log('API Request headers:', {
-      'Content-Type': headers['Content-Type'],
-      'Authorization': `Bearer ${OPENROUTER_API_KEY.substring(0, 10)}...`,
-      'HTTP-Referer': headers['HTTP-Referer'],
-      'X-Title': headers['X-Title'],
-    });
-    
-    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
-    
-    console.log('API Response status:', response.status);
-    
-    // Handle error responses
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`OpenRouter API error (${response.status}):`, errorText);
+    try {
+      console.log('Sending request to Supabase Edge Function...');
       
-      try {
-        const errorJson = JSON.parse(errorText);
-        console.error('Parsed error:', errorJson);
+      // Edge Functionを使った方法を試す（JWT認証なし）
+      const response = await fetch(SUPABASE_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'apikey': SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      console.log('API Response status:', response.status);
+      
+      // Edge Functionからのエラーレスポンスを処理
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`API error (${response.status}):`, errorText);
         
-        if (response.status === 401) {
-          throw new Error(`認証エラー: APIキーが無効または期限切れです。(${errorJson.error?.message || 'No auth credentials found'})`);
-        } else if (response.status === 400) {
-          throw new Error(`リクエストエラー: ${errorJson.error?.message || errorText}`);
-        } else if (response.status === 429) {
-          throw new Error('レート制限に達しました。しばらく待ってから再試行してください。');
+        let errorMessage = `API error: ${response.status}`;
+        
+        try {
+          const errorJson = JSON.parse(errorText);
+          console.error('Parsed error:', errorJson);
+          
+          if (errorJson.error) {
+            errorMessage = `エラー: ${errorJson.error}`;
+          } else if (response.status === 401) {
+            errorMessage = `認証エラー: APIキーが無効または期限切れです。`;
+          } else if (response.status === 400) {
+            errorMessage = `リクエストエラー: ${errorJson.error?.message || errorText}`;
+          } else if (response.status === 429) {
+            errorMessage = 'レート制限に達しました。しばらく待ってから再試行してください。';
+          } else if (response.status === 500) {
+            errorMessage = 'サーバーエラーが発生しました。しばらくしてからもう一度お試しください。';
+          }
+        } catch (e) {
+          console.error('Error parsing error response:', e);
         }
-      } catch (e) {
-        console.error('Error parsing error response:', e);
+        
+        return errorMessage;
+      }
+
+      const data = await response.json();
+      
+      if (!data || !data.choices || data.choices.length === 0) {
+        console.error('Invalid API response format:', data);
+        return 'APIからの応答が無効です。';
       }
       
-      throw new Error(`API error: ${response.status} - ${errorText}`);
+      const content = data.choices[0]?.message?.content || '';
+      
+      if (!content) {
+        console.error('Empty content in API response:', data);
+        return 'APIからの応答が空です。';
+      }
+      
+      console.log(`API Response received - Length: ${content.length}`);
+      console.log(`Response preview: ${content.substring(0, 50)}...`);
+      
+      if (onChunk && content) {
+        onChunk(content);
+      }
+      
+      return content;
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError.name === 'AbortError') {
+        return 'APIリクエストがタイムアウトしました。ネットワーク接続を確認してください。';
+      }
+      
+      console.error('Error when calling Edge Function:', fetchError);
+      return 'サーバーとの通信に問題が発生しました。しばらくしてからもう一度お試しください。';
     }
-
-    const data = await response.json() as ChatCompletionResponse;
-    
-    if (!data || !data.choices || data.choices.length === 0) {
-      console.error('Invalid API response format:', data);
-      throw new Error('APIからの応答が無効です。');
-    }
-    
-    const content = data.choices[0]?.message?.content || '';
-    
-    if (!content) {
-      console.error('Empty content in API response:', data);
-      throw new Error('APIからの応答が空です。');
-    }
-    
-    console.log(`API Response received - Length: ${content.length}`);
-    console.log(`Response preview: ${content.substring(0, 50)}...`);
-    
-    if (onChunk && content) {
-      onChunk(content);
-    }
-    
-    return content;
   } catch (error) {
     console.error('Error in fetchChatCompletion:', error);
     
-    console.error('Request details:', {
-      modelId,
-      normalizedModelId: normalizeModelId(modelId),
-      messageCount: messages.length,
-      firstUserMessage: messages.find(m => m.role === 'user')?.content.substring(0, 50),
-    });
-    
     if (error instanceof Error) {
-      if (error.message.includes('認証エラー') || 
-          error.message.includes('リクエストエラー') || 
-          error.message.includes('レート制限') ||
-          error.message.includes('APIからの応答')) {
-        return error.message;
-      }
+      return `エラーが発生しました: ${error.message}`;
     }
     
     return 'エラーが発生しました。ネットワーク接続を確認して、もう一度お試しください。';

@@ -16,15 +16,24 @@ export type Chat = {
   createdAt: number;
   updatedAt: number;
   unreadCount: number;
+  iconType: 'default' | 'custom';
+  iconId?: string;
+  iconUri?: string;
 };
 
 export interface ChatState {
   chats: Chat[];
   currentChatId: string | null;
+  chatToDelete: string | null;
+  isDeleteDialogVisible: boolean;
   createChat: (modelId: string) => string;
   addMessage: (chatId: string, message: Omit<Message, 'id' | 'timestamp'>) => void;
   updateChatTitle: (chatId: string, title: string) => void;
+  updateChatModel: (chatId: string, modelId: string) => void;
+  updateChatIcon: (chatId: string, icon: { iconType: 'default' | 'custom'; iconId?: string; iconUri?: string }) => void;
   deleteChat: (chatId: string) => void;
+  confirmDeleteChat: (chatId: string) => void;
+  cancelDeleteChat: () => void;
   setCurrentChat: (chatId: string | null) => void;
   markChatAsRead: (chatId: string) => void;
 }
@@ -37,6 +46,8 @@ export const createChatSlice: StateCreator<
 > = (set, get) => ({
   chats: [],
   currentChatId: null,
+  chatToDelete: null,
+  isDeleteDialogVisible: false,
   createChat: (modelId) => {
     const id = Date.now().toString();
     const newChat: Chat = {
@@ -47,6 +58,8 @@ export const createChatSlice: StateCreator<
       createdAt: Date.now(),
       updatedAt: Date.now(),
       unreadCount: 0,
+      iconType: 'default',
+      iconId: 'chatbubble',
     };
     
     set((state) => ({
@@ -58,14 +71,16 @@ export const createChatSlice: StateCreator<
   },
   addMessage: (chatId, message) => {
     set((state) => {
-      const chats = state.chats.map((chat) => {
+      console.log(`Adding message - ChatID: ${chatId}, Role: ${message.role}`);
+      
+      const newMessage: Message = {
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        ...message,
+        timestamp: Date.now(),
+      };
+      
+      const updatedChats = state.chats.map((chat) => {
         if (chat.id === chatId) {
-          const newMessage: Message = {
-            id: Date.now().toString(),
-            ...message,
-            timestamp: Date.now(),
-          };
-          
           const updatedChat: Chat = {
             ...chat,
             messages: [...chat.messages, newMessage],
@@ -82,7 +97,11 @@ export const createChatSlice: StateCreator<
         return chat;
       });
       
-      return { chats };
+      console.log(`Message added - ChatID: ${chatId}, Total messages: ${
+        updatedChats.find(c => c.id === chatId)?.messages.length || 0
+      }`);
+      
+      return { chats: updatedChats };
     });
   },
   updateChatTitle: (chatId, title) => {
@@ -92,6 +111,26 @@ export const createChatSlice: StateCreator<
       ),
     }));
   },
+  updateChatModel: (chatId, modelId) => {
+    set((state) => ({
+      chats: state.chats.map((chat) =>
+        chat.id === chatId ? { ...chat, modelId } : chat
+      ),
+    }));
+  },
+  updateChatIcon: (chatId, icon) => {
+    set((state) => ({
+      chats: state.chats.map((chat) =>
+        chat.id === chatId ? { ...chat, ...icon } : chat
+      ),
+    }));
+  },
+  confirmDeleteChat: (chatId) => {
+    set({ chatToDelete: chatId, isDeleteDialogVisible: true });
+  },
+  cancelDeleteChat: () => {
+    set({ chatToDelete: null, isDeleteDialogVisible: false });
+  },
   deleteChat: (chatId) => {
     set((state) => {
       const filteredChats = state.chats.filter((chat) => chat.id !== chatId);
@@ -99,9 +138,13 @@ export const createChatSlice: StateCreator<
         ? filteredChats.length > 0 ? filteredChats[0].id : null
         : state.currentChatId;
       
+      console.log(`Chat deleted - ChatID: ${chatId}`);
+      
       return {
         chats: filteredChats,
         currentChatId: newCurrentChatId,
+        chatToDelete: null,
+        isDeleteDialogVisible: false,
       };
     });
   },

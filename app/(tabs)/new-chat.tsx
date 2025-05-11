@@ -9,13 +9,18 @@ import {
   KeyboardAvoidingView, 
   Platform,
   Keyboard,
-  Dimensions
+  Dimensions,
+  SafeAreaView
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
 import { MODELS } from '../constants/models';
+import ModelSelectModal from '../components/ModelSelectModal';
+import LocalModelInstallModal from '../components/LocalModelInstallModal';
+import Header from '../components/Header';
+import theme from '../ui/theme';
 
 const SUGGESTIONS = [
   'AIについて教えてください',
@@ -27,17 +32,25 @@ const SUGGESTIONS = [
 
 export default function NewChatScreen() {
   const router = useRouter();
+  const colors = useColors(); // 動的カラーを取得
+  
   const [input, setInput] = useState('');
   const createChat = useStore(state => state.createChat);
   const addMessage = useStore(state => state.addMessage);
   const localModelStatus = useStore(state => state.localModelStatus);
+  const plan = useStore(state => state.plan);
   
   const defaultModel = MODELS.find(model => !model.isPremium && !model.isLocal);
+  const [selectedModelId, setSelectedModelId] = useState<string>(defaultModel?.id || 'openai/gpt-4o-mini');
+  const [showModelSelect, setShowModelSelect] = useState(false);
+  const [showLocalModelInstall, setShowLocalModelInstall] = useState(false);
+
+  const selectedModel = MODELS.find(m => m.id === selectedModelId) || defaultModel;
 
   const handleSendMessage = (content: string) => {
     if (!content.trim()) return;
     
-    const chatId = createChat(defaultModel?.id || 'openai/gpt-4o-mini');
+    const chatId = createChat(selectedModelId);
     
     addMessage(chatId, {
       role: 'user',
@@ -50,7 +63,7 @@ export default function NewChatScreen() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   
   // Create a ref for the ScrollView
-  const scrollViewRef = React.useRef(null);
+  const scrollViewRef = React.useRef<ScrollView | null>(null);
 
   const scrollToBottom = () => {
     if (scrollViewRef.current) {
@@ -77,155 +90,209 @@ export default function NewChatScreen() {
     };
   }, []);
 
-  return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+  const handleSelectModel = (modelId: string) => {
+    const model = MODELS.find(m => m.id === modelId);
+    if (!model) return;
+    if (model.isLocal && localModelStatus !== 'ready') {
+      setSelectedModelId(modelId);
+      setShowLocalModelInstall(true);
+      return;
+    }
+    if (model.isPremium && plan === 'free') {
+      setSelectedModelId(modelId);
+      return;
+    }
+    setSelectedModelId(modelId);
+  };
+
+  const ModelSelectButton = () => (
+    <TouchableOpacity
+      style={styles.modelSelectButton}
+      onPress={() => setShowModelSelect(true)}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
     >
-      <ScrollView 
-        ref={scrollViewRef}
-        style={styles.suggestionsContainer}
-        contentContainerStyle={{ 
-          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : 20 
+      <Text style={styles.modelSelectButtonText}>{selectedModel?.name}</Text>
+      <Ionicons name="chevron-down" size={16} color={colors.textOnPrimary} />
+    </TouchableOpacity>
+  );
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    suggestionsContainer: {
+      flex: 1,
+      padding: 16,
+    },
+    suggestionsTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      marginBottom: 12,
+      color: colors.text,
+    },
+    chipContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginBottom: 24,
+    },
+    chip: {
+      backgroundColor: colors.lightGray,
+      borderRadius: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      margin: 4,
+    },
+    chipText: {
+      fontSize: 14,
+      color: colors.text,
+    },
+    localModelBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: `${colors.accentBlue}20`,
+      padding: 12,
+      borderRadius: 8,
+      margin: 16,
+      marginTop: 0,
+    },
+    localModelText: {
+      fontSize: 14,
+      color: colors.accentBlue,
+      marginLeft: 8,
+      flex: 1,
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      padding: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.lightGray,
+      backgroundColor: colors.background,
+    },
+    input: {
+      flex: 1,
+      backgroundColor: colors.lightGray,
+      borderRadius: 20,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      maxHeight: 120,
+      fontSize: 16,
+      color: colors.text,
+    },
+    sendButton: {
+      backgroundColor: colors.primary,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: 8,
+    },
+    sendButtonDisabled: {
+      backgroundColor: colors.lightGray,
+    },
+    modelSelectButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.xs,
+      borderRadius: theme.radius.lg,
+    },
+    modelSelectButtonText: {
+      marginRight: theme.spacing.xs,
+      fontSize: theme.fontSizes.sm,
+      fontWeight: '500',
+      color: colors.textOnPrimary,
+    },
+  });
+
+  return (
+    <>
+      <Stack.Screen
+        options={{
+          headerShown: false,
         }}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-      >
-        <Text style={styles.suggestionsTitle}>おすすめの質問</Text>
-        <View style={styles.chipContainer}>
-          {SUGGESTIONS.map((suggestion, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.chip}
-              onPress={() => handleSendMessage(suggestion)}
-            >
-              <Text style={styles.chipText}>{suggestion}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        
-        <View style={styles.modelInfoContainer}>
-          <Text style={styles.modelInfoTitle}>現在のモデル: {defaultModel?.name}</Text>
-          <Text style={styles.modelInfoDescription}>
-            チャットルームでモデルを変更できます
-          </Text>
-          
-          {localModelStatus !== 'ready' && (
-            <View style={styles.localModelBanner}>
-              <Ionicons name="information-circle-outline" size={20} color={colors.accentBlue} />
-              <Text style={styles.localModelText}>
-                ローカルモデル (Qwen3:4B) をインストールすると、オフラインでも使用できます
-              </Text>
-            </View>
-          )}
-        </View>
-      </ScrollView>
+      />
       
-      <View style={[styles.inputContainer, keyboardHeight > 0 && { paddingBottom: Platform.OS === 'ios' ? 8 : 0 }]}>
-        <TextInput
-          style={styles.input}
-          placeholder="メッセージを入力..."
-          value={input}
-          onChangeText={setInput}
-          multiline
+      <SafeAreaView style={styles.container}>
+        <Header
+          title="新規チャット"
+          showBack={false}
+          onTitleEdit={undefined}
+          rightComponent={<ModelSelectButton />}
         />
-        <TouchableOpacity
-          style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
-          disabled={!input.trim()}
-          onPress={() => handleSendMessage(input)}
+        
+        {localModelStatus !== 'ready' && (
+          <View style={styles.localModelBanner}>
+            <Ionicons name="information-circle-outline" size={20} color={colors.accentBlue} />
+            <Text style={styles.localModelText}>
+              ローカルモデル (Qwen3:4B) をインストールすると、オフラインでも使用できます
+            </Text>
+          </View>
+        )}
+        
+        <KeyboardAvoidingView 
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          <Ionicons name="send" size={24} color={input.trim() ? colors.background : colors.gray} />
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.suggestionsContainer}
+            contentContainerStyle={{ 
+              paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : 20 
+            }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
+            <Text style={styles.suggestionsTitle}>おすすめの質問</Text>
+            <View style={styles.chipContainer}>
+              {SUGGESTIONS.map((suggestion, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.chip}
+                  onPress={() => handleSendMessage(suggestion)}
+                >
+                  <Text style={styles.chipText}>{suggestion}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+          
+          <View style={[styles.inputContainer, keyboardHeight > 0 && { paddingBottom: Platform.OS === 'ios' ? 8 : 0 }]}>
+            <TextInput
+              style={styles.input}
+              placeholder="メッセージを入力..."
+              value={input}
+              onChangeText={setInput}
+              multiline
+              placeholderTextColor={colors.secondaryText}
+            />
+            <TouchableOpacity
+              style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
+              disabled={!input.trim()}
+              onPress={() => handleSendMessage(input)}
+            >
+              <Ionicons name="send" size={24} color={input.trim() ? colors.background : colors.gray} />
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+        
+        {/* モデル選択モーダル */}
+        <ModelSelectModal
+          visible={showModelSelect}
+          onClose={() => setShowModelSelect(false)}
+          onSelectModel={handleSelectModel}
+          currentModelId={selectedModelId}
+        />
+        
+        {/* ローカルモデルインストールモーダル */}
+        <LocalModelInstallModal
+          visible={showLocalModelInstall}
+          onClose={() => setShowLocalModelInstall(false)}
+        />
+      </SafeAreaView>
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  suggestionsContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  suggestionsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 24,
-  },
-  chip: {
-    backgroundColor: colors.lightGray,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    margin: 4,
-  },
-  chipText: {
-    fontSize: 14,
-  },
-  modelInfoContainer: {
-    padding: 16,
-    backgroundColor: colors.lightGray,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  modelInfoTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  modelInfoDescription: {
-    fontSize: 14,
-    color: colors.darkGray,
-    marginBottom: 12,
-  },
-  localModelBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
-    padding: 12,
-    borderRadius: 8,
-  },
-  localModelText: {
-    fontSize: 14,
-    color: colors.accentBlue,
-    marginLeft: 8,
-    flex: 1,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.lightGray,
-    alignItems: 'flex-end',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: colors.lightGray,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    maxHeight: 120,
-    fontSize: 16,
-  },
-  sendButton: {
-    backgroundColor: colors.primary,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  sendButtonDisabled: {
-    backgroundColor: colors.lightGray,
-  },
-});

@@ -1,0 +1,260 @@
+diff --git "a/\344\277\256\346\255\243\350\250\210\347\224\273.md" "b/\344\277\256\346\255\243\350\250\210\347\224\273.md"
+index 2a9015b..83c40b7 100644
+--- "a/\344\277\256\346\255\243\350\250\210\347\224\273.md"
++++ "b/\344\277\256\346\255\243\350\250\210\347\224\273.md"
+@@ -432,6 +432,255 @@ if (useAutoRouter) {
+   };
+   ```
+ 
++#### 開発モード・本番モードのプラン切替
++開発モードと本番モードでのプラン切替機能を実装します。開発モードではタップ1つで即時切替を可能にし、本番モードでは適切な決済処理を実装します。
++
++##### 開発モード実装
++- `screens/SettingsScreen.tsx` - 開発モード用の簡易プラン切替UI
++  ```typescript
++  // screens/SettingsScreen.tsx (開発モード部分)
++  import React from 'react';
++  import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
++  import { useStore } from '../store';
++  import { PLANS } from '../constants/plans';
++  import theme from '../ui/theme';
++
++  const DevPlanSwitcher = () => {
++    const { plan, setPlan, updateQuotaLimits } = useStore();
++    
++    // 開発モードでのプラン切替処理
++    const switchPlan = (newPlan: string) => {
++      setPlan(newPlan);
++      updateQuotaLimits();
++      // 開発モードではレシート検証をスキップ
++    };
++    
++    return (
++      <View style={styles.container}>
++        <Text style={styles.title}>開発モード: プラン切替</Text>
++        
++        {Object.entries(PLANS).map(([planId, planData]) => (
++          <TouchableOpacity
++            key={planId}
++            style={[
++              styles.planButton,
++              plan === planId && styles.activePlan
++            ]}
++            onPress={() => switchPlan(planId)}
++          >
++            <Text style={[
++              styles.planText,
++              plan === planId && styles.activePlanText
++            ]}>
++              {planData.name}
++            </Text>
++          </TouchableOpacity>
++        ))}
++        
++        <Text style={styles.note}>
++          ※開発モードでは支払い処理をスキップします
++        </Text>
++      </View>
++    );
++  };
++  
++  const styles = StyleSheet.create({
++    container: {
++      marginVertical: theme.spacing.lg,
++      padding: theme.spacing.md,
++      backgroundColor: theme.colors.background.light,
++      borderRadius: theme.borderRadius.md,
++    },
++    title: {
++      fontSize: theme.typography.heading2.fontSize,
++      fontWeight: 'bold',
++      marginBottom: theme.spacing.md,
++    },
++    planButton: {
++      padding: theme.spacing.md,
++      marginVertical: theme.spacing.xs,
++      borderRadius: theme.borderRadius.sm,
++      backgroundColor: theme.colors.gray[200],
++    },
++    activePlan: {
++      backgroundColor: theme.colors.primary,
++    },
++    planText: {
++      fontSize: theme.typography.body.fontSize,
++      color: theme.colors.text.primary.light,
++    },
++    activePlanText: {
++      color: theme.colors.text.inverse,
++      fontWeight: 'bold',
++    },
++    note: {
++      marginTop: theme.spacing.md,
++      fontSize: theme.typography.caption.fontSize,
++      color: theme.colors.text.secondary.light,
++      fontStyle: 'italic',
++    },
++  });
++  ```
++
++##### 本番モード実装
++- `services/subscription.ts` - 本番モード用の決済処理
++  ```typescript
++  // services/subscription.ts (本番モード部分)
++  import * as StoreKit from 'expo-store-kit';
++  import * as InAppPurchases from 'expo-in-app-purchases';
++  import { Platform } from 'react-native';
++  import { supabase } from './supabase';
++  import { PLANS } from '../constants/plans';
++  import useStore from '../store';
++
++  // プラン購入処理
++  export const purchasePlan = async (planId: string, period: 'monthly' | 'halfyearly' | 'yearly') => {
++    try {
++      // プラン情報取得
++      const plan = PLANS[planId];
++      if (!plan || !plan.periods || !plan.periods[period]) {
++        throw new Error('Invalid plan or period');
++      }
++      
++      const productId = plan.periods[period].id;
++      
++      // プラットフォーム別の購入処理
++      if (Platform.OS === 'ios') {
++        // iOS: StoreKit 2
++        await StoreKit.requestPermissions();
++        const products = await StoreKit.getProductsAsync([productId]);
++        
++        if (products.length === 0) {
++          throw new Error('Product not found');
++        }
++        
++        const purchase = await StoreKit.purchaseItemAsync(productId);
++        
++        if (purchase.resultCode === StoreKit.PurchaseResultCode.SUCCESS) {
++          // レシート検証
++          return await verifyReceipt(purchase.receipt, 'ios');
++        } else {
++          throw new Error(`Purchase failed: ${purchase.resultCode}`);
++        }
++      } else {
++        // Android: Google Play Billing
++        await InAppPurchases.connectAsync();
++        const products = await InAppPurchases.getProductsAsync([productId]);
++        
++        if (products.length === 0) {
++          throw new Error('Product not found');
++        }
++        
++        const { responseCode, results } = await InAppPurchases.purchaseItemAsync(productId);
++        
++        if (responseCode === InAppPurchases.IAPResponseCode.OK) {
++          const purchase = results[0];
++          // レシート検証
++          return await verifyReceipt(purchase.purchaseToken, 'android');
++        } else {
++          throw new Error(`Purchase failed: ${responseCode}`);
++        }
++      }
++    } catch (error) {
++      console.error('Purchase failed:', error);
++      return { success: false, message: error.message };
++    }
++  };
++  
++  // 購入状態の復元
++  export const restorePurchases = async () => {
++    try {
++      let receipt;
++      
++      if (Platform.OS === 'ios') {
++        // iOS: StoreKit 2
++        await StoreKit.requestPermissions();
++        const purchases = await StoreKit.getPurchasesAsync();
++        
++        if (purchases.length > 0) {
++          // 最新の購入を使用
++          receipt = purchases[0].receipt;
++        }
++      } else {
++        // Android: Google Play Billing
++        await InAppPurchases.connectAsync();
++        const { responseCode, results } = await InAppPurchases.getPurchaseHistoryAsync();
++        
++        if (responseCode === InAppPurchases.IAPResponseCode.OK && results.length > 0) {
++          // 最新の購入を使用
++          receipt = results[0].purchaseToken;
++        }
++      }
++      
++      if (receipt) {
++        // レシート検証
++        return await verifyReceipt(receipt, Platform.OS as 'ios' | 'android');
++      }
++      
++      return { success: false, message: 'No purchases found' };
++    } catch (error) {
++      console.error('Restore purchases failed:', error);
++      return { success: false, message: error.message };
++    }
++  };
++  ```
++
++##### 環境判定と切替
++- `config/env.ts` - 開発/本番モード判定
++  ```typescript
++  // config/env.ts
++  import Constants from 'expo-constants';
++
++  // 環境変数またはビルド設定から開発モードかどうかを判定
++  export const isDevelopmentMode = () => {
++    // Expoの場合
++    if (Constants.expoConfig?.extra?.isDev) {
++      return true;
++    }
++    
++    // __DEV__グローバル変数（React Native）
++    if (typeof __DEV__ !== 'undefined' && __DEV__) {
++      return true;
++    }
++    
++    // プロセス環境変数（Node.js）
++    if (process.env.NODE_ENV === 'development') {
++      return true;
++    }
++    
++    return false;
++  };
++  ```
++
++- `screens/SubscriptionScreen.tsx` - 環境に応じたUI切替
++  ```typescript
++  // screens/SubscriptionScreen.tsx
++  import React from 'react';
++  import { View, ScrollView } from 'react-native';
++  import { isDevelopmentMode } from '../config/env';
++  import { PlanCards } from '../components/PlanCards';
++  import { DevPlanSwitcher } from '../components/DevPlanSwitcher';
++  import { ProductList } from '../components/ProductList';
++  
++  export const SubscriptionScreen = () => {
++    const isDevMode = isDevelopmentMode();
++    
++    return (
++      <ScrollView>
++        <PlanCards />
++        
++        {isDevMode ? (
++          // 開発モード: 簡易切替UI
++          <DevPlanSwitcher />
++        ) : (
++          // 本番モード: 決済UI
++          <ProductList />
++        )}
++      </ScrollView>
++    );
++  };
++  ```
++
+ ## 2. APIキー管理バックエンド
+ 
+ ### 2.1 Per-User APIキープロビジョニング

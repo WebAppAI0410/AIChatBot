@@ -1,0 +1,1659 @@
+diff --git a/requirements.md b/requirements.md
+index 4cdfe6e..de54bc3 100644
+--- a/requirements.md
++++ b/requirements.md
+@@ -89,8 +89,8 @@ sequenceDiagram
+ ---
+ 
+ ## 5. 主な非機能要件
+-- **ローカルモデル DL** : Wi‑Fi 推奨、途中再開対応。
+-- **ストレージ** : インストール容量残 < 15GB 時は警告。
++- **ローカルモデル DL** : Unsloth版Qwen3-4B (Q4_K_M) 4bit GGUF（約2.5GB）、Wi‑Fi推奨、途中再開対応。コンテキスト長32,768トークン対応。メモリ不足時はQ3_K_M（約2.08GB）へ自動フォールバック。
++- **ストレージ** : インストール容量残 < 3GB 時は警告。llama.rnによるネイティブ推論。
+ - **UI/UX** : ModelSelect バッジ → `未DL / DL中 / 検証中 / 使用可 / エラー` を色分け表示。
+ - **セキュリティ** : APIキーはサーバーサイドで管理し、ユーザーごとに発行。自動ローテーション機能あり。
+ - **クォータ管理** : プランごとの月次トークンバケツと日次画像バケツを実装。クォータ80%で警告表示、100%でフォールバックまたはアップグレード誘導。
+diff --git a/screen_design.md b/screen_design.md
+index 330e925..7dadba2 100644
+--- a/screen_design.md
++++ b/screen_design.md
+@@ -54,26 +54,82 @@ Qwen3:4B (ローカル)   [⚪️ 未DL]  ▸
+ 
+ ---
+ 
+-## 4. 画像生成UI
++## 4. 画像生成機能
++
++### 4.1 チャット内画像モード
+ ```
+ ┌────────────────────────────┐
+-│ 画像生成                    │
+-│ SDXL: 残り 5/5回            │
+-│ [テキスト入力エリア]        │
++│ ←  AI相談                  │
+ │                            │
+-│ モデル:                     │
+-│ [SDXL] [DALL-E]            │
++│ [AI応答...]                 │
+ │                            │
+-│ サイズ:                     │
+-│ [512×512] [768×768] [1024×1024] │
++│ ┌──────────────────────┐   │
++│ │🖼️ [テキスト入力エリア] 📎│ ← 🖼️アイコンが青色=画像モード有効
++│ └──────────────────────┘   │
+ │                            │
+-│ 品質:                       │
+-│ [標準] [高品質]             │
++│ モデル: SDXL ▼             │ ← プラン別に利用可能なモデル表示
++│ 残り: 4/5回                 │ ← 日次制限カウンター
++│                            │
++│ サイズ: [512×512] [768×768] [1024×1024] │
++│ 品質: [標準] [高品質]       │ ← Premium以上で高品質オプション
+ │                            │
+ │ [生成]                      │
+ └────────────────────────────┘
+ ```
+ 
++### 4.2 画像タブ
++```
++┌────────────────────────────┐
++│ 画像ギャラリー              │ ← ヘッダー
++│                            │
++│ ┌────┐ ┌────┐ ┌────┐      │
++│ │    │ │    │ │    │      │ ← Masonryギャラリー
++│ └────┘ └────┘ └────┘      │ （無限スクロール）
++│ ┌──────┐    ┌──────┐      │
++│ │      │    │      │      │
++│ └──────┘    └──────┘      │
++│                            │
++│ ┌──────────────────────┐   │
++│ │[テキスト入力エリア]   📎│ ← 画像生成プロンプト入力
++│ └──────────────────────┘   │
++│                            │
++│ モデル: [SDXL] [DALL-E] [Lightning] │ ← プラン別に利用可能
++│                            │
++│ サイズ: [512×512] [768×768] [1024×1024] │
++│ 品質: [標準] [高品質]       │ ← Premium以上で高品質オプション
++│ マスク: [アップロード]      │ ← 近日公開（グレーアウト）
++│                            │
++│ [生成] SDXL: 残り 4/5回     │ ← 選択中モデルの残り回数表示
++└────────────────────────────┘
++```
++
++### 4.3 プラン別モデル選択UI
++```
++┌────────────────────────────┐
++│ モデル選択                  │
++│                            │
++│ [SDXL] 残り: 4/5回          │ ← Free/Lite/Premium共通
++│                            │
++│ [DALL-E 3] 残り: 0/0回      │ ← Free: グレーアウト
++│            残り: 1/1回      │ ← Lite: 1回/日
++│            残り: 3/5回      │ ← Premium: 5回/日
++│                            │
++│ [Lightning] 無制限          │ ← 全プラン無制限（低品質）
++│                            │
++│ [キャンセル]                │
++└────────────────────────────┘
++```
++
++### 4.4 クォータ超過時のフォールバックUI
++```
++┌────────────────────────────┐
++│ ⚠️ DALL-E 3の制限に達しました │
++│ SDXLにフォールバックします   │ ← 自動フォールバック通知
++│                            │
++│ [OK] [プランをアップグレード] │ ← Premiumユーザーには表示しない
++└────────────────────────────┘
++```
++
+ ---
+ 
+ ## 5. メッセージアクション
+diff --git "a/\344\277\256\346\255\243\350\250\210\347\224\273.md" "b/\344\277\256\346\255\243\350\250\210\347\224\273.md"
+index b70b6e5..5773fb4 100644
+--- "a/\344\277\256\346\255\243\350\250\210\347\224\273.md"
++++ "b/\344\277\256\346\255\243\350\250\210\347\224\273.md"
+@@ -1,5 +1,7 @@
+ # AI チャットボットアプリ 修正計画
+ 
++**実装方針**: 各機能を実装するごとに順次コミットを行い、すべての実装が完了した後に最終的なプルリクエストを作成します。
++
+ ## 概要
+ 
+ 本計画は、AI チャットボットアプリの機能強化と UI/UX 改善を目的とした包括的な修正内容をまとめたものです。主な変更点は以下の通りです。
+@@ -22,6 +24,53 @@
+ | **Lite** | **¥980** | ¥5,600/6ヶ月<br>¥9,800/12ヶ月 | **300k tokens** ≈ 600 msg | SDXL-25step ×10 | Free プランのモデル **+** o3, o4-mini, o4-mini-high, Gemini 2.5 Pro Preview | クォータ超過時は下位モデルへフォールバック |
+ | **Premium** | **¥3,980** | ¥23,800/6ヶ月<br>¥39,800/12ヶ月 | **1.5M tokens** ≈ 3,000 msg | **DALL·E 3 ×5** + SDXL-25step ×50 | Lite プランのモデル **+** GPT-4.5 Preview, Claude 3.7 Sonnet & Sonnet-thinking | クォータ超過時は段階的にフォールバック |
+ 
++#### 実装ファイル
++- `constants/plans.ts` - プラン定義（価格、期間、機能制限）
++  ```typescript
++  export const PLANS = {
++    FREE: {
++      id: 'free',
++      name: 'Free',
++      price: 0,
++      tokens: 10000,
++      sdxlImages: 5,
++      dalleImages: 0,
++      modelTiers: [0, 2], // Tier 2は1回/日制限あり
++      aiAssists: 3,
++    },
++    LITE: {
++      id: 'lite',
++      name: 'Lite',
++      price: 980,
++      tokens: 300000,
++      sdxlImages: 15,
++      dalleImages: 1,
++      modelTiers: [0, 1, 2],
++      aiAssists: 20,
++      periods: {
++        MONTHLY: { id: 'lite.monthly', price: 980 },
++        HALFYEAR: { id: 'lite.halfyear', price: 5600 },
++        YEARLY: { id: 'lite.yearly', price: 9800 },
++      },
++    },
++    PREMIUM: {
++      id: 'premium',
++      name: 'Premium',
++      price: 3980,
++      tokens: 1500000,
++      sdxlImages: 50,
++      dalleImages: 5,
++      modelTiers: [0, 1, 2],
++      aiAssists: 100,
++      periods: {
++        MONTHLY: { id: 'premium.monthly', price: 3980 },
++        HALFYEAR: { id: 'premium.halfyear', price: 23800 },
++        YEARLY: { id: 'premium.yearly', price: 39800 },
++      },
++    },
++  };
++  ```
++
+ ### 1.2 Tierシステム（バックエンド）
+ 
+ #### LLM Tier
+@@ -39,12 +88,241 @@
+ | **0** | Workers AI SDXL-25step / img2img / inpaint | 10,000 neurons / day | ¥0 |
+ | **2** | OpenAI DALL·E 3 | 60 req / min | ¥0.04 / image |
+ 
++#### 実装ファイル
++- `constants/models.ts` - モデル定義とTier分類
++  ```typescript
++  export const MODEL_TIERS = {
++    0: 'FREE',
++    1: 'LOW_COST',
++    2: 'PREMIUM',
++  };
++
++  export const MODELS = {
++    // Tier 0 (Free)
++    'gemini-2.5-pro-exp': { tier: 0, name: 'Gemini 2.5 Pro Exp', provider: 'google' },
++    'deepseek-r1-zero': { tier: 0, name: 'DeepSeek R1 Zero', provider: 'deepseek' },
++    // Tier 1 (Low-cost)
++    'gpt-4o-mini': { tier: 1, name: 'GPT-4o mini', provider: 'openai' },
++    'gpt-4.1-mini': { tier: 1, name: 'GPT-4.1 mini', provider: 'openai' },
++    // Tier 2 (Premium)
++    'gpt-4o': { tier: 2, name: 'GPT-4o', provider: 'openai' },
++    'claude-3.7-sonnet': { tier: 2, name: 'Claude 3.7 Sonnet', provider: 'anthropic' },
++    // ローカルモデル
++    'qwen3-4b-local': { tier: 0, name: 'Qwen3:4B (ローカル)', provider: 'local' },
++  };
++
++  export const IMAGE_MODELS = {
++    'sdxl': { tier: 0, name: 'SDXL', provider: 'cloudflare' },
++    'dalle3': { tier: 2, name: 'DALL-E 3', provider: 'openai' },
++  };
++  ```
++
+ ### 1.3 クォータ管理
+ 
++#### 実装詳細
++
+ - **月次トークンバケツ**: プランごとの月間トークン使用量制限
++  - `store/userStore.ts` に実装
++  ```typescript
++  type TokenQuota = {
++    used: number;
++    limit: number;
++    resetDate: string; // ISO形式の日付文字列
++  };
++
++  type UserState = {
++    // 他のユーザー状態...
++    plan: 'free' | 'lite' | 'premium';
++    subscription: {
++      id: string;
++      startDate: string;
++      endDate: string;
++      autoRenew: boolean;
++    } | null;
++    quota: {
++      tokens: TokenQuota;
++      images: {
++        sdxl: { used: number; limit: number; resetDate: string; };
++        dalle: { used: number; limit: number; resetDate: string; };
++      };
++      aiAssists: { used: number; limit: number; resetDate: string; };
++    };
++    // クォータ関連アクション
++    incrementTokenUsage: (amount: number) => void;
++    incrementImageUsage: (type: 'sdxl' | 'dalle') => void;
++    incrementAiAssistUsage: () => void;
++    checkQuotaStatus: (type: 'tokens' | 'sdxl' | 'dalle' | 'aiAssists') => 'ok' | 'warning' | 'exceeded';
++    resetDailyQuotas: () => void; // 日次クォータのリセット
++  };
++  ```
++
+ - **日次画像バケツ**: `img:tier0:{uid}` & `img:tier2:{uid}`（毎日0時にリセット）
++  - アプリ起動時に日付チェックを行い、必要に応じてリセット
++  ```typescript
++  // store/userStore.ts
++  const resetDailyQuotas = () => {
++    const now = new Date();
++    const today = now.toISOString().split('T')[0]; // YYYY-MM-DD形式
++    
++    // 画像クォータのリセット日をチェック
++    const sdxlResetDate = new Date(state.quota.images.sdxl.resetDate);
++    if (sdxlResetDate.toISOString().split('T')[0] !== today) {
++      set((state) => ({
++        quota: {
++          ...state.quota,
++          images: {
++            ...state.quota.images,
++            sdxl: {
++              used: 0,
++              limit: PLANS[state.plan.toUpperCase()].sdxlImages,
++              resetDate: today,
++            },
++            dalle: {
++              used: 0,
++              limit: PLANS[state.plan.toUpperCase()].dalleImages,
++              resetDate: today,
++            },
++          },
++          aiAssists: {
++            used: 0,
++            limit: PLANS[state.plan.toUpperCase()].aiAssists,
++            resetDate: today,
++          },
++        },
++      }));
++    }
++  };
++  ```
++
+ - **クォータ警告**: 残り20%で警告バナー表示
++  - `components/QuotaWarningBanner.tsx` に実装
++  ```typescript
++  // components/QuotaWarningBanner.tsx
++  export const QuotaWarningBanner = () => {
++    const quotaStatus = useStore((state) => state.checkQuotaStatus('tokens'));
++    const plan = useStore((state) => state.plan);
++    
++    if (quotaStatus !== 'warning') return null;
++    
++    return (
++      <View style={styles.warningBanner}>
++        <Text style={styles.warningText}>⚠️ トークン残りわずか (20%)</Text>
++        <View style={styles.buttonContainer}>
++          <Button title="詳細" onPress={() => router.push('/settings/usage')} />
++          <Button title="閉じる" onPress={() => {/* バナーを一時的に非表示 */}} />
++        </View>
++      </View>
++    );
++  };
++  ```
++
+ - **フォールバックロジック**: クォータ超過時に下位Tierモデルへ自動切替
++  - `services/api.ts` に実装
++  ```typescript
++  // services/api.ts
++  export const getChatCompletion = async (messages: Message[], modelId: string) => {
++    const userState = useStore.getState();
++    const selectedModel = MODELS[modelId];
++    
++    // クォータチェック
++    const quotaStatus = userState.checkQuotaStatus('tokens');
++    
++    // モデル選択ロジック
++    let effectiveModel = modelId;
++    
++    if (quotaStatus === 'exceeded') {
++      // クォータ超過時のフォールバックロジック
++      const userPlan = userState.plan;
++      const availableTiers = PLANS[userPlan.toUpperCase()].modelTiers;
++      
++      // 現在のモデルTierより低いTierを探す
++      const lowerTiers = availableTiers.filter(tier => tier < selectedModel.tier);
++      
++      if (lowerTiers.length > 0) {
++        // 最も高いTierのモデルを選択
++        const fallbackTier = Math.max(...lowerTiers);
++        // 該当Tierのモデルから一つ選択
++        const fallbackModels = Object.entries(MODELS)
++          .filter(([_, model]) => model.tier === fallbackTier)
++          .map(([id, _]) => id);
++          
++        if (fallbackModels.length > 0) {
++          effectiveModel = fallbackModels[0]; // 最初のモデルを使用
++          // フォールバック通知
++          showToast(`クォータ超過のため ${MODELS[effectiveModel].name} にフォールバックしました`);
++        }
++      } else {
++        // フォールバック不可の場合
++        throw new Error('月間クォータを超過しました。プランをアップグレードするか、翌月まで待ってください。');
++      }
++    }
++    
++    // APIリクエスト実行
++    // ...
++  };
++  ```
++
++#### サブスクリプション管理
++- `services/subscription.ts` - サブスクリプション検証ロジック
++  ```typescript
++  // services/subscription.ts
++  import * as StoreKit from 'expo-store-kit';
++  import * as SecureStore from 'expo-secure-store';
++  import { supabase } from './supabase';
++  import { PLANS } from '../constants/plans';
++  import useStore from '../store';
++
++  // レシート検証
++  export const verifyReceipt = async (receipt: string, platform: 'ios' | 'android') => {
++    try {
++      // Supabase Edge Functionでレシート検証
++      const { data, error } = await supabase.functions.invoke('verify-receipt', {
++        body: { receipt, platform },
++      });
++      
++      if (error) throw error;
++      
++      if (data.valid) {
++        // 有効なレシート
++        const { productId, purchaseDate, expiryDate } = data;
++        
++        // プラン情報の更新
++        let planId = 'free';
++        
++        // productIdからプランを特定
++        Object.entries(PLANS).forEach(([key, plan]) => {
++          if (plan.periods) {
++            Object.values(plan.periods).forEach(period => {
++              if (period.id === productId) {
++                planId = plan.id;
++              }
++            });
++          }
++        });
++        
++        // ストアの更新
++        useStore.getState().updateSubscription({
++          id: productId,
++          startDate: purchaseDate,
++          endDate: expiryDate,
++          autoRenew: true,
++        });
++        
++        useStore.getState().setPlan(planId);
++        
++        // クォータの更新
++        useStore.getState().updateQuotaLimits();
++        
++        return { success: true, plan: planId };
++      }
++      
++      return { success: false, message: 'Invalid receipt' };
++    } catch (error) {
++      console.error('Receipt verification failed:', error);
++      return { success: false, message: error.message };
++    }
++  };
++  ```
+ 
+ ## 2. APIキー管理バックエンド
+ 
+@@ -52,72 +330,1196 @@
+ 
+ | Provider | プロビジョニング方法 | レート/コスト制限 | ローテーションAPI | 備考 |
+ |----------|----------------------|------------------|------------------|------|
+-| **OpenRouter** | `POST /api/v1/keys` | `limit` (USD) or `req_per_min` | `DELETE /api/v1/keys/{id}` | 組織クレジット継承 |
+-| **Cloudflare Workers AI** | **Scoped API Tokens** | "Workers KV/AI" + R2/AI権限 | `PUT /user/tokens/{id}` | 90日ごとのローテーション推奨 |
+-| **OpenAI** (画像) | Child key via Dashboard | 組織レベルの使用上限のみ | 手動またはSeleniumスクリプト | 手動プールからのローテーション |
++| **OpenRouter** | `POST /api/v1/auth/keys` | `limit` (USD) or `req_per_min` | `DELETE /api/v1/auth/keys/{id}` | 組織クレジット継承 |
++| **Cloudflare Workers AI** | 少数の共有キー管理 | ロードバランシング | 90日ごとの手動更新 | 複数キー間でのリクエスト分散 |
++| **OpenAI** (画像) | 組織単位の少数キー | 使用量追跡 | 60-90日ごとの手動更新 | ユーザーIDとリクエスト紐付け |
++
++### 2.2 実装アーキテクチャ
++
++#### 2.2.1 OpenRouter Provisioning API実装
++
++```typescript
++// supabase/functions/api-key-management/index.ts
++import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
++import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
++
++const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1'
++const MASTER_KEYS = Deno.env.get('OPENROUTER_MASTER_KEYS')?.split(',') || []
++
++serve(async (req) => {
++  // Supabase クライアント初期化
++  const supabaseClient = createClient(
++    Deno.env.get('SUPABASE_URL') ?? '',
++    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
++  )
++  
++  const { user_id, action } = await req.json()
++  
++  // ユーザー検証
++  const { data: user, error: userError } = await supabaseClient
++    .from('users')
++    .select('id, plan')
++    .eq('id', user_id)
++    .single()
++  
++  if (userError || !user) {
++    return new Response(JSON.stringify({ error: 'User not found' }), { status: 404 })
++  }
++  
++  // マスターキー選択（ラウンドロビン）
++  const masterKeyIndex = Math.floor(Math.random() * MASTER_KEYS.length)
++  const masterKey = MASTER_KEYS[masterKeyIndex]
++  
++  if (action === 'provision') {
++    try {
++      // 既存キーの確認
++      const { data: existingKey } = await supabaseClient
++        .from('api_keys')
++        .select('or_key, or_key_id, or_expires')
++        .eq('user_id', user_id)
++        .single()
++      
++      // 有効期限内のキーが存在する場合は再利用
++      if (existingKey && new Date(existingKey.or_expires) > new Date()) {
++        return new Response(JSON.stringify({ 
++          key: existingKey.or_key,
++          expires: existingKey.or_expires
++        }))
++      }
++      
++      // 新規キー発行
++      const response = await fetch(`${OPENROUTER_API_URL}/auth/keys`, {
++        method: 'POST',
++        headers: {
++          'Authorization': `Bearer ${masterKey}`,
++          'Content-Type': 'application/json'
++        },
++        body: JSON.stringify({
++          name: `user-${user_id.substring(0, 8)}`,
++          limit: getPlanLimit(user.plan),
++          req_per_min: getPlanRateLimit(user.plan),
++          expires_after_days: 30
++        })
++      })
++      
++      if (!response.ok) {
++        throw new Error(`OpenRouter API error: ${response.status}`)
++      }
++      
++      const keyData = await response.json()
++      
++      // キー情報をDBに保存
++      const expiryDate = new Date()
++      expiryDate.setDate(expiryDate.getDate() + 30)
++      
++      await supabaseClient
++        .from('api_keys')
++        .upsert({
++          user_id,
++          or_key: keyData.key,
++          or_key_id: keyData.id,
++          or_expires: expiryDate.toISOString()
++        })
++      
++      return new Response(JSON.stringify({ 
++        key: keyData.key,
++        expires: expiryDate.toISOString()
++      }))
++    } catch (error) {
++      console.error('Key provisioning error:', error)
++      
++      // フォールバック: 共有キーを返す
++      return new Response(JSON.stringify({ 
++        key: masterKey,
++        is_fallback: true,
++        error: error.message
++      }))
++    }
++  } else if (action === 'rotate') {
++    // キーローテーションロジック
++    // ...同様の実装
++  }
++  
++  return new Response(JSON.stringify({ error: 'Invalid action' }), { status: 400 })
++})
++
++// プラン別の制限設定
++function getPlanLimit(plan) {
++  switch (plan) {
++    case 'premium': return 50 // $50相当
++    case 'lite': return 20    // $20相当
++    case 'free': return 5     // $5相当
++    default: return 2
++  }
++}
++
++function getPlanRateLimit(plan) {
++  switch (plan) {
++    case 'premium': return 60 // 1分あたり60リクエスト
++    case 'lite': return 30    // 1分あたり30リクエスト
++    case 'free': return 10    // 1分あたり10リクエスト
++    default: return 5
++  }
++}
++```
++
++#### 2.2.2 Cloudflare/OpenAI共有キー管理
++
++```typescript
++// supabase/functions/shared-key-manager/index.ts
++import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
++
++// 共有キープール
++const CF_KEYS = Deno.env.get('CLOUDFLARE_API_KEYS')?.split(',') || []
++const OA_KEYS = Deno.env.get('OPENAI_API_KEYS')?.split(',') || []
++
++// キー使用状況追跡（メモリ内、実運用ではRedisなどを使用）
++const keyUsage = {
++  cf: CF_KEYS.map(() => ({ count: 0, lastError: null })),
++  oa: OA_KEYS.map(() => ({ count: 0, lastError: null }))
++}
++
++serve(async (req) => {
++  const { service, user_id } = await req.json()
++  
++  if (service === 'cloudflare') {
++    // 最も使用回数の少ないキーを選択
++    const minIndex = keyUsage.cf
++      .map((usage, index) => ({ index, count: usage.count }))
++      .sort((a, b) => a.count - b.count)[0].index
++    
++    // 使用回数をインクリメント
++    keyUsage.cf[minIndex].count++
++    
++    return new Response(JSON.stringify({ 
++      key: CF_KEYS[minIndex],
++      key_index: minIndex
++    }))
++  } else if (service === 'openai') {
++    // OpenAIキー選択ロジック（同様）
++    const minIndex = keyUsage.oa
++      .map((usage, index) => ({ index, count: usage.count }))
++      .sort((a, b) => a.count - b.count)[0].index
++    
++    keyUsage.oa[minIndex].count++
++    
++    return new Response(JSON.stringify({ 
++      key: OA_KEYS[minIndex],
++      key_index: minIndex
++    }))
++  }
++  
++  return new Response(JSON.stringify({ error: 'Invalid service' }), { status: 400 })
++})
++```
++
++#### 2.2.3 クライアント側実装
+ 
+-### 2.2 データモデル
++```typescript
++// services/api.ts
++import { supabase } from './supabase'
++
++// APIキー取得関数
++export const getApiKey = async (service: 'openrouter' | 'cloudflare' | 'openai') => {
++  try {
++    let endpoint = ''
++    let payload = {}
++    
++    switch (service) {
++      case 'openrouter':
++        endpoint = 'api-key-management'
++        payload = { action: 'provision' }
++        break
++      case 'cloudflare':
++      case 'openai':
++        endpoint = 'shared-key-manager'
++        payload = { service }
++        break
++    }
++    
++    const { data, error } = await supabase.functions.invoke(endpoint, {
++      body: {
++        user_id: supabase.auth.user()?.id,
++        ...payload
++      }
++    })
++    
++    if (error) throw error
++    
++    return data.key
++  } catch (error) {
++    console.error(`Failed to get ${service} API key:`, error)
++    throw new Error(`APIキーの取得に失敗しました: ${error.message}`)
++  }
++}
++
++// APIリクエスト関数
++export const makeApiRequest = async (service, endpoint, options) => {
++  try {
++    const apiKey = await getApiKey(service)
++    
++    // APIリクエスト実行
++    const response = await fetch(endpoint, {
++      ...options,
++      headers: {
++        ...options.headers,
++        'Authorization': `Bearer ${apiKey}`
++      }
++    })
++    
++    // レート制限エラー処理
++    if (response.status === 429) {
++      // エラー報告
++      await reportKeyError(service, apiKey, '429')
++      
++      // 再試行（別のキーで）
++      return makeApiRequest(service, endpoint, options)
++    }
++    
++    return response
++  } catch (error) {
++    // エラーハンドリング
++    console.error('API request failed:', error)
++    throw error
++  }
++}
++
++// キーエラー報告
++const reportKeyError = async (service, key, errorType) => {
++  try {
++    await supabase.functions.invoke('key-error-reporter', {
++      body: { service, key, errorType }
++    })
++  } catch (e) {
++    console.error('Failed to report key error:', e)
++  }
++}
++```
++
++### 2.3 データモデル
+ 
+ ```sql
++-- api_keys テーブル
+ CREATE TABLE api_keys (
+-  user_id UUID PRIMARY KEY,
++  user_id UUID PRIMARY KEY REFERENCES auth.users(id),
+   or_key TEXT,
+   or_key_id TEXT,
+-  or_expires TIMESTAMP,
+-  cf_token TEXT,
+-  cf_token_id TEXT,
+-  cf_expires TIMESTAMP,
+-  oa_key TEXT,
+-  oa_created TIMESTAMP
++  or_expires TIMESTAMP WITH TIME ZONE,
++  last_used TIMESTAMP WITH TIME ZONE DEFAULT now(),
++  error_count INTEGER DEFAULT 0,
++  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
++);
++
++-- key_usage_logs テーブル
++CREATE TABLE key_usage_logs (
++  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
++  user_id UUID REFERENCES auth.users(id),
++  service TEXT NOT NULL,
++  key_index INTEGER,
++  request_type TEXT NOT NULL,
++  tokens_used INTEGER,
++  status_code INTEGER,
++  error TEXT,
++  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+ );
++
++-- RLSポリシー
++ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
++CREATE POLICY "Users can only access their own API keys"
++  ON api_keys FOR ALL
++  USING (auth.uid() = user_id);
++
++ALTER TABLE key_usage_logs ENABLE ROW LEVEL SECURITY;
++CREATE POLICY "Users can only access their own usage logs"
++  ON key_usage_logs FOR ALL
++  USING (auth.uid() = user_id);
+ ```
+ 
+-### 2.3 キーローテーション
++### 2.4 キーローテーション戦略
++
++#### 2.4.1 OpenRouter
++
++- **自動ローテーション**: 有効期限の5日前に新キー発行
++- **実装**: Supabase Cronジョブで毎日実行
++  ```sql
++  -- 期限切れ間近のキーを検出するクエリ
++  SELECT user_id, or_key_id
++  FROM api_keys
++  WHERE or_expires < (now() + interval '5 days')
++  ```
++
++#### 2.4.2 Cloudflare & OpenAI
++
++- **手動ローテーション**: 管理者が90日ごとに新キーを追加
++- **実装**: 環境変数更新 + Edge Function再デプロイ
++- **移行戦略**: 古いキーを2週間保持し、徐々に新キーへ移行
+ 
+-- **OpenRouter & Cloudflare**: 自動ローテーション（有効期限の5日前、30日ごと）
+-- **OpenAI**: 60-90日ごと（手動プールから交換）
++### 2.5 エラーハンドリングとフォールバック
+ 
+-### 2.4 エラーハンドリング
++| シナリオ | アクション | 実装詳細 |
++|----------|-----------|----------|
++| **キー作成失敗** | 指数バックオフ再試行 | 最大3回、間隔を2倍ずつ増加（1s→2s→4s） |
++| | 共有キーへフォールバック | マスターキーを一時的に使用、エラーログ記録 |
++| **Provider 429** | キー切り替え | 別のキーインデックスを選択し再試行 |
++| | Tierダウングレード | 低Tierモデルへ自動切替（`userStore.checkQuotaStatus`と連携） |
++| **ローテーション失敗** | アラート通知 | 管理者へSlack通知、手動介入要求 |
++| | 有効期限延長 | 一時的に期限を7日延長し、サービス継続を確保 |
++| **認証エラー** | プラットフォーム固有フォールバック | iOS: Keychain、Android: EncryptedSharedPreferences |
++| | オフラインモード | ローカルモデルへの自動切替 |
+ 
+-| シナリオ | アクション |
+-|----------|-----------|
+-| キー作成失敗 | 指数バックオフ再試行、共有組織キーへのフォールバック |
+-| Provider 429 | Tierダウングレードまたはリクエストキュー |
+-| ローテーション失敗 | アラート通知、古いキーの有効期限延長 |
++### 2.6 セキュリティ対策
++
++- **キー保護**: すべてのキーはEdge Functionでのみ使用し、クライアントには公開しない
++- **アクセス制限**: RLSポリシーによるデータ保護
++- **監査ログ**: すべてのキー使用をログに記録し、異常検知
++- **暗号化**: キーはSupabase内で暗号化して保存
++- **レート制限**: ユーザーごとのリクエスト制限を実装
++
++### 2.7 実装スケジュール
++
++| フェーズ | タスク | 期間 |
++|---------|-------|------|
++| 1 | データモデル作成 | 1日 |
++| 2 | OpenRouter Provisioning API実装 | 2日 |
++| 3 | 共有キー管理システム実装 | 2日 |
++| 4 | クライアント統合 | 1日 |
++| 5 | エラーハンドリングとフォールバック | 2日 |
++| 6 | テストとデバッグ | 2日 |
+ 
+ ## 3. UI/UXリファクタリング
+ 
+-### 3.1 UI一貫性
++### 3.1 UI一貫性の実装
++
++#### 3.1.1 テーマシステム
++
++```typescript
++// app/ui/theme.ts
++export const theme = {
++  // カラーパレット
++  colors: {
++    primary: '#005E36',
++    primaryLight: '#00C26A',
++    accentBlue: '#007AFF',
++    deleteRed: '#FF3B30',
++    warningYellow: '#FFCC00',
++    background: {
++      light: '#FFFFFF',
++      dark: '#121212',
++    },
++    text: {
++      primary: {
++        light: '#000000',
++        dark: '#FFFFFF',
++      },
++      secondary: {
++        light: '#666666',
++        dark: '#AAAAAA',
++      },
++    },
++    // 他のカラー定義
++  },
++  
++  // スペーシング
++  spacing: {
++    xs: 4,
++    sm: 8,
++    md: 16,
++    lg: 24,
++    xl: 32,
++    xxl: 48,
++  },
++  
++  // セーフエリア
++  safeArea: {
++    top: 'env(safe-area-inset-top, 0px)',
++    bottom: 'env(safe-area-inset-bottom, 0px)',
++    left: 'env(safe-area-inset-left, 0px)',
++    right: 'env(safe-area-inset-right, 0px)',
++  },
++  
++  // タイポグラフィ
++  typography: {
++    heading1: {
++      fontSize: 24,
++      fontWeight: 'bold',
++      lineHeight: 32,
++    },
++    heading2: {
++      fontSize: 20,
++      fontWeight: 'bold',
++      lineHeight: 28,
++    },
++    // 他のテキストスタイル
++  },
++  
++  // ボーダーラディウス
++  borderRadius: {
++    sm: 4,
++    md: 8,
++    lg: 16,
++    xl: 24,
++    pill: 9999,
++  },
++  
++  // シャドウ
++  shadows: {
++    sm: {
++      shadowOffset: { width: 0, height: 1 },
++      shadowOpacity: 0.18,
++      shadowRadius: 1.0,
++      elevation: 1,
++    },
++    // 他のシャドウ定義
++  },
++  
++  // アニメーション
++  animation: {
++    duration: {
++      fast: 150,
++      normal: 300,
++      slow: 500,
++    },
++    easing: {
++      easeInOut: 'cubic-bezier(0.4, 0, 0.2, 1)',
++      easeOut: 'cubic-bezier(0.0, 0, 0.2, 1)',
++      easeIn: 'cubic-bezier(0.4, 0, 1, 1)',
++    },
++  },
++};
++
++// ユーティリティ関数
++export const getColor = (colorPath: string, isDark: boolean = false) => {
++  // カラーパスからテーマカラーを取得する実装
++};
++
++export const getSpacing = (size: keyof typeof theme.spacing) => {
++  return theme.spacing[size];
++};
++
++// Tailwind風ユーティリティ
++export const tw = {
++  p: (size: keyof typeof theme.spacing) => ({ padding: theme.spacing[size] }),
++  px: (size: keyof typeof theme.spacing) => ({ 
++    paddingLeft: theme.spacing[size], 
++    paddingRight: theme.spacing[size] 
++  }),
++  py: (size: keyof typeof theme.spacing) => ({ 
++    paddingTop: theme.spacing[size], 
++    paddingBottom: theme.spacing[size] 
++  }),
++  // 他のユーティリティ
++};
++```
++
++#### 3.1.2 コンポーネントリファクタリング優先順位
++
++| コンポーネント | 現状の問題 | リファクタリング方針 | 優先度 |
++|--------------|-----------|-------------------|-------|
++| **ChatBubble** | インラインスタイル多用、パディング不一致 | テーマ適用、Tailwind風クラス化 | 最高 |
++| **Header** | 画面ごとに異なるパディング | `theme.safeArea.top`統一 | 最高 |
++| **BottomTabs** | ハードコードされた色/サイズ | テーマカラー参照 | 高 |
++| **Buttons** | 複数の実装バリエーション | 統一Button + variant | 高 |
++| **Modals** | スタイル不一致 | 共通Modal + content pattern | 中 |
++| **Lists** | 不統一なセパレータ/パディング | ListItem抽象化 | 中 |
++| **Forms** | 重複コード | FormField抽象化 | 低 |
++
++#### 3.1.3 実装アプローチ
++
++```typescript
++// 例: ChatBubble リファクタリング
++// Before:
++<View style={{ 
++  backgroundColor: isUser ? '#DCF8C6' : '#FFFFFF',
++  borderRadius: 10,
++  padding: 12,
++  marginVertical: 4,
++  marginHorizontal: 8,
++  // ... その他インラインスタイル
++}}>
++  <Text style={{ fontSize: 16, color: '#000000' }}>{message.text}</Text>
++</View>
+ 
+-- **統一トップパディング**: すべての画面で `theme.safeTop` を使用
+-- **集中スタイル**: 共通サイズ/カラーを `ui/theme.ts` に抽出
+-- **コンポーネントクリーンアップ**: インラインスタイル → Tailwind風ユーティリティクラスまたは `styled()` バリアント
++// After:
++import { theme, tw } from '../../ui/theme';
++
++<ChatBubble 
++  variant={isUser ? 'user' : 'ai'}
++  style={[tw.my('xs'), tw.mx('sm')]}
++>
++  <Text style={tw.text('body')}>{message.text}</Text>
++</ChatBubble>
++
++// components/ChatBubble.tsx
++const variants = {
++  user: {
++    backgroundColor: theme.colors.userBubble,
++    alignSelf: 'flex-end',
++  },
++  ai: {
++    backgroundColor: theme.colors.aiBubble,
++    alignSelf: 'flex-start',
++  },
++};
++
++export const ChatBubble = ({ variant, style, children }) => (
++  <View 
++    style={[
++      tw.p('md'),
++      tw.rounded('lg'),
++      variants[variant],
++      style,
++    ]}
++  >
++    {children}
++  </View>
++);
++```
+ 
+ ### 3.2 使用量表示UI
+ 
+-- **Settings › Usage ペイン**:
+-  - モデルTierごとのトークンバー（`<ProgressRing>`）
+-  - 画像カウント（DALL·E / SDXL-25 / Lightning）
+-- **ランタイム警告**:
+-  - 80%クォータ → 黄色バナー「残りわずか」
+-  - 100% → 自動フォールバックまたは429 + アップグレードCTA
++#### 3.2.1 Settings › Usage ペイン
++
++```typescript
++// components/UsagePanel.tsx
++export const UsagePanel = () => {
++  const { 
++    tokenUsage, 
++    tokenLimit,
++    imageUsage,
++    imageLimit,
++    aiAssistUsage,
++    aiAssistLimit,
++    plan 
++  } = useStore(state => state.user);
++  
++  const tokenPercentage = Math.min(100, Math.round((tokenUsage / tokenLimit) * 100));
++  const tokenWarning = tokenPercentage >= 80;
++  
++  return (
++    <View style={tw.p('lg')}>
++      <Text style={tw.text('heading2')}>トークン使用量</Text>
++      <ProgressBar 
++        percentage={tokenPercentage}
++        color={tokenWarning ? theme.colors.warningYellow : theme.colors.primary}
++        label={`${tokenUsage.toLocaleString()}/${tokenLimit.toLocaleString()}`}
++      />
++      
++      <Text style={[tw.text('heading2'), tw.mt('lg')]}>画像生成</Text>
++      <View style={tw.mt('sm')}>
++        <UsageCounter 
++          label="DALL-E"
++          current={imageUsage.dalle}
++          limit={imageLimit.dalle}
++          isPremium
++        />
++        <UsageCounter 
++          label="SDXL"
++          current={imageUsage.sdxl}
++          limit={imageLimit.sdxl}
++        />
++        <UsageCounter 
++          label="Lightning"
++          current={imageUsage.lightning}
++          limit="∞"
++          isUnlimited
++        />
++      </View>
++      
++      <Text style={[tw.text('heading2'), tw.mt('lg')]}>AIアシスト</Text>
++      <ProgressBar 
++        percentage={(aiAssistUsage / aiAssistLimit) * 100}
++        color={theme.colors.accentBlue}
++        label={`${aiAssistUsage}/${aiAssistLimit}`}
++      />
++      
++      {plan !== 'premium' && (
++        <UpgradeButton 
++          style={tw.mt('xl')}
++          label={`${plan === 'free' ? 'Lite' : 'Premium'}にアップグレード`}
++        />
++      )}
++    </View>
++  );
++};
++
++// components/ProgressBar.tsx
++export const ProgressBar = ({ percentage, color, label }) => (
++  <View style={[tw.mt('sm'), { height: 24 }]}>
++    <View style={[tw.rounded('pill'), { backgroundColor: '#E0E0E0', height: '100%' }]}>
++      <View 
++        style={[
++          tw.rounded('pill'),
++          { 
++            backgroundColor: color,
++            width: `${percentage}%`,
++            height: '100%',
++          }
++        ]}
++      />
++    </View>
++    <Text style={[tw.text('caption'), tw.mt('xs')]}>{label}</Text>
++  </View>
++);
++
++// components/UsageCounter.tsx
++export const UsageCounter = ({ label, current, limit, isPremium, isUnlimited }) => (
++  <View style={[tw.flexRow, tw.itemsCenter, tw.justifyBetween, tw.py('xs')]}>
++    <View style={tw.flexRow}>
++      <Text style={tw.text('body')}>{label}</Text>
++      {isPremium && (
++        <Badge 
++          label="Premium" 
++          style={tw.ml('xs')}
++          variant="premium"
++        />
++      )}
++    </View>
++    <Text style={tw.text('body')}>
++      {isUnlimited ? `${current}/${limit}` : `${current}/${limit}`}
++    </Text>
++  </View>
++);
++```
++
++#### 3.2.2 ランタイム警告システム
++
++```typescript
++// components/QuotaWarningBanner.tsx
++export const QuotaWarningBanner = () => {
++  const { checkQuotaStatus, dismissWarning } = useStore(state => state.user);
++  const [isVisible, setIsVisible] = useState(false);
++  const quotaStatus = checkQuotaStatus();
++  
++  useEffect(() => {
++    setIsVisible(quotaStatus.warning || quotaStatus.exceeded);
++  }, [quotaStatus]);
++  
++  if (!isVisible) return null;
++  
++  return (
++    <Animated.View 
++      style={[
++        tw.px('md'),
++        tw.py('sm'),
++        tw.flexRow,
++        tw.itemsCenter,
++        tw.justifyBetween,
++        {
++          backgroundColor: quotaStatus.exceeded 
++            ? theme.colors.deleteRed 
++            : theme.colors.warningYellow,
++        }
++      ]}
++      entering={SlideInDown}
++      exiting={SlideOutUp}
++    >
++      <View style={tw.flexRow}>
++        <Icon 
++          name={quotaStatus.exceeded ? 'alert-circle' : 'alert-triangle'} 
++          color="#FFFFFF"
++          size={20}
++        />
++        <Text style={[tw.text('body'), tw.ml('sm'), { color: '#FFFFFF' }]}>
++          {quotaStatus.exceeded 
++            ? 'クォータ超過: 低Tierモデルへ自動切替' 
++            : `トークン残りわずか (${quotaStatus.percentage}%)`}
++        </Text>
++      </View>
++      
++      <View style={tw.flexRow}>
++        {quotaStatus.exceeded && (
++          <Button 
++            label="アップグレード"
++            variant="white"
++            onPress={() => {
++              dismissWarning();
++              // ナビゲーション: サブスクリプション画面へ
++            }}
++            style={tw.mr('sm')}
++          />
++        )}
++        <Button 
++          label="詳細"
++          variant="outline"
++          onPress={() => {
++            dismissWarning();
++            // ナビゲーション: 使用量画面へ
++          }}
++          style={tw.mr('sm')}
++        />
++        <Button 
++          label="閉じる"
++          variant="outline"
++          onPress={dismissWarning}
++        />
++      </View>
++    </Animated.View>
++  );
++};
++```
++
++### 3.3 アニメーションとトランジション
++
++#### 3.3.1 標準アニメーション
++
++| 要素 | アニメーション | 実装 |
++|------|--------------|------|
++| **モーダル** | フェード + スケール | Reanimated `FadeIn` + `ScaleIn` |
++| **リスト項目** | スライドイン | Reanimated `SlideInRight` |
++| **タブ切替** | クロスフェード | Reanimated `FadeIn` + `FadeOut` |
++| **ボタン** | スケール + ハイライト | Pressable + Animated.Value |
++| **バナー** | スライドダウン | Reanimated `SlideInDown` |
++
++```typescript
++// 例: ボタンプレスアニメーション
++export const AnimatedButton = ({ onPress, label, ...props }) => {
++  const scale = useSharedValue(1);
++  
++  const animatedStyle = useAnimatedStyle(() => ({
++    transform: [{ scale: scale.value }],
++  }));
++  
++  const handlePressIn = () => {
++    scale.value = withTiming(0.95, { 
++      duration: theme.animation.duration.fast,
++      easing: Easing.inOut(Easing.ease),
++    });
++  };
++  
++  const handlePressOut = () => {
++    scale.value = withTiming(1, { 
++      duration: theme.animation.duration.fast,
++      easing: Easing.inOut(Easing.ease),
++    });
++  };
++  
++  return (
++    <Pressable
++      onPressIn={handlePressIn}
++      onPressOut={handlePressOut}
++      onPress={onPress}
++      {...props}
++    >
++      <Animated.View style={[styles.button, animatedStyle]}>
++        <Text style={styles.label}>{label}</Text>
++      </Animated.View>
++    </Pressable>
++  );
++};
++```
++
++#### 3.3.2 スクリーントランジション
++
++```typescript
++// app/_layout.tsx
++export default function RootLayout() {
++  return (
++    <Stack
++      screenOptions={{
++        animation: 'fade_from_bottom',
++        headerShown: false,
++        contentStyle: {
++          backgroundColor: theme.colors.background.light,
++        },
++      }}
++    >
++      <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
++      <Stack.Screen 
++        name="chat/[id]" 
++        options={{ 
++          animation: 'slide_from_right',
++          gestureEnabled: true,
++          gestureDirection: 'horizontal',
++        }} 
++      />
++      <Stack.Screen 
++        name="settings/usage" 
++        options={{ 
++          animation: 'slide_from_bottom',
++          presentation: 'modal',
++        }} 
++      />
++      {/* 他の画面定義 */}
++    </Stack>
++  );
++}
++```
++
++### 3.4 アクセシビリティ強化
++
++- **セマンティックラベル**: すべてのインタラクティブ要素に `accessibilityLabel` 追加
++- **コントラスト**: WCAG AA基準（4.5:1）を満たすカラー調整
++- **フォーカス状態**: キーボード/スクリーンリーダー操作のサポート
++- **タッチターゲット**: 最小44×44 pxのタッチエリア確保
++
++```typescript
++// 例: アクセシブルボタン
++export const AccessibleButton = ({ label, onPress, icon }) => (
++  <Pressable
++    onPress={onPress}
++    accessibilityLabel={label}
++    accessibilityRole="button"
++    accessibilityState={{ disabled: false }}
++    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
++    style={({ pressed }) => [
++      styles.button,
++      pressed && styles.buttonPressed,
++    ]}
++  >
++    {icon && <Icon name={icon} style={styles.icon} />}
++    <Text style={styles.label}>{label}</Text>
++  </Pressable>
++);
++```
++
++### 3.5 レスポンシブデザイン
++
++- **Flexbox**: 柔軟なレイアウト構造の採用
++- **相対単位**: パーセンテージとFlexベースのサイズ設定
++- **デバイス適応**: `useWindowDimensions` によるサイズ検出
++- **向き対応**: 縦横両方の向きをサポート
++
++```typescript
++// hooks/useResponsive.ts
++export const useResponsive = () => {
++  const { width, height } = useWindowDimensions();
++  const isLandscape = width > height;
++  
++  const breakpoints = {
++    sm: width < 375,
++    md: width >= 375 && width < 768,
++    lg: width >= 768,
++  };
++  
++  const spacing = {
++    container: breakpoints.sm ? 12 : breakpoints.md ? 16 : 24,
++    // 他のレスポンシブ値
++  };
++  
++  return {
++    width,
++    height,
++    isLandscape,
++    breakpoints,
++    spacing,
++  };
++};
++
++// 使用例
++const MyComponent = () => {
++  const { breakpoints, spacing } = useResponsive();
++  
++  return (
++    <View style={{ padding: spacing.container }}>
++      {breakpoints.lg ? (
++        <TwoColumnLayout />
++      ) : (
++        <SingleColumnLayout />
++      )}
++    </View>
++  );
++};
++```
++
++### 3.6 実装スケジュール
++
++| フェーズ | タスク | 期間 |
++|---------|-------|------|
++| 1 | テーマシステム構築 (`ui/theme.ts`) | 1日 |
++| 2 | 共通コンポーネントリファクタリング (Button, Header, ChatBubble) | 2日 |
++| 3 | 使用量表示UI実装 | 1日 |
++| 4 | クォータ警告システム | 1日 |
++| 5 | アニメーション統合 | 2日 |
++| 6 | アクセシビリティ対応 | 1日 |
++| 7 | テスト・調整 | 2日 |
++
++## 4. ローカルモデル管理（Unsloth版Qwen3-4B）
++
++### 4.1 モデル選定と準備
++
++- **選定モデル**: Unsloth版Qwen3-4B (Q4_K_M) 4bit GGUF
++  - **サイズ**: 約2.5GB（4bit量子化済み）
++  - **ソース**: Hugging Faceの`unsloth/Qwen3-4B-GGUF`リポジトリ
++  - **特徴**: 品質と速度のバランスが良い4bit量子化モデル、コンテキスト長32,768トークン
++  - **ライセンス**: Apache-2.0（暗号化不要）
++
++- **ホスティング**:
++  - Supabase Storageのプライベートバケット`models/qwen3-4b/`に配置
++  - ファイルのSHA-256ハッシュを保存（整合性チェック用）
++  - Edge Functionで署名付きURLを生成（有効期間1時間）
++
++### 4.2 ダウンロードワーカー実装
++
++```typescript
++// services/localModel.ts
++export const downloadQwen3Model = async (
++  progressCallback: (progress: number) => void
++): Promise<boolean> => {
++  try {
++    // 保存先パス
++    const destDir = `${FileSystem.documentDirectory}models/`;
++    const destPath = `${destDir}Qwen3-4B-Q4_K_M.gguf`;
++    
++    // ディレクトリ作成
++    await FileSystem.makeDirectoryAsync(destDir, { intermediates: true });
++    
++    // ストレージチェック
++    const { freeSizeInBytes } = await getAvailableStorageSpace();
++    if (freeSizeInBytes < 3 * 1024 * 1024 * 1024) { // 3GB以上必要
++      throw new Error('ストレージ容量が不足しています。少なくとも3GB以上の空き容量が必要です。');
++    }
++    
++    // 署名付きURL取得
++    const signedUrl = await api.getSignedUrl('models/qwen3-4b/Q4_K_M.gguf');
++    
++    // ダウンロード（進捗表示付き）
++    await FileSystem.downloadAsync(signedUrl, destPath, {
++      md5: true,
++      headers: { 'Cache-Control': 'no-store' },
++      callback: (downloadProgress) => {
++        const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
++        progressCallback(progress);
++      }
++    });
++    
++    // ハッシュ検証
++    const fileInfo = await FileSystem.getInfoAsync(destPath, { md5: true });
++    const isValid = fileInfo.md5 === EXPECTED_QWEN_MD5;
++    
++    if (!isValid) {
++      throw new Error('ダウンロードしたモデルファイルの整合性検証に失敗しました。');
++    }
++    
++    // 成功を記録
++    await SecureStore.setItemAsync('qwenInstalled', 'true');
++    await SecureStore.setItemAsync('qwenInstalledDate', new Date().toISOString());
++    
++    return true;
++  } catch (error) {
++    console.error('Qwen3モデルダウンロードエラー:', error);
++    throw error;
++  }
++};
++```
++
++### 4.3 llama.rnによるモデルロード
++
++```typescript
++// services/localInference.ts
++import { initLlama, LlamaContext } from 'llama.rn';
++
++export const loadQwenModel = async (): Promise<LlamaContext | null> => {
++  try {
++    const modelPath = `${FileSystem.documentDirectory}models/Qwen3-4B-Q4_K_M.gguf`;
++    
++    // ファイル存在確認
++    const fileInfo = await FileSystem.getInfoAsync(modelPath);
++    if (!fileInfo.exists) {
++      throw new Error('モデルファイルが見つかりません。');
++    }
++    
++    // モデルロード
++    const ctx = await initLlama({
++      modelPath: 'file://' + modelPath,
++      nCtx: 4096,      // コンテキストウィンドウサイズ
++      nThreads: 4,     // 使用スレッド数
++      nBatch: 512,     // バッチサイズ
++    });
++    
++    return ctx;
++  } catch (error) {
++    // メモリ不足エラー（LLAMA_NOMEM）の場合
++    if (error.message.includes('LLAMA_NOMEM') || error.message.includes('memory')) {
++      console.warn('メモリ不足エラー、軽量モデルへフォールバック');
++      return await loadFallbackModel();
++    }
++    
++    console.error('Qwenモデルロードエラー:', error);
++    return null;
++  }
++};
++
++// メモリ不足時のフォールバック処理
++async function loadFallbackModel(): Promise<LlamaContext | null> {
++  try {
++    // 軽量モデルのパス（Q3_K_Mは約2.08GB）
++    const fallbackPath = `${FileSystem.documentDirectory}models/Qwen3-4B-Q3_K_M.gguf`;
++    
++    // 軽量モデルが存在しない場合はダウンロード
++    const fileInfo = await FileSystem.getInfoAsync(fallbackPath);
++    if (!fileInfo.exists) {
++      // ユーザーに通知
++      showToast('メモリ制約のため軽量モデルをダウンロードします');
++      
++      // 軽量モデルのダウンロード処理（省略）
++      // ...
++    }
++    
++    // 軽量モデルのロード
++    const ctx = await initLlama({
++      modelPath: 'file://' + fallbackPath,
++      nCtx: 2048,      // コンテキスト縮小
++      nThreads: 2,     // スレッド数削減
++      nBatch: 256,     // バッチサイズ削減
++    });
++    
++    return ctx;
++  } catch (error) {
++    console.error('フォールバックモデルロードエラー:', error);
++    
++    // すべて失敗した場合はクラウドモデルへの切替えを推奨
++    showToast('ローカルモデルを読み込めません。クラウドモデルに切り替えます。');
++    return null;
++  }
++}
++```
++
++### 4.4 ステータスバッジとUI
++
++```typescript
++// components/LocalModelStatusBadge.tsx
++export const LocalModelStatusBadge = () => {
++  const { 
++    modelStatus, 
++    downloadProgress,
++    errorMessage 
++  } = useStore(state => state.localModel);
++  
++  // ステータスに応じたバッジ表示
++  const getBadgeContent = () => {
++    switch (modelStatus) {
++      case 'not_downloaded':
++        return { icon: '⚪️', label: '未DL', color: '#AAAAAA' };
++      case 'downloading':
++        return { 
++          icon: '🔄', 
++          label: `${Math.round(downloadProgress * 100)}%`, 
++          color: '#007AFF' 
++        };
++      case 'verifying':
++        return { icon: '🔍', label: '検証中', color: '#FFCC00' };
++      case 'ready':
++        return { icon: '🟢', label: '使用可', color: '#34C759' };
++      case 'error':
++        return { icon: '🔴', label: 'エラー', color: '#FF3B30' };
++      default:
++        return { icon: '⚪️', label: '未DL', color: '#AAAAAA' };
++    }
++  };
++  
++  const badge = getBadgeContent();
++  
++  return (
++    <Pressable 
++      onPress={() => {
++        // エラー状態の場合、詳細を表示
++        if (modelStatus === 'error' && errorMessage) {
++          Alert.alert('エラー詳細', errorMessage);
++        }
++      }}
++      style={[styles.badge, { backgroundColor: badge.color }]}
++    >
++      <Text style={styles.icon}>{badge.icon}</Text>
++      <Text style={styles.label}>{badge.label}</Text>
++    </Pressable>
++  );
++};
++```
++
++### 4.5 プラン別クォータ管理
++
++| プラン | ローカルLLM呼び出し上限／日 | 超過時の挙動 |
++|--------|--------------------------|------------|
++| Free | 50 回 | Cloud版 GPT-4o-mini に自動フォールバック |
++| Lite | 500 回 | 同上 |
++| Premium | 無制限 | — |
++
++```typescript
++// store/localModelStore.ts
++export const createLocalModelSlice = (set, get) => ({
++  // 状態
++  modelStatus: 'not_downloaded',
++  downloadProgress: 0,
++  errorMessage: null,
++  dailyUsageCount: 0,
++  dailyUsageLimit: 50, // デフォルトはFreeプラン
++  usageResetDate: new Date().toISOString().split('T')[0],
++  
++  // アクション
++  checkDailyUsageLimit: () => {
++    const state = get();
++    const today = new Date().toISOString().split('T')[0];
++    
++    // 日付が変わっていたらリセット
++    if (state.usageResetDate !== today) {
++      set({
++        dailyUsageCount: 0,
++        usageResetDate: today,
++      });
++      return true; // 制限内
++    }
++    
++    // プラン別の制限チェック
++    const { plan } = get().user;
++    const isPremium = plan === 'premium';
++    
++    // Premiumは無制限
++    if (isPremium) return true;
++    
++    // 制限チェック
++    return state.dailyUsageCount < state.dailyUsageLimit;
++  },
++  
++  incrementUsageCount: () => {
++    set(state => ({
++      dailyUsageCount: state.dailyUsageCount + 1,
++    }));
++  },
++  
++  updateUsageLimitByPlan: (plan) => {
++    const limits = {
++      free: 50,
++      lite: 500,
++      premium: Number.MAX_SAFE_INTEGER, // 実質無制限
++    };
++    
++    set({
++      dailyUsageLimit: limits[plan] || limits.free,
++    });
++  },
++  
++  // その他のアクション（ダウンロード、ステータス更新など）
++  // ...
++});
++```
+ 
+-## 4. ローカルモデル管理（Qwen 3 4B GGUF）
++### 4.6 ネイティブ連携
+ 
+-### 4.1 実装詳細
++- **iOS**: `pod install`でllama.cppをリンク
++  ```ruby
++  # ios/Podfile
++  pod 'llama-cpp', :path => '../node_modules/llama.rn/ios'
++  ```
+ 
+-- **ダウンロードワーカー**: RN FS → `FileSystem.documentDirectory/models/qwen3-4b.gguf`、進捗表示
+-- **インストールボタン**: チェックサムMD5が `local_models` テーブルと一致するまで無効
+-- **エンジン**: llama.cpp via react-native-llm, `n_threads=4`
+-- **エラー状態**: ストレージ不足/ネットワークエラー → トースト + 再試行オプション
++- **Android**: Gradleでネイティブライブラリをリンク
++  ```gradle
++  // android/app/build.gradle
++  android {
++    // ...
++    packagingOptions {
++      pickFirst 'lib/x86/libllama.so'
++      pickFirst 'lib/x86_64/libllama.so'
++      pickFirst 'lib/arm64-v8a/libllama.so'
++      pickFirst 'lib/armeabi-v7a/libllama.so'
++    }
++  }
++  ```
+ 
+-### 4.2 ステータスバッジ
++### 4.7 セキュリティと保存場所
+ 
+-- **未DL**: ⚪️ 白色
+-- **DL中**: 🔄 青色（進捗%表示）
+-- **検証中**: 🔍 黄色
+-- **使用可**: 🟢 緑色
+-- **エラー**: 🔴 赤色（タップでエラー詳細）
++- **保存場所**: `FileSystem.documentDirectory`配下（アプリ削除で自動消去）
++- **ライセンス**: Apache-2.0ライセンスのため暗号化不要
++- **iOS Files.app連携**: 必要に応じて`com.apple.security.files.user-selected.read-write`エンティトルメントを追加
+ 
+ ## 5. 画像生成機能強化
+ 

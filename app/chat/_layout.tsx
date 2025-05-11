@@ -1,8 +1,10 @@
 import React from 'react';
 import { Stack } from 'expo-router';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
 
 export default function ChatLayout() {
+  const colors = useColors(); // 動的カラーを取得
+  
   return (
     <Stack
       screenOptions={{
@@ -11,6 +13,9 @@ export default function ChatLayout() {
         presentation: 'card',
         gestureEnabled: true,
         gestureDirection: 'horizontal',
+        contentStyle: {
+          backgroundColor: colors.background
+        }
       }}
     />
   );
