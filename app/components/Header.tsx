@@ -1,0 +1,217 @@
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar, TextInput } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import theme from '../ui/theme';
+import useColors from '../constants/colors';
+
+type HeaderProps = {
+  title: string;
+  showBack?: boolean;
+  showModelSelect?: boolean;
+  onModelSelect?: () => void;
+  currentModelName?: string;
+  onTitleEdit?: (newTitle: string) => void;
+  rightComponent?: React.ReactNode;
+};
+
+const Header: React.FC<HeaderProps> = ({
+  title,
+  showBack = true,
+  showModelSelect = false,
+  onModelSelect,
+  currentModelName,
+  onTitleEdit,
+  rightComponent,
+}) => {
+  const router = useRouter();
+  const colors = useColors();
+  const [isEditingTitle, setIsEditingTitle] = React.useState(false);
+  const [editTitle, setEditTitle] = React.useState(title);
+
+  const handleBackPress = () => {
+    router.back();
+  };
+
+  const startTitleEdit = () => {
+    if (onTitleEdit) {
+      setEditTitle(title);
+      setIsEditingTitle(true);
+    }
+  };
+
+  const saveTitleEdit = () => {
+    if (onTitleEdit && editTitle.trim()) {
+      onTitleEdit(editTitle.trim());
+      setIsEditingTitle(false);
+    }
+  };
+
+  const cancelTitleEdit = () => {
+    setIsEditingTitle(false);
+  };
+
+  return (
+    <View style={[
+      styles.container,
+      { backgroundColor: colors.primary }
+    ]}>
+      {showBack && (
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={handleBackPress}
+          hitSlop={{ top: theme.spacing.sm, bottom: theme.spacing.sm, left: theme.spacing.sm, right: theme.spacing.sm }}
+        >
+          <Ionicons name="chevron-back" size={24} color={colors.textOnPrimary} />
+        </TouchableOpacity>
+      )}
+
+      {isEditingTitle ? (
+        <View style={styles.editTitleContainer}>
+          <TextInput
+            style={[styles.editTitleInput, { color: colors.textOnPrimary }]}
+            value={editTitle}
+            onChangeText={setEditTitle}
+            multiline
+            numberOfLines={2}
+            maxLength={50}
+            autoFocus
+            onSubmitEditing={saveTitleEdit}
+            blurOnSubmit={true}
+            returnKeyType="done"
+          />
+          <TouchableOpacity
+            style={styles.titleEditIcon}
+            onPress={saveTitleEdit}
+          >
+            <Ionicons name="checkmark" size={22} color={colors.textOnPrimary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.titleEditIcon}
+            onPress={cancelTitleEdit}
+          >
+            <Ionicons name="close" size={22} color={colors.textOnPrimary} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.titleContainer}
+          onPress={onTitleEdit ? startTitleEdit : undefined}
+          activeOpacity={onTitleEdit ? 0.7 : 1}
+        >
+          <Text
+            style={[styles.title, { color: colors.textOnPrimary }]}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {title}
+          </Text>
+          {onTitleEdit && (
+            <Ionicons 
+              name="pencil" 
+              size={18} 
+              color={colors.textOnPrimary} 
+              style={styles.titleEditIcon} 
+            />
+          )}
+        </TouchableOpacity>
+      )}
+
+      {showModelSelect && onModelSelect && (
+        <TouchableOpacity
+          style={styles.modelButton}
+          onPress={onModelSelect}
+          hitSlop={{ top: theme.spacing.sm, bottom: theme.spacing.sm, left: theme.spacing.sm, right: theme.spacing.sm }}
+        >
+          <Text style={[styles.modelButtonText, { color: colors.textOnPrimary }]}>
+            {currentModelName || 'モデル選択'}
+          </Text>
+          <Ionicons name="chevron-down" size={16} color={colors.textOnPrimary} />
+        </TouchableOpacity>
+      )}
+
+      {rightComponent && (
+        <View style={styles.rightComponentContainer}>
+          {rightComponent}
+        </View>
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: theme.safeArea.top,
+    paddingBottom: 0,
+    paddingHorizontal: theme.spacing.md,
+    height: 44 + theme.safeArea.top, // Increased height to match blue area
+  },
+  backButton: {
+    width: 32,
+    height: 32,
+    borderRadius: theme.radius.round,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: -4, // Adjust vertical position to center in blue area
+  },
+  titleContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 28,
+    marginTop: -4, // Adjust vertical position to center in blue area
+  },
+  title: {
+    fontSize: theme.fontSizes.md,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginHorizontal: theme.spacing.sm,
+  },
+  titleEditIcon: {
+    marginLeft: theme.spacing.xs,
+    marginRight: theme.spacing.xs,
+  },
+  editTitleContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 28,
+    marginTop: -4, // Adjust vertical position to center in blue area
+  },
+  editTitleInput: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    fontSize: theme.fontSizes.lg,
+    fontWeight: '600',
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    marginRight: theme.spacing.xs,
+    maxHeight: 48,
+  },
+  modelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.lg,
+    marginTop: -4, // Adjust vertical position to center in blue area
+  },
+  modelButtonText: {
+    marginRight: theme.spacing.xs,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: '500',
+  },
+  rightComponentContainer: {
+    marginLeft: theme.spacing.sm,
+  },
+});
+
+export default Header;
