@@ -4,7 +4,7 @@
 | 項目 | 内容 |
 |------|------|
 | **ミッション** | 「最安 × 高品質 × 広告ゼロ」を両立した"持ち歩けるAIチャットボットアプリ" |
-| **主な特徴** | **UI/UX** : LINE ライク濃緑トーク UI、下部タブ **Chats / NewChat / Image / Notes / Settings**。<br>**AI** : OpenRouter Model-Routing + 端末ローカル Qwen3‑4B のハイブリッド。<br>**ノート連携** : 回答をワンタップで Markdown/Text ノートへ保存。AIアシスト付き編集機能。<br>**ローカルモデル導線** : ModelSelect に常時「Qwen3‑4B (ローカル)」。未インストール時はインストールモーダルへ誘導。<br>**画像生成** : SDXL（Workers AI）とDALL-E両方をサポート。チャット内で直接生成可能。<br>**ビジネス** : ゲスト利用 → 課金／同期時に認証。Free ¥0・Lite ¥980・Premium ¥3,980。 |
+| **主な特徴** | **UI/UX** : LINE ライク濃緑トーク UI、下部タブ **Chats / NewChat / Image / Notes / Settings**。<br>**AI** : OpenRouter Model-Routing（Auto Router機能搭載）+ 端末ローカル Qwen3‑4B のハイブリッド。<br>**ノート連携** : 回答をワンタップで Markdown/Text ノートへ保存。AIアシスト付き編集機能。<br>**ローカルモデル導線** : ModelSelect に常時「Qwen3‑4B (ローカル)」。未インストール時はインストールモーダルへ誘導。<br>**画像生成** : SDXL（Workers AI）とDALL-E両方をサポート。チャット内で直接生成可能。<br>**ビジネス** : ゲスト利用 → 課金／同期時に認証。Free ¥0・Lite ¥980・Premium ¥3,980。 |
 | **ターゲット** | 日本語ユーザー：学生・ビジネスパーソン・クリエイター |
 
 ---
@@ -82,9 +82,9 @@ sequenceDiagram
 ## 4. 料金プラン（更新版）
 | プラン | 月額 | 半年/年間 | チャット／月 | 画像／日 | モデル | 備考 |
 |--------|------|-----------|-------------|----------|--------|------|
-| **Free** | ¥0 | - | **10k tokens** ≈ 20 msg | SDXL-25step ×5 | GPT-4o, 4o-mini, 4.1-mini & nano, DeepSeek V3, R1, **R1 Zero**, Gemini 2.5 Flash/Pro Exp, **Qwen3:4B (ローカル)** | GPT-4o & 4.1シリーズは合計で1 msg/日の制限あり |
-| **Lite** | **¥980** | ¥5,600/6ヶ月<br>¥9,800/12ヶ月 | **300k tokens** ≈ 600 msg | SDXL-25step ×10 | Free プランのモデル **+** o3, o4-mini, o4-mini-high, Gemini 2.5 Pro Preview | クォータ超過時は下位モデルへフォールバック |
-| **Premium** | **¥3,980** | ¥23,800/6ヶ月<br>¥39,800/12ヶ月 | **1.5M tokens** ≈ 3,000 msg | **DALL·E 3 ×5** + SDXL-25step ×50 | Lite プランのモデル **+** GPT-4.5 Preview, Claude 3.7 Sonnet & Sonnet-thinking | クォータ超過時は段階的にフォールバック |
+| **Free** | ¥0 | - | **10k tokens** ≈ 20 msg | SDXL-25step ×5 | **Auto (低コストモデルのみ)**, GPT-4o, 4o-mini, 4.1-mini & nano, DeepSeek V3, R1, **R1 Zero**, Gemini 2.5 Flash/Pro Exp, **Qwen3:4B (ローカル)** | GPT-4o & 4.1シリーズは合計で1 msg/日の制限あり |
+| **Lite** | **¥980** | ¥5,600/6ヶ月<br>¥9,800/12ヶ月 | **300k tokens** ≈ 600 msg | SDXL-25step ×10 | **Auto (中コストモデルまで)**, Free プランのモデル **+** o3, o4-mini, o4-mini-high, Gemini 2.5 Pro Preview | クォータ超過時は下位モデルへフォールバック |
+| **Premium** | **¥3,980** | ¥23,800/6ヶ月<br>¥39,800/12ヶ月 | **1.5M tokens** ≈ 3,000 msg | **DALL·E 3 ×5** + SDXL-25step ×50 | **Auto (すべてのモデル)**, Lite プランのモデル **+** GPT-4.5 Preview, Claude 3.7 Sonnet & Sonnet-thinking | クォータ超過時は段階的にフォールバック |
 
 ---
 

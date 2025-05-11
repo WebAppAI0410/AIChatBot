@@ -3,7 +3,7 @@
 ## 1. クライアント機能
 | 区分 | 機能 | ライブラリ / メモ |
 |------|------|------------------|
-| ModelSelect | モデル RadioList + StatusBadge | Zustand + Tamagui |
+| ModelSelect | モデル RadioList + StatusBadge + Auto Router | Zustand + Tamagui |
 | LocalModelInstall | DL / 進捗 / 検証 / 登録 | `expo-file-system`, `mlc_llm_mobile` |
 | localModelStore | `status`, `progress`, `path` | Zustand Slice |
 | Settings | ローカルモデル管理 (DL,削除,更新) | Storage 残量チェック |
