@@ -47,7 +47,7 @@ export default function AppearanceScreen() {
   const colorThemes = [
     { id: 'green', label: 'グリーン', color: '#047857' },
     { id: 'blue', label: 'ブルー', color: '#0066CC' },
-    { id: 'orange', label: 'オレンジ', color: '#F97316' },
+    { id: 'orange', label: 'オレンジ', color: '#C2410C' },
     { id: 'purple', label: 'パープル', color: '#7C3AED' },
   ];
 
@@ -75,7 +75,7 @@ export default function AppearanceScreen() {
       alignItems: 'center',
     },
     headerTitle: {
-      color: colors.background,
+      color: colors.textOnPrimary,
       fontSize: 18,
       fontWeight: '600',
       flex: 1,
@@ -118,7 +118,7 @@ export default function AppearanceScreen() {
       color: colors.text,
     },
     selectedOptionText: {
-      color: colors.background,
+      color: colors.textOnPrimary,
       fontWeight: '500',
     },
     colorThemeContainer: {
@@ -135,7 +135,7 @@ export default function AppearanceScreen() {
     },
     selectedColorOption: {
       borderWidth: 3,
-      borderColor: colors.background,
+      borderColor: colors.textOnPrimary,
     },
     fontSizeContainer: {
       flexDirection: 'row',
@@ -157,7 +157,7 @@ export default function AppearanceScreen() {
       color: colors.text,
     },
     selectedFontSizeText: {
-      color: colors.background,
+      color: colors.textOnPrimary,
       fontWeight: '500',
     },
   });
@@ -178,7 +178,7 @@ export default function AppearanceScreen() {
             onPress={() => router.navigate('/(tabs)/settings')}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Ionicons name="chevron-back" size={24} color={colors.background} />
+            <Ionicons name="chevron-back" size={24} color={colors.textOnPrimary} />
           </TouchableOpacity>
           
           <Text style={styles.headerTitle}>
@@ -203,7 +203,7 @@ export default function AppearanceScreen() {
                 <Ionicons
                   name={option.icon as any}
                   size={24}
-                  color={theme === option.id ? colors.background : colors.text}
+                  color={theme === option.id ? colors.textOnPrimary : colors.text}
                 />
                 <Text
                   style={[
@@ -214,7 +214,7 @@ export default function AppearanceScreen() {
                   {option.label}
                 </Text>
                 {theme === option.id && (
-                  <Ionicons name="checkmark" size={24} color={colors.background} />
+                  <Ionicons name="checkmark" size={24} color={colors.textOnPrimary} />
                 )}
               </TouchableOpacity>
             ))}
@@ -287,7 +287,7 @@ export default function AppearanceScreen() {
                   {option.label}
                 </Text>
                 {language === option.id && (
-                  <Ionicons name="checkmark" size={24} color={colors.background} />
+                  <Ionicons name="checkmark" size={24} color={colors.textOnPrimary} />
                 )}
               </TouchableOpacity>
             ))}

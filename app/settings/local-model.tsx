@@ -91,7 +91,7 @@ export default function LocalModelScreen() {
       alignItems: 'center',
     },
     headerTitle: {
-      color: colors.background,
+      color: colors.textOnPrimary,
       fontSize: 18,
       fontWeight: '600',
       flex: 1,
@@ -227,7 +227,7 @@ export default function LocalModelScreen() {
       backgroundColor: colors.error,
     },
     buttonText: {
-      color: colors.background,
+      color: colors.textOnPrimary,
       fontSize: 16,
       fontWeight: '500',
       marginLeft: 8,
@@ -269,7 +269,7 @@ export default function LocalModelScreen() {
             onPress={() => router.navigate('/(tabs)/settings')}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Ionicons name="chevron-back" size={24} color={colors.background} />
+            <Ionicons name="chevron-back" size={24} color={colors.textOnPrimary} />
           </TouchableOpacity>
           
           <Text style={styles.headerTitle}>

@@ -268,7 +268,7 @@ export default function ChatScreen() {
       alignItems: 'center',
     },
     headerTitle: {
-      color: colors.background,
+      color: colors.textOnPrimary,
       fontSize: 18,
       fontWeight: '600',
       flex: 1,
@@ -311,7 +311,7 @@ export default function ChatScreen() {
       lineHeight: 22,
     },
     userMessageText: {
-      color: colors.background,
+      color: colors.textOnPrimary,
     },
     assistantMessageText: {
       color: colors.text,
@@ -364,7 +364,7 @@ export default function ChatScreen() {
       borderRadius: 16,
     },
     modelButtonText: {
-      color: colors.background,
+      color: colors.textOnPrimary,
       marginRight: 4,
       fontSize: 14,
       fontWeight: '500',
@@ -390,7 +390,7 @@ export default function ChatScreen() {
     editTitleInput: {
       flex: 1,
       backgroundColor: 'rgba(255,255,255,0.15)',
-      color: colors.background,
+      color: colors.textOnPrimary,
       fontSize: 18,
       fontWeight: '600',
       borderRadius: 8,
@@ -473,7 +473,7 @@ export default function ChatScreen() {
             onPress={() => router.back()}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Ionicons name="chevron-back" size={24} color={colors.background} />
+            <Ionicons name="chevron-back" size={24} color={colors.textOnPrimary} />
           </TouchableOpacity>
           
           {isEditingTitle ? (
@@ -504,13 +504,13 @@ export default function ChatScreen() {
                   }
                 }}
               >
-                <Ionicons name="checkmark" size={22} color={colors.background} />
+                <Ionicons name="checkmark" size={22} color={colors.textOnPrimary} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.titleEditIcon}
                 onPress={() => setIsEditingTitle(false)}
               >
-                <Ionicons name="close" size={22} color={colors.background} />
+                <Ionicons name="close" size={22} color={colors.textOnPrimary} />
               </TouchableOpacity>
             </View>
           ) : (
@@ -529,7 +529,7 @@ export default function ChatScreen() {
               >
                 {chat.title}
               </Text>
-              <Ionicons name="pencil" size={18} color={colors.background} style={styles.titleEditIcon} />
+              <Ionicons name="pencil" size={18} color={colors.textOnPrimary} style={styles.titleEditIcon} />
             </TouchableOpacity>
           )}
           <TouchableOpacity 
@@ -538,7 +538,7 @@ export default function ChatScreen() {
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
             <Text style={styles.modelButtonText}>{currentModel.name}</Text>
-            <Ionicons name="chevron-down" size={16} color={colors.background} />
+            <Ionicons name="chevron-down" size={16} color={colors.textOnPrimary} />
           </TouchableOpacity>
         </View>
         
@@ -573,7 +573,7 @@ export default function ChatScreen() {
             />
             {isLoading ? (
               <View style={styles.loadingButton}>
-                <ActivityIndicator color={colors.background} />
+                <ActivityIndicator color={colors.textOnPrimary} />
               </View>
             ) : (
               <TouchableOpacity
@@ -581,7 +581,7 @@ export default function ChatScreen() {
                 onPress={handleSend}
                 disabled={!input.trim()}
               >
-                <Ionicons name="send" size={24} color={input.trim() ? colors.background : colors.gray} />
+                <Ionicons name="send" size={24} color={input.trim() ? colors.textOnPrimary : colors.gray} />
               </TouchableOpacity>
             )}
           </View>

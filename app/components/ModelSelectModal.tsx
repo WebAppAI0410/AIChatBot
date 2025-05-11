@@ -183,7 +183,7 @@ export default function ModelSelectModal({
     badgeText: {
       fontSize: 12,
       fontWeight: 'bold',
-      color: colors.background,
+      color: colors.textOnPrimary,
     },
     premiumBadge: {
       backgroundColor: colors.accentBlue,
@@ -195,7 +195,7 @@ export default function ModelSelectModal({
     premiumBadgeText: {
       fontSize: 12,
       fontWeight: 'bold',
-      color: colors.background,
+      color: colors.textOnPrimary,
     },
   });
   

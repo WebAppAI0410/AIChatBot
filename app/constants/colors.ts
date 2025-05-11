@@ -9,6 +9,7 @@ const themeColors = {
     lightSecondary: '#10B981',   // 明るい緑
     darkPrimary: '#10B981',      // 明るい緑（ダークモードプライマリ）
     darkSecondary: '#047857',    // 深めの緑（ダークモードセカンダリ）
+    textOnPrimary: '#FFFFFF',    // プライマリーカラー上のテキスト色
   },
   blue: {
     // 視認性の高い青
@@ -16,13 +17,15 @@ const themeColors = {
     lightSecondary: '#38BDF8',   // 明るい青
     darkPrimary: '#38BDF8',      // 明るい青（ダークモードプライマリ）
     darkSecondary: '#0066CC',    // 深めの青（ダークモードセカンダリ）
+    textOnPrimary: '#FFFFFF',    // プライマリーカラー上のテキスト色
   },
   orange: {
-    // 視認性の高いオレンジ
-    lightPrimary: '#F97316',     // 深めのオレンジ
-    lightSecondary: '#FB923C',   // 明るいオレンジ
-    darkPrimary: '#FB923C',      // 明るいオレンジ（ダークモードプライマリ）
-    darkSecondary: '#F97316',    // 深めのオレンジ（ダークモードセカンダリ）
+    // 視認性の高い暗めのオレンジ
+    lightPrimary: '#C2410C',     // 深めのオレンジ
+    lightSecondary: '#F97316',   // 明るいオレンジ
+    darkPrimary: '#F97316',      // 明るいオレンジ（ダークモードプライマリ）
+    darkSecondary: '#C2410C',    // 深めのオレンジ（ダークモードセカンダリ）
+    textOnPrimary: '#FFFFFF',    // 白テキスト（他のテーマと統一）
   },
   purple: {
     // 視認性の高い紫
@@ -30,6 +33,7 @@ const themeColors = {
     lightSecondary: '#A78BFA',   // 明るい紫
     darkPrimary: '#A78BFA',      // 明るい紫（ダークモードプライマリ）
     darkSecondary: '#7C3AED',    // 深めの紫（ダークモードセカンダリ）
+    textOnPrimary: '#FFFFFF',    // プライマリーカラー上のテキスト色
   }
 };
 
@@ -71,6 +75,7 @@ export const createLightColors = (theme: 'green' | 'blue' | 'orange' | 'purple')
     ...baseLightColors,
     primary: themeColors[theme].lightPrimary,
     primaryLight: themeColors[theme].lightSecondary,
+    textOnPrimary: themeColors[theme].textOnPrimary,
   };
 };
 
@@ -80,6 +85,7 @@ export const createDarkColors = (theme: 'green' | 'blue' | 'orange' | 'purple') 
     ...baseDarkColors,
     primary: themeColors[theme].darkPrimary,
     primaryLight: themeColors[theme].darkSecondary,
+    textOnPrimary: themeColors[theme].textOnPrimary,
   };
 };
 

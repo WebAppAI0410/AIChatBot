@@ -118,7 +118,7 @@ export default function LocalModelInstallModal({
       backgroundColor: colors.primary,
     },
     primaryButtonText: {
-      color: 'white',
+      color: colors.textOnPrimary,
       fontWeight: 'bold',
       fontSize: 16,
     },
@@ -137,7 +137,7 @@ export default function LocalModelInstallModal({
       marginTop: 24,
     },
     cancelButtonText: {
-      color: 'white',
+      color: colors.textOnPrimary,
       fontWeight: 'bold',
       fontSize: 16,
     },

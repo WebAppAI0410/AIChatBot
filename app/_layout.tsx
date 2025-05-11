@@ -68,7 +68,7 @@ export function TabsLayout() {
         headerStyle: {
           backgroundColor: colors.primary,
         },
-        headerTintColor: colors.background,
+        headerTintColor: colors.textOnPrimary,
       }}
     >
       <Tabs.Screen

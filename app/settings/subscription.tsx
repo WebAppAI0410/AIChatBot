@@ -109,7 +109,7 @@ export default function SubscriptionScreen() {
       alignItems: 'center',
     },
     headerTitle: {
-      color: colors.background,
+      color: colors.textOnPrimary,
       fontSize: 18,
       fontWeight: '600',
       flex: 1,
@@ -222,7 +222,7 @@ export default function SubscriptionScreen() {
     selectButtonText: {
       fontSize: 16,
       fontWeight: 'bold',
-      color: colors.background,
+      color: colors.textOnPrimary,
     },
     currentPlanButtonText: {
       color: colors.primary,
@@ -358,7 +358,7 @@ export default function SubscriptionScreen() {
             onPress={() => router.navigate('/(tabs)/settings')}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Ionicons name="chevron-back" size={24} color={colors.background} />
+            <Ionicons name="chevron-back" size={24} color={colors.textOnPrimary} />
           </TouchableOpacity>
           
           <Text style={styles.headerTitle}>
