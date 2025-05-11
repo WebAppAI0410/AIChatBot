@@ -61,13 +61,12 @@ export default function UsageScreen() {
   const tokenWarning = tokenPercentage >= 80;
 
   const imageUsage = {
-    dalle: Math.round(dailyImageGenCount * 0.6), // 60% of daily usage
-    sdxl: Math.round(dailyImageGenCount * 0.3),  // 30% of daily usage
-    lightning: Math.round(dailyImageGenCount * 0.1) // 10% of daily usage
+    dalle: Math.round(dailyImageGenCount * 0.7), // 70% of daily usage
+    sdxl: Math.round(dailyImageGenCount * 0.3)   // 30% of daily usage
   };
 
   const imageLimit = {
-    dalle: Math.round(dailyImageGenLimit * 0.6),
+    dalle: Math.round(dailyImageGenLimit * 0.7),
     sdxl: Math.round(dailyImageGenLimit * 0.3)
   };
 
@@ -122,13 +121,6 @@ export default function UsageScreen() {
               limit={imageLimit.sdxl}
               isPremium={false}
               isUnlimited={false}
-            />
-            <UsageCounter
-              label="Lightning"
-              current={imageUsage.lightning}
-              limit="∞"
-              isPremium={false}
-              isUnlimited={true}
             />
           </View>
 
