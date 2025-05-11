@@ -15,6 +15,12 @@ export default function SettingsScreen() {
       description: 'プランの管理と支払い情報',
     },
     {
+      title: '使用量',
+      icon: 'analytics-outline',
+      route: 'settings/usage',
+      description: 'トークンと機能の使用状況',
+    },
+    {
       title: 'モデル設定',
       icon: 'server-outline',
       route: 'settings/local-model',
