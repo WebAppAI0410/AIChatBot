@@ -1,0 +1,1942 @@
+diff --git a/app/_layout.tsx b/app/_layout.tsx
+index cf79235..9660f28 100644
+--- a/app/_layout.tsx
++++ b/app/_layout.tsx
+@@ -10,6 +10,7 @@ import { useStore } from './store';
+ import { useColors } from './constants/colors';
+ import config from '../tamagui.config';
+ import { useColorScheme } from 'react-native';
++import { ThemeProvider } from './ui/ThemeProvider';
+ 
+ // ColorsType型を定義
+ import type { lightColors } from './constants/colors';
+@@ -44,8 +45,10 @@ export default function RootLayout() {
+         <TamaguiProvider config={config}>
+           <Theme name={activeTheme}>
+             <ColorsContext.Provider value={colors}>
+-              <StatusBar style={activeTheme === 'dark' ? 'light' : 'dark'} />
+-              <Slot />
++              <ThemeProvider>
++                <StatusBar style={activeTheme === 'dark' ? 'light' : 'dark'} />
++                <Slot />
++              </ThemeProvider>
+             </ColorsContext.Provider>
+           </Theme>
+         </TamaguiProvider>
+diff --git a/app/components/Badge.tsx b/app/components/Badge.tsx
+new file mode 100644
+index 0000000..1928a78
+--- /dev/null
++++ b/app/components/Badge.tsx
+@@ -0,0 +1,138 @@
++import React from 'react';
++import { View, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
++import theme from '../ui/theme';
++import useColors from '../constants/colors';
++
++type BadgeProps = {
++  label?: string;
++  variant?: 'primary' | 'success' | 'warning' | 'error' | 'info';
++  size?: 'small' | 'medium' | 'large';
++  showDot?: boolean;
++  style?: ViewStyle;
++  textStyle?: TextStyle;
++};
++
++const Badge: React.FC<BadgeProps> = ({
++  label,
++  variant = 'primary',
++  size = 'medium',
++  showDot = false,
++  style,
++  textStyle,
++}) => {
++  const colors = useColors();
++  
++  const getBadgeColor = () => {
++    switch (variant) {
++      case 'primary':
++        return colors.primary;
++      case 'success':
++        return colors.success;
++      case 'warning':
++        return colors.warning;
++      case 'error':
++        return colors.error;
++      case 'info':
++        return colors.accentBlue;
++      default:
++        return colors.primary;
++    }
++  };
++  
++  const getSizeStyle = () => {
++    switch (size) {
++      case 'small':
++        return {
++          paddingVertical: theme.spacing.xs / 2,
++          paddingHorizontal: label ? theme.spacing.xs : theme.spacing.xs / 2,
++          borderRadius: theme.radius.sm,
++          dotSize: 6,
++          fontSize: theme.fontSizes.xs,
++        };
++      case 'medium':
++        return {
++          paddingVertical: theme.spacing.xs,
++          paddingHorizontal: label ? theme.spacing.sm : theme.spacing.xs,
++          borderRadius: theme.radius.md,
++          dotSize: 8,
++          fontSize: theme.fontSizes.sm,
++        };
++      case 'large':
++        return {
++          paddingVertical: theme.spacing.sm,
++          paddingHorizontal: label ? theme.spacing.md : theme.spacing.sm,
++          borderRadius: theme.radius.lg,
++          dotSize: 10,
++          fontSize: theme.fontSizes.md,
++        };
++      default:
++        return {
++          paddingVertical: theme.spacing.xs,
++          paddingHorizontal: label ? theme.spacing.sm : theme.spacing.xs,
++          borderRadius: theme.radius.md,
++          dotSize: 8,
++          fontSize: theme.fontSizes.sm,
++        };
++    }
++  };
++  
++  const sizeStyle = getSizeStyle();
++  const badgeColor = getBadgeColor();
++  
++  return (
++    <View
++      style={[
++        styles.badge,
++        {
++          backgroundColor: badgeColor,
++          paddingVertical: sizeStyle.paddingVertical,
++          paddingHorizontal: sizeStyle.paddingHorizontal,
++          borderRadius: sizeStyle.borderRadius,
++        },
++        !label && { width: sizeStyle.dotSize * 2, height: sizeStyle.dotSize * 2 },
++        style,
++      ]}
++    >
++      {showDot && !label && (
++        <View
++          style={[
++            styles.dot,
++            {
++              width: sizeStyle.dotSize,
++              height: sizeStyle.dotSize,
++              borderRadius: sizeStyle.dotSize / 2,
++            },
++          ]}
++        />
++      )}
++      
++      {label && (
++        <Text
++          style={[
++            styles.text,
++            { fontSize: sizeStyle.fontSize, color: theme.colors.text.inverse },
++            textStyle,
++          ]}
++        >
++          {label}
++        </Text>
++      )}
++    </View>
++  );
++};
++
++const styles = StyleSheet.create({
++  badge: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'center',
++  },
++  text: {
++    fontWeight: '500',
++  },
++  dot: {
++    backgroundColor: '#FFFFFF',
++  },
++});
++
++export default Badge;
+diff --git a/app/components/Button.tsx b/app/components/Button.tsx
+new file mode 100644
+index 0000000..37093ba
+--- /dev/null
++++ b/app/components/Button.tsx
+@@ -0,0 +1,248 @@
++import React from 'react';
++import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
++import { Ionicons } from '@expo/vector-icons';
++import theme from '../ui/theme';
++import useColors from '../constants/colors';
++
++type ButtonProps = {
++  title: string;
++  onPress: () => void;
++  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'text';
++  size?: 'small' | 'medium' | 'large';
++  iconName?: keyof typeof Ionicons.glyphMap;
++  iconPosition?: 'left' | 'right';
++  disabled?: boolean;
++  loading?: boolean;
++  fullWidth?: boolean;
++  style?: ViewStyle;
++  textStyle?: TextStyle;
++};
++
++const Button: React.FC<ButtonProps> = ({
++  title,
++  onPress,
++  variant = 'primary',
++  size = 'medium',
++  iconName,
++  iconPosition = 'left',
++  disabled = false,
++  loading = false,
++  fullWidth = false,
++  style,
++  textStyle: customTextStyle,
++}) => {
++  const colors = useColors();
++  
++  const getButtonStyle = () => {
++    const baseStyle: ViewStyle = {
++      ...styles.button,
++      ...sizeStyles[size],
++    };
++    
++    if (fullWidth) {
++      baseStyle.width = '100%';
++    }
++    
++    switch (variant) {
++      case 'primary':
++        return {
++          ...baseStyle,
++          backgroundColor: colors.primary,
++        };
++      case 'secondary':
++        return {
++          ...baseStyle,
++          backgroundColor: colors.lightGray,
++        };
++      case 'outline':
++        return {
++          ...baseStyle,
++          backgroundColor: 'transparent',
++          borderWidth: theme.borderWidth.thin,
++          borderColor: colors.primary,
++        };
++      case 'danger':
++        return {
++          ...baseStyle,
++          backgroundColor: colors.error,
++        };
++      case 'text':
++        return {
++          ...baseStyle,
++          backgroundColor: 'transparent',
++          paddingHorizontal: 0,
++        };
++      default:
++        return baseStyle;
++    }
++  };
++  
++  const getTextStyle = () => {
++    const baseStyle: TextStyle = {
++      ...styles.text,
++      ...textSizeStyles[size],
++    };
++    
++    switch (variant) {
++      case 'primary':
++        return {
++          ...baseStyle,
++          color: colors.textOnPrimary,
++        };
++      case 'secondary':
++        return {
++          ...baseStyle,
++          color: colors.text,
++        };
++      case 'outline':
++        return {
++          ...baseStyle,
++          color: colors.primary,
++        };
++      case 'danger':
++        return {
++          ...baseStyle,
++          color: colors.textOnPrimary,
++        };
++      case 'text':
++        return {
++          ...baseStyle,
++          color: colors.primary,
++        };
++      default:
++        return baseStyle;
++    }
++  };
++  
++  const getIconColor = () => {
++    switch (variant) {
++      case 'primary':
++      case 'danger':
++        return colors.textOnPrimary;
++      case 'secondary':
++        return colors.text;
++      case 'outline':
++      case 'text':
++        return colors.primary;
++      default:
++        return colors.textOnPrimary;
++    }
++  };
++  
++  const getIconSize = () => {
++    switch (size) {
++      case 'small':
++        return 16;
++      case 'medium':
++        return 18;
++      case 'large':
++        return 20;
++      default:
++        return 18;
++    }
++  };
++  
++  const buttonStyle = getButtonStyle();
++  const calculatedTextStyle = getTextStyle();
++  const iconColor = getIconColor();
++  const iconSize = getIconSize();
++  
++  return (
++    <TouchableOpacity
++      style={[
++        buttonStyle,
++        disabled && styles.disabled,
++        style,
++      ]}
++      onPress={onPress}
++      disabled={disabled || loading}
++      activeOpacity={0.7}
++    >
++      {loading ? (
++        <ActivityIndicator
++          size="small"
++          color={iconColor}
++          style={styles.loader}
++        />
++      ) : (
++        <>
++          {iconName && iconPosition === 'left' && (
++            <Ionicons
++              name={iconName}
++              size={iconSize}
++              color={iconColor}
++              style={styles.leftIcon}
++            />
++          )}
++          <Text style={[calculatedTextStyle, customTextStyle]}>
++            {title}
++          </Text>
++          {iconName && iconPosition === 'right' && (
++            <Ionicons
++              name={iconName}
++              size={iconSize}
++              color={iconColor}
++              style={styles.rightIcon}
++            />
++          )}
++        </>
++      )}
++    </TouchableOpacity>
++  );
++};
++
++const sizeStyles = {
++  small: {
++    paddingVertical: theme.spacing.xs,
++    paddingHorizontal: theme.spacing.md,
++    borderRadius: theme.radius.md,
++  },
++  medium: {
++    paddingVertical: theme.spacing.sm,
++    paddingHorizontal: theme.spacing.lg,
++    borderRadius: theme.radius.md,
++  },
++  large: {
++    paddingVertical: theme.spacing.md,
++    paddingHorizontal: theme.spacing.xl,
++    borderRadius: theme.radius.lg,
++  },
++};
++
++const textSizeStyles = {
++  small: {
++    fontSize: theme.fontSizes.sm,
++  },
++  medium: {
++    fontSize: theme.fontSizes.md,
++  },
++  large: {
++    fontSize: theme.fontSizes.lg,
++  },
++};
++
++const styles = StyleSheet.create({
++  button: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'center',
++  },
++  text: {
++    fontWeight: '600',
++    textAlign: 'center',
++  },
++  leftIcon: {
++    marginRight: theme.spacing.xs,
++  },
++  rightIcon: {
++    marginLeft: theme.spacing.xs,
++  },
++  disabled: {
++    opacity: 0.5,
++  },
++  loader: {
++    marginHorizontal: theme.spacing.xs,
++  },
++});
++
++export default Button;
+diff --git a/app/components/Card.tsx b/app/components/Card.tsx
+new file mode 100644
+index 0000000..8dd36d8
+--- /dev/null
++++ b/app/components/Card.tsx
+@@ -0,0 +1,67 @@
++import React from 'react';
++import { View, StyleSheet, ViewStyle } from 'react-native';
++import theme from '../ui/theme';
++import useColors from '../constants/colors';
++
++type CardProps = {
++  children: React.ReactNode;
++  variant?: 'default' | 'elevated' | 'outlined';
++  padding?: 'none' | 'small' | 'medium' | 'large';
++  style?: ViewStyle;
++};
++
++const Card: React.FC<CardProps> = ({
++  children,
++  variant = 'default',
++  padding = 'medium',
++  style,
++}) => {
++  const colors = useColors();
++  
++  const getCardStyle = () => {
++    const baseStyle: ViewStyle = {
++      backgroundColor: colors.card,
++      borderRadius: theme.radius.lg,
++      ...paddingStyles[padding],
++    };
++    
++    switch (variant) {
++      case 'elevated':
++        return {
++          ...baseStyle,
++          ...theme.shadows.medium,
++        };
++      case 'outlined':
++        return {
++          ...baseStyle,
++          borderWidth: theme.borderWidth.thin,
++          borderColor: colors.border,
++        };
++      default:
++        return baseStyle;
++    }
++  };
++  
++  return (
++    <View style={[getCardStyle(), style]}>
++      {children}
++    </View>
++  );
++};
++
++const paddingStyles = {
++  none: {
++    padding: 0,
++  },
++  small: {
++    padding: theme.spacing.sm,
++  },
++  medium: {
++    padding: theme.spacing.md,
++  },
++  large: {
++    padding: theme.spacing.lg,
++  },
++};
++
++export default Card;
+diff --git a/app/components/ChatBubble.tsx b/app/components/ChatBubble.tsx
+new file mode 100644
+index 0000000..5f3858e
+--- /dev/null
++++ b/app/components/ChatBubble.tsx
+@@ -0,0 +1,71 @@
++import React from 'react';
++import { View, Text, StyleSheet } from 'react-native';
++import theme from '../ui/theme';
++import useColors from '../constants/colors';
++import { Message } from '../store/chatStore';
++
++type ChatBubbleProps = {
++  message: Message;
++};
++
++const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
++  const isUser = message.role === 'user';
++  const colors = useColors();
++  
++  return (
++    <View style={[
++      styles.messageContainer,
++      isUser ? styles.userMessageContainer : styles.assistantMessageContainer
++    ]}>
++      <View style={[
++        styles.messageBubble,
++        isUser ? [styles.userMessageBubble, { backgroundColor: colors.primary }] : [styles.assistantMessageBubble, { backgroundColor: colors.card }]
++      ]}>
++        <Text style={[
++          styles.messageText,
++          isUser ? [styles.userMessageText, { color: colors.textOnPrimary }] : [styles.assistantMessageText, { color: colors.text }]
++        ]}>
++          {message.content}
++        </Text>
++      </View>
++    </View>
++  );
++};
++
++const styles = StyleSheet.create({
++  messageContainer: {
++    marginBottom: theme.spacing.md,
++    flexDirection: 'row',
++  },
++  userMessageContainer: {
++    justifyContent: 'flex-end',
++  },
++  assistantMessageContainer: {
++    justifyContent: 'flex-start',
++  },
++  messageBubble: {
++    maxWidth: '80%',
++    padding: theme.spacing.md,
++    borderRadius: theme.radius.lg,
++  },
++  userMessageBubble: {
++    backgroundColor: theme.colors.primary,
++    borderBottomRightRadius: theme.radius.xs,
++  },
++  assistantMessageBubble: {
++    backgroundColor: theme.colors.background.light,
++    borderBottomLeftRadius: theme.radius.xs,
++  },
++  messageText: {
++    fontSize: theme.fontSizes.md,
++    lineHeight: theme.typography.body.lineHeight,
++  },
++  userMessageText: {
++    color: theme.colors.text.inverse,
++  },
++  assistantMessageText: {
++    color: theme.colors.text.light,
++  },
++});
++
++export default ChatBubble;
+diff --git a/app/components/Header.tsx b/app/components/Header.tsx
+new file mode 100644
+index 0000000..fd7a8bb
+--- /dev/null
++++ b/app/components/Header.tsx
+@@ -0,0 +1,213 @@
++import React from 'react';
++import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar, TextInput } from 'react-native';
++import { Ionicons } from '@expo/vector-icons';
++import { useRouter } from 'expo-router';
++import theme from '../ui/theme';
++import useColors from '../constants/colors';
++
++type HeaderProps = {
++  title: string;
++  showBack?: boolean;
++  showModelSelect?: boolean;
++  onModelSelect?: () => void;
++  currentModelName?: string;
++  onTitleEdit?: (newTitle: string) => void;
++  rightComponent?: React.ReactNode;
++};
++
++const Header: React.FC<HeaderProps> = ({
++  title,
++  showBack = true,
++  showModelSelect = false,
++  onModelSelect,
++  currentModelName,
++  onTitleEdit,
++  rightComponent,
++}) => {
++  const router = useRouter();
++  const colors = useColors();
++  const [isEditingTitle, setIsEditingTitle] = React.useState(false);
++  const [editTitle, setEditTitle] = React.useState(title);
++
++  const handleBackPress = () => {
++    router.back();
++  };
++
++  const startTitleEdit = () => {
++    if (onTitleEdit) {
++      setEditTitle(title);
++      setIsEditingTitle(true);
++    }
++  };
++
++  const saveTitleEdit = () => {
++    if (onTitleEdit && editTitle.trim()) {
++      onTitleEdit(editTitle.trim());
++      setIsEditingTitle(false);
++    }
++  };
++
++  const cancelTitleEdit = () => {
++    setIsEditingTitle(false);
++  };
++
++  return (
++    <View style={[
++      styles.container,
++      { backgroundColor: colors.primary }
++    ]}>
++      {showBack && (
++        <TouchableOpacity
++          style={styles.backButton}
++          onPress={handleBackPress}
++          hitSlop={{ top: theme.spacing.sm, bottom: theme.spacing.sm, left: theme.spacing.sm, right: theme.spacing.sm }}
++        >
++          <Ionicons name="chevron-back" size={24} color={colors.textOnPrimary} />
++        </TouchableOpacity>
++      )}
++
++      {isEditingTitle ? (
++        <View style={styles.editTitleContainer}>
++          <TextInput
++            style={[styles.editTitleInput, { color: colors.textOnPrimary }]}
++            value={editTitle}
++            onChangeText={setEditTitle}
++            multiline
++            numberOfLines={2}
++            maxLength={50}
++            autoFocus
++            onSubmitEditing={saveTitleEdit}
++            blurOnSubmit={true}
++            returnKeyType="done"
++          />
++          <TouchableOpacity
++            style={styles.titleEditIcon}
++            onPress={saveTitleEdit}
++          >
++            <Ionicons name="checkmark" size={22} color={colors.textOnPrimary} />
++          </TouchableOpacity>
++          <TouchableOpacity
++            style={styles.titleEditIcon}
++            onPress={cancelTitleEdit}
++          >
++            <Ionicons name="close" size={22} color={colors.textOnPrimary} />
++          </TouchableOpacity>
++        </View>
++      ) : (
++        <TouchableOpacity
++          style={styles.titleContainer}
++          onPress={onTitleEdit ? startTitleEdit : undefined}
++          activeOpacity={onTitleEdit ? 0.7 : 1}
++        >
++          <Text
++            style={[styles.title, { color: colors.textOnPrimary }]}
++            numberOfLines={2}
++            ellipsizeMode="tail"
++          >
++            {title}
++          </Text>
++          {onTitleEdit && (
++            <Ionicons 
++              name="pencil" 
++              size={18} 
++              color={colors.textOnPrimary} 
++              style={styles.titleEditIcon} 
++            />
++          )}
++        </TouchableOpacity>
++      )}
++
++      {showModelSelect && onModelSelect && (
++        <TouchableOpacity
++          style={styles.modelButton}
++          onPress={onModelSelect}
++          hitSlop={{ top: theme.spacing.sm, bottom: theme.spacing.sm, left: theme.spacing.sm, right: theme.spacing.sm }}
++        >
++          <Text style={[styles.modelButtonText, { color: colors.textOnPrimary }]}>
++            {currentModelName || 'モデル選択'}
++          </Text>
++          <Ionicons name="chevron-down" size={16} color={colors.textOnPrimary} />
++        </TouchableOpacity>
++      )}
++
++      {rightComponent && (
++        <View style={styles.rightComponentContainer}>
++          {rightComponent}
++        </View>
++      )}
++    </View>
++  );
++};
++
++const styles = StyleSheet.create({
++  container: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    paddingTop: Platform.OS === 'ios' ? theme.spacing.lg + 12 : StatusBar.currentHeight || 0,
++    paddingBottom: theme.spacing.md,
++    paddingHorizontal: theme.spacing.md,
++    height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
++  },
++  backButton: {
++    width: 40,
++    height: 40,
++    borderRadius: theme.radius.round,
++    backgroundColor: 'rgba(255, 255, 255, 0.2)',
++    justifyContent: 'center',
++    alignItems: 'center',
++  },
++  titleContainer: {
++    flex: 1,
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'center',
++    minHeight: 40,
++  },
++  title: {
++    fontSize: theme.fontSizes.lg,
++    fontWeight: '600',
++    textAlign: 'center',
++    marginHorizontal: theme.spacing.sm,
++  },
++  titleEditIcon: {
++    marginLeft: theme.spacing.xs,
++    marginRight: theme.spacing.xs,
++  },
++  editTitleContainer: {
++    flex: 1,
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'center',
++    minHeight: 40,
++  },
++  editTitleInput: {
++    flex: 1,
++    backgroundColor: 'rgba(255,255,255,0.15)',
++    fontSize: theme.fontSizes.lg,
++    fontWeight: '600',
++    borderRadius: theme.radius.md,
++    paddingHorizontal: theme.spacing.sm,
++    paddingVertical: theme.spacing.xs,
++    marginRight: theme.spacing.xs,
++    maxHeight: 48,
++  },
++  modelButton: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    backgroundColor: 'rgba(255, 255, 255, 0.2)',
++    paddingHorizontal: theme.spacing.md,
++    paddingVertical: theme.spacing.xs,
++    borderRadius: theme.radius.lg,
++  },
++  modelButtonText: {
++    marginRight: theme.spacing.xs,
++    fontSize: theme.fontSizes.sm,
++    fontWeight: '500',
++  },
++  rightComponentContainer: {
++    marginLeft: theme.spacing.sm,
++  },
++});
++
++export default Header;
+diff --git a/app/components/Input.tsx b/app/components/Input.tsx
+new file mode 100644
+index 0000000..b4e8456
+--- /dev/null
++++ b/app/components/Input.tsx
+@@ -0,0 +1,142 @@
++import React, { useState } from 'react';
++import { TextInput, View, Text, StyleSheet, TextInputProps, ViewStyle } from 'react-native';
++import { Ionicons } from '@expo/vector-icons';
++import theme from '../ui/theme';
++import useColors from '../constants/colors';
++
++type InputProps = TextInputProps & {
++  label?: string;
++  error?: string;
++  leftIcon?: keyof typeof Ionicons.glyphMap;
++  rightIcon?: keyof typeof Ionicons.glyphMap;
++  onRightIconPress?: () => void;
++  containerStyle?: ViewStyle;
++};
++
++const Input: React.FC<InputProps> = ({
++  label,
++  error,
++  leftIcon,
++  rightIcon,
++  onRightIconPress,
++  containerStyle,
++  ...textInputProps
++}) => {
++  const colors = useColors();
++  const [isFocused, setIsFocused] = useState(false);
++  
++  const handleFocus = () => {
++    setIsFocused(true);
++    if (textInputProps.onFocus) {
++      textInputProps.onFocus(null as any);
++    }
++  };
++  
++  const handleBlur = () => {
++    setIsFocused(false);
++    if (textInputProps.onBlur) {
++      textInputProps.onBlur(null as any);
++    }
++  };
++  
++  return (
++    <View style={[styles.container, containerStyle]}>
++      {label && (
++        <Text style={[styles.label, { color: colors.text }]}>
++          {label}
++        </Text>
++      )}
++      
++      <View style={[
++        styles.inputContainer,
++        { 
++          borderColor: error 
++            ? colors.error 
++            : isFocused 
++              ? colors.primary 
++              : colors.border 
++        },
++      ]}>
++        {leftIcon && (
++          <Ionicons
++            name={leftIcon}
++            size={20}
++            color={colors.gray}
++            style={styles.leftIcon}
++          />
++        )}
++        
++        <TextInput
++          style={[
++            styles.input,
++            { color: colors.text },
++            leftIcon && styles.inputWithLeftIcon,
++            rightIcon && styles.inputWithRightIcon,
++          ]}
++          placeholderTextColor={colors.gray}
++          onFocus={handleFocus}
++          onBlur={handleBlur}
++          {...textInputProps}
++        />
++        
++        {rightIcon && (
++          <Ionicons
++            name={rightIcon}
++            size={20}
++            color={colors.gray}
++            style={styles.rightIcon}
++            onPress={onRightIconPress}
++          />
++        )}
++      </View>
++      
++      {error && (
++        <Text style={[styles.error, { color: colors.error }]}>
++          {error}
++        </Text>
++      )}
++    </View>
++  );
++};
++
++const styles = StyleSheet.create({
++  container: {
++    marginBottom: theme.spacing.md,
++  },
++  label: {
++    fontSize: theme.fontSizes.sm,
++    marginBottom: theme.spacing.xs,
++    fontWeight: '500',
++  },
++  inputContainer: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    borderWidth: theme.borderWidth.thin,
++    borderRadius: theme.radius.md,
++    backgroundColor: 'transparent',
++  },
++  input: {
++    flex: 1,
++    paddingVertical: theme.spacing.sm,
++    paddingHorizontal: theme.spacing.md,
++    fontSize: theme.fontSizes.md,
++  },
++  inputWithLeftIcon: {
++    paddingLeft: theme.spacing.xs,
++  },
++  inputWithRightIcon: {
++    paddingRight: theme.spacing.xs,
++  },
++  leftIcon: {
++    marginLeft: theme.spacing.md,
++  },
++  rightIcon: {
++    marginRight: theme.spacing.md,
++  },
++  error: {
++    fontSize: theme.fontSizes.sm,
++    marginTop: theme.spacing.xs,
++  },
++});
++
++export default Input;
+diff --git a/app/components/ListItem.tsx b/app/components/ListItem.tsx
+new file mode 100644
+index 0000000..080803e
+--- /dev/null
++++ b/app/components/ListItem.tsx
+@@ -0,0 +1,111 @@
++import React from 'react';
++import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
++import { Ionicons } from '@expo/vector-icons';
++import theme from '../ui/theme';
++import useColors from '../constants/colors';
++
++type ListItemProps = {
++  title: string;
++  subtitle?: string;
++  leftIcon?: keyof typeof Ionicons.glyphMap;
++  rightIcon?: keyof typeof Ionicons.glyphMap | 'chevron';
++  onPress?: () => void;
++  selected?: boolean;
++  style?: ViewStyle;
++  badge?: React.ReactNode;
++};
++
++const ListItem: React.FC<ListItemProps> = ({
++  title,
++  subtitle,
++  leftIcon,
++  rightIcon,
++  onPress,
++  selected = false,
++  style,
++  badge,
++}) => {
++  const colors = useColors();
++  
++  const Container = onPress ? TouchableOpacity : View;
++  
++  return (
++    <Container
++      style={[
++        styles.container,
++        { borderBottomColor: colors.border },
++        selected && { backgroundColor: colors.lightGray },
++        style,
++      ]}
++      onPress={onPress}
++      activeOpacity={0.7}
++    >
++      {leftIcon && (
++        <View style={styles.leftIconContainer}>
++          <Ionicons name={leftIcon} size={24} color={colors.primary} />
++        </View>
++      )}
++      
++      <View style={styles.contentContainer}>
++        <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
++          {title}
++        </Text>
++        
++        {subtitle && (
++          <Text style={[styles.subtitle, { color: colors.secondaryText }]} numberOfLines={2}>
++            {subtitle}
++          </Text>
++        )}
++      </View>
++      
++      {badge && (
++        <View style={styles.badgeContainer}>
++          {badge}
++        </View>
++      )}
++      
++      {rightIcon && (
++        <View style={styles.rightIconContainer}>
++          <Ionicons
++            name={rightIcon === 'chevron' ? 'chevron-forward' : rightIcon}
++            size={rightIcon === 'chevron' ? 20 : 24}
++            color={colors.gray}
++          />
++        </View>
++      )}
++    </Container>
++  );
++};
++
++const styles = StyleSheet.create({
++  container: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    paddingVertical: theme.spacing.md,
++    paddingHorizontal: theme.spacing.md,
++    borderBottomWidth: theme.borderWidth.thin,
++  },
++  leftIconContainer: {
++    marginRight: theme.spacing.md,
++  },
++  contentContainer: {
++    flex: 1,
++    justifyContent: 'center',
++  },
++  title: {
++    fontSize: theme.fontSizes.md,
++    fontWeight: '500',
++  },
++  subtitle: {
++    fontSize: theme.fontSizes.sm,
++    marginTop: theme.spacing.xs,
++  },
++  badgeContainer: {
++    marginRight: theme.spacing.sm,
++  },
++  rightIconContainer: {
++    marginLeft: theme.spacing.sm,
++  },
++});
++
++export default ListItem;
+diff --git a/app/components/LocalModelStatusBadge.tsx b/app/components/LocalModelStatusBadge.tsx
+new file mode 100644
+index 0000000..c0ac627
+--- /dev/null
++++ b/app/components/LocalModelStatusBadge.tsx
+@@ -0,0 +1,107 @@
++import React from 'react';
++import { View, Text, StyleSheet } from 'react-native';
++import { Ionicons } from '@expo/vector-icons';
++import theme from '../ui/theme';
++import useColors from '../constants/colors';
++
++export type ModelStatus = 'not_installed' | 'downloading' | 'ready' | 'error';
++
++type LocalModelStatusBadgeProps = {
++  status: ModelStatus;
++  progress?: number;
++  compact?: boolean;
++};
++
++const LocalModelStatusBadge: React.FC<LocalModelStatusBadgeProps> = ({
++  status,
++  progress = 0,
++  compact = false,
++}) => {
++  const colors = useColors();
++  
++  const getStatusConfig = () => {
++    switch (status) {
++      case 'not_installed':
++        return {
++          label: compact ? '未' : '未インストール',
++          icon: 'cloud-download-outline',
++          color: theme.componentStyles.badge.notInstalled.backgroundColor,
++        };
++      case 'downloading':
++        return {
++          label: compact ? `${Math.round(progress * 100)}%` : `ダウンロード中 ${Math.round(progress * 100)}%`,
++          icon: 'arrow-down-outline',
++          color: theme.componentStyles.badge.downloading.backgroundColor,
++        };
++      case 'ready':
++        return {
++          label: compact ? '済' : 'インストール済み',
++          icon: 'checkmark-outline',
++          color: theme.componentStyles.badge.ready.backgroundColor,
++        };
++      case 'error':
++        return {
++          label: compact ? 'エラー' : 'インストールエラー',
++          icon: 'alert-circle-outline',
++          color: theme.componentStyles.badge.error.backgroundColor,
++        };
++      default:
++        return {
++          label: compact ? '未' : '未インストール',
++          icon: 'cloud-download-outline',
++          color: theme.componentStyles.badge.notInstalled.backgroundColor,
++        };
++    }
++  };
++  
++  const statusConfig = getStatusConfig();
++  
++  return (
++    <View style={[
++      styles.container,
++      { backgroundColor: statusConfig.color },
++      compact && styles.compactContainer,
++    ]}>
++      <Ionicons
++        name={statusConfig.icon as any}
++        size={compact ? 12 : 14}
++        color="#FFFFFF"
++        style={styles.icon}
++      />
++      <Text style={[
++        styles.label,
++        compact && styles.compactLabel,
++      ]}>
++        {statusConfig.label}
++      </Text>
++    </View>
++  );
++};
++
++const styles = StyleSheet.create({
++  container: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    paddingHorizontal: theme.spacing.sm,
++    paddingVertical: theme.spacing.xs,
++    borderRadius: theme.radius.md,
++  },
++  compactContainer: {
++    paddingHorizontal: theme.spacing.xs,
++    paddingVertical: 2,
++    borderRadius: theme.radius.sm,
++  },
++  icon: {
++    marginRight: theme.spacing.xs,
++  },
++  label: {
++    color: '#FFFFFF',
++    fontSize: theme.fontSizes.sm,
++    fontWeight: '500',
++  },
++  compactLabel: {
++    fontSize: theme.fontSizes.xs,
++  },
++});
++
++export default LocalModelStatusBadge;
+diff --git a/app/components/QuotaWarningBanner.tsx b/app/components/QuotaWarningBanner.tsx
+new file mode 100644
+index 0000000..6b89b68
+--- /dev/null
++++ b/app/components/QuotaWarningBanner.tsx
+@@ -0,0 +1,119 @@
++import React from 'react';
++import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
++import { Ionicons } from '@expo/vector-icons';
++import theme from '../ui/theme';
++import useColors from '../constants/colors';
++import Button from './Button';
++
++type QuotaWarningBannerProps = {
++  quotaType: 'tokens' | 'images' | 'aiAssist';
++  percentRemaining: number;
++  onUpgrade?: () => void;
++  onDismiss?: () => void;
++};
++
++const QuotaWarningBanner: React.FC<QuotaWarningBannerProps> = ({
++  quotaType,
++  percentRemaining,
++  onUpgrade,
++  onDismiss,
++}) => {
++  const colors = useColors();
++  
++  const getQuotaTypeLabel = () => {
++    switch (quotaType) {
++      case 'tokens':
++        return 'トークン';
++      case 'images':
++        return '画像生成';
++      case 'aiAssist':
++        return 'AIアシスト';
++      default:
++        return 'クォータ';
++    }
++  };
++  
++  const getMessage = () => {
++    const quotaLabel = getQuotaTypeLabel();
++    if (percentRemaining <= 0) {
++      return `${quotaLabel}の月間クォータを使い切りました。プランをアップグレードするか、来月まで待ってください。`;
++    } else {
++      return `${quotaLabel}の月間クォータが残り${percentRemaining}%です。プランをアップグレードして制限を増やしましょう。`;
++    }
++  };
++  
++  return (
++    <View style={[
++      styles.container,
++      theme.componentStyles.quotaWarning.container,
++    ]}>
++      <View style={styles.iconContainer}>
++        <Ionicons
++          name="warning-outline"
++          size={24}
++          color={colors.warning}
++        />
++      </View>
++      
++      <View style={styles.contentContainer}>
++        <Text style={[
++          styles.message,
++          theme.componentStyles.quotaWarning.text,
++        ]}>
++          {getMessage()}
++        </Text>
++        
++        {onUpgrade && (
++          <Button
++            title="プランをアップグレード"
++            variant="primary"
++            size="small"
++            iconName="arrow-up-circle-outline"
++            onPress={onUpgrade}
++            style={styles.upgradeButton}
++          />
++        )}
++      </View>
++      
++      {onDismiss && (
++        <TouchableOpacity
++          style={styles.dismissButton}
++          onPress={onDismiss}
++          hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
++        >
++          <Ionicons
++            name="close"
++            size={20}
++            color={colors.gray}
++          />
++        </TouchableOpacity>
++      )}
++    </View>
++  );
++};
++
++const styles = StyleSheet.create({
++  container: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    marginHorizontal: theme.spacing.md,
++  },
++  iconContainer: {
++    marginRight: theme.spacing.md,
++  },
++  contentContainer: {
++    flex: 1,
++  },
++  message: {
++    fontSize: theme.fontSizes.sm,
++    marginBottom: theme.spacing.sm,
++  },
++  upgradeButton: {
++    alignSelf: 'flex-start',
++  },
++  dismissButton: {
++    padding: theme.spacing.xs,
++  },
++});
++
++export default QuotaWarningBanner;
+diff --git a/app/ui/ThemeProvider.tsx b/app/ui/ThemeProvider.tsx
+new file mode 100644
+index 0000000..1af9706
+--- /dev/null
++++ b/app/ui/ThemeProvider.tsx
+@@ -0,0 +1,34 @@
++import React, { createContext, useContext, ReactNode } from 'react';
++import theme from './theme';
++import useColors from '../constants/colors';
++
++type ThemeContextType = {
++  theme: typeof theme;
++  colors: ReturnType<typeof useColors>;
++};
++
++const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
++
++type ThemeProviderProps = {
++  children: ReactNode;
++};
++
++export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
++  const colors = useColors();
++  
++  return (
++    <ThemeContext.Provider value={{ theme, colors }}>
++      {children}
++    </ThemeContext.Provider>
++  );
++};
++
++export const useTheme = (): ThemeContextType => {
++  const context = useContext(ThemeContext);
++  if (!context) {
++    throw new Error('useTheme must be used within a ThemeProvider');
++  }
++  return context;
++};
++
++export default ThemeProvider;
+diff --git a/app/ui/theme.ts b/app/ui/theme.ts
+new file mode 100644
+index 0000000..aa79fc4
+--- /dev/null
++++ b/app/ui/theme.ts
+@@ -0,0 +1,216 @@
++export const theme = {
++  colors: {
++    primary: '#005E36',
++    primaryLight: '#00C26A',
++    accentBlue: '#007AFF',
++    deleteRed: '#FF3B30',
++    warningYellow: '#FFCC00',
++    background: {
++      light: '#FFFFFF',
++      dark: '#121212',
++    },
++    text: {
++      primary: {
++        light: '#000000',
++        dark: '#FFFFFF',
++      },
++      secondary: {
++        light: '#666666',
++        dark: '#AAAAAA',
++      },
++      inverse: '#FFFFFF',
++      light: '#000000',
++    },
++    gray: {
++      100: '#F5F5F5',
++      200: '#EEEEEE',
++      300: '#DDDDDD',
++      400: '#CCCCCC',
++      500: '#AAAAAA',
++      600: '#888888',
++      700: '#666666',
++      800: '#444444',
++      900: '#222222',
++    },
++    border: {
++      light: '#DDDDDD',
++      dark: '#444444',
++    },
++    success: '#34C759',
++    error: '#FF3B30',
++    warning: '#FFCC00',
++    info: '#007AFF',
++  },
++  
++  spacing: {
++    xs: 4,
++    sm: 8,
++    md: 16,
++    lg: 24,
++    xl: 32,
++    xxl: 48,
++  },
++  
++  safeArea: {
++    top: 'env(safe-area-inset-top, 0px)',
++    bottom: 'env(safe-area-inset-bottom, 0px)',
++    left: 'env(safe-area-inset-left, 0px)',
++    right: 'env(safe-area-inset-right, 0px)',
++  },
++  
++  typography: {
++    heading1: {
++      fontSize: 24,
++      fontWeight: 'bold',
++      lineHeight: 32,
++    },
++    heading2: {
++      fontSize: 20,
++      fontWeight: 'bold',
++      lineHeight: 28,
++    },
++    heading3: {
++      fontSize: 18,
++      fontWeight: 'bold',
++      lineHeight: 24,
++    },
++    body: {
++      fontSize: 16,
++      fontWeight: 'normal',
++      lineHeight: 22,
++    },
++    caption: {
++      fontSize: 14,
++      fontWeight: 'normal',
++      lineHeight: 18,
++    },
++    small: {
++      fontSize: 12,
++      fontWeight: 'normal',
++      lineHeight: 16,
++    },
++  },
++  
++  radius: {
++    xs: 2,
++    sm: 4,
++    md: 8,
++    lg: 12,
++    xl: 16,
++    round: 9999,
++  },
++  
++  shadows: {
++    small: {
++      shadowColor: '#000000',
++      shadowOffset: { width: 0, height: 1 },
++      shadowOpacity: 0.1,
++      shadowRadius: 2,
++      elevation: 1,
++    },
++    medium: {
++      shadowColor: '#000000',
++      shadowOffset: { width: 0, height: 2 },
++      shadowOpacity: 0.15,
++      shadowRadius: 4,
++      elevation: 2,
++    },
++    large: {
++      shadowColor: '#000000',
++      shadowOffset: { width: 0, height: 4 },
++      shadowOpacity: 0.2,
++      shadowRadius: 8,
++      elevation: 4,
++    },
++  },
++  
++  animation: {
++    fast: 150,
++    normal: 300,
++    slow: 500,
++  },
++  
++  fontSizes: {
++    xs: 12,
++    sm: 14,
++    md: 16,
++    lg: 18,
++    xl: 20,
++    xxl: 24,
++  },
++  
++  borderWidth: {
++    thin: 1,
++    normal: 2,
++    thick: 3,
++  },
++  
++  componentStyles: {
++    badge: {
++      notInstalled: {
++        backgroundColor: '#CCCCCC',
++      },
++      downloading: {
++        backgroundColor: '#FFCC00',
++      },
++      ready: {
++        backgroundColor: '#34C759',
++      },
++      error: {
++        backgroundColor: '#FF3B30',
++      },
++    },
++    input: {
++      default: {
++        borderWidth: 1,
++        borderColor: '#DDDDDD',
++        borderRadius: 8,
++        paddingHorizontal: 16,
++        paddingVertical: 12,
++        backgroundColor: '#FFFFFF',
++      },
++      focused: {
++        borderColor: '#005E36',
++      },
++      error: {
++        borderColor: '#FF3B30',
++      },
++    },
++    listItem: {
++      default: {
++        paddingVertical: 12,
++        paddingHorizontal: 16,
++        borderBottomWidth: 1,
++        borderBottomColor: '#EEEEEE',
++      },
++      selected: {
++        backgroundColor: '#F5F5F5',
++      },
++    },
++    chatBubble: {
++      user: {
++        backgroundColor: '#005E36',
++        borderBottomRightRadius: 2,
++      },
++      assistant: {
++        backgroundColor: '#F5F5F5',
++        borderBottomLeftRadius: 2,
++      },
++    },
++    quotaWarning: {
++      container: {
++        backgroundColor: '#FFF9E6',
++        borderWidth: 1,
++        borderColor: '#FFCC00',
++        borderRadius: 8,
++        padding: 16,
++        marginVertical: 8,
++      },
++      text: {
++        color: '#664D00',
++      },
++    },
++  },
++};
++
++export default theme;
+diff --git "a/\344\277\256\346\255\243\350\250\210\347\224\273.md" "b/\344\277\256\346\255\243\350\250\210\347\224\273.md"
+index 2a9015b..5178b13 100644
+--- "a/\344\277\256\346\255\243\350\250\210\347\224\273.md"
++++ "b/\344\277\256\346\255\243\350\250\210\347\224\273.md"
+@@ -140,31 +140,31 @@ const renderAutoModelOption = () => {
+     <TouchableOpacity
+       style={[
+         styles.modelItem,
+-        'auto' === currentModelId && styles.selectedModelItem,
++        'openrouter/auto' === currentModelId && styles.selectedModelItem,
+       ]}
+-      onPress={() => handleModelSelect({ id: 'auto', isAuto: true })}
++      onPress={() => handleModelSelect({ id: 'openrouter/auto', isAuto: true })}
+     >
+       <View style={styles.modelInfo}>
+         <Text style={[
+           styles.modelName,
+-          'auto' === currentModelId && styles.selectedModelName,
++          'openrouter/auto' === currentModelId && styles.selectedModelName,
+         ]}>
+           Auto (最適なモデルを自動選択)
+         </Text>
+         <Text style={[
+           styles.modelDescription,
+-          'auto' === currentModelId && styles.selectedModelDescription,
++          'openrouter/auto' === currentModelId && styles.selectedModelDescription,
+         ]}>
+           サーバー負荷と可用性に基づいて最適なモデルを選択
+         </Text>
+       </View>
+       
+       <View style={styles.modelRight}>
+-        {'auto' === currentModelId ? (
++        {'openrouter/auto' === currentModelId ? (
+           <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+         ) : (
+           <View style={styles.radioOuter}>
+-            {'auto' === currentModelId && <View style={styles.radioInner} />}
++            {'openrouter/auto' === currentModelId && <View style={styles.radioInner} />}
+           </View>
+         )}
+       </View>
+@@ -174,7 +174,7 @@ const renderAutoModelOption = () => {
+ 
+ // FlatListのdataに追加
+ const modelData = [
+-  { id: 'auto', name: 'Auto', isAuto: true },
++  { id: 'openrouter/auto', name: 'Auto', isAuto: true },
+   ...filteredModels
+ ];
+ ```
+@@ -186,7 +186,7 @@ const modelData = [
+ if (useAutoRouter) {
+   const userPlan = userState.plan;
+   const params = {
+-    model: "auto",
++    model: "openrouter/auto", // 公式ドキュメント確認済み
+     route: userPlan // プラン別ルーティング設定
+   };
+   
+@@ -432,6 +432,255 @@ if (useAutoRouter) {
+   };
+   ```
+ 
++#### 開発モード・本番モードのプラン切替
++開発モードと本番モードでのプラン切替機能を実装します。開発モードではタップ1つで即時切替を可能にし、本番モードでは適切な決済処理を実装します。
++
++##### 開発モード実装
++- `screens/SettingsScreen.tsx` - 開発モード用の簡易プラン切替UI
++  ```typescript
++  // screens/SettingsScreen.tsx (開発モード部分)
++  import React from 'react';
++  import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
++  import { useStore } from '../store';
++  import { PLANS } from '../constants/plans';
++  import theme from '../ui/theme';
++
++  const DevPlanSwitcher = () => {
++    const { plan, setPlan, updateQuotaLimits } = useStore();
++    
++    // 開発モードでのプラン切替処理
++    const switchPlan = (newPlan: string) => {
++      setPlan(newPlan);
++      updateQuotaLimits();
++      // 開発モードではレシート検証をスキップ
++    };
++    
++    return (
++      <View style={styles.container}>
++        <Text style={styles.title}>開発モード: プラン切替</Text>
++        
++        {Object.entries(PLANS).map(([planId, planData]) => (
++          <TouchableOpacity
++            key={planId}
++            style={[
++              styles.planButton,
++              plan === planId && styles.activePlan
++            ]}
++            onPress={() => switchPlan(planId)}
++          >
++            <Text style={[
++              styles.planText,
++              plan === planId && styles.activePlanText
++            ]}>
++              {planData.name}
++            </Text>
++          </TouchableOpacity>
++        ))}
++        
++        <Text style={styles.note}>
++          ※開発モードでは支払い処理をスキップします
++        </Text>
++      </View>
++    );
++  };
++  
++  const styles = StyleSheet.create({
++    container: {
++      marginVertical: theme.spacing.lg,
++      padding: theme.spacing.md,
++      backgroundColor: theme.colors.background.light,
++      borderRadius: theme.borderRadius.md,
++    },
++    title: {
++      fontSize: theme.typography.heading2.fontSize,
++      fontWeight: 'bold',
++      marginBottom: theme.spacing.md,
++    },
++    planButton: {
++      padding: theme.spacing.md,
++      marginVertical: theme.spacing.xs,
++      borderRadius: theme.borderRadius.sm,
++      backgroundColor: theme.colors.gray[200],
++    },
++    activePlan: {
++      backgroundColor: theme.colors.primary,
++    },
++    planText: {
++      fontSize: theme.typography.body.fontSize,
++      color: theme.colors.text.primary.light,
++    },
++    activePlanText: {
++      color: theme.colors.text.inverse,
++      fontWeight: 'bold',
++    },
++    note: {
++      marginTop: theme.spacing.md,
++      fontSize: theme.typography.caption.fontSize,
++      color: theme.colors.text.secondary.light,
++      fontStyle: 'italic',
++    },
++  });
++  ```
++
++##### 本番モード実装
++- `services/subscription.ts` - 本番モード用の決済処理
++  ```typescript
++  // services/subscription.ts (本番モード部分)
++  import * as StoreKit from 'expo-store-kit';
++  import * as InAppPurchases from 'expo-in-app-purchases';
++  import { Platform } from 'react-native';
++  import { supabase } from './supabase';
++  import { PLANS } from '../constants/plans';
++  import useStore from '../store';
++
++  // プラン購入処理
++  export const purchasePlan = async (planId: string, period: 'monthly' | 'halfyearly' | 'yearly') => {
++    try {
++      // プラン情報取得
++      const plan = PLANS[planId];
++      if (!plan || !plan.periods || !plan.periods[period]) {
++        throw new Error('Invalid plan or period');
++      }
++      
++      const productId = plan.periods[period].id;
++      
++      // プラットフォーム別の購入処理
++      if (Platform.OS === 'ios') {
++        // iOS: StoreKit 2
++        await StoreKit.requestPermissions();
++        const products = await StoreKit.getProductsAsync([productId]);
++        
++        if (products.length === 0) {
++          throw new Error('Product not found');
++        }
++        
++        const purchase = await StoreKit.purchaseItemAsync(productId);
++        
++        if (purchase.resultCode === StoreKit.PurchaseResultCode.SUCCESS) {
++          // レシート検証
++          return await verifyReceipt(purchase.receipt, 'ios');
++        } else {
++          throw new Error(`Purchase failed: ${purchase.resultCode}`);
++        }
++      } else {
++        // Android: Google Play Billing
++        await InAppPurchases.connectAsync();
++        const products = await InAppPurchases.getProductsAsync([productId]);
++        
++        if (products.length === 0) {
++          throw new Error('Product not found');
++        }
++        
++        const { responseCode, results } = await InAppPurchases.purchaseItemAsync(productId);
++        
++        if (responseCode === InAppPurchases.IAPResponseCode.OK) {
++          const purchase = results[0];
++          // レシート検証
++          return await verifyReceipt(purchase.purchaseToken, 'android');
++        } else {
++          throw new Error(`Purchase failed: ${responseCode}`);
++        }
++      }
++    } catch (error) {
++      console.error('Purchase failed:', error);
++      return { success: false, message: error.message };
++    }
++  };
++  
++  // 購入状態の復元
++  export const restorePurchases = async () => {
++    try {
++      let receipt;
++      
++      if (Platform.OS === 'ios') {
++        // iOS: StoreKit 2
++        await StoreKit.requestPermissions();
++        const purchases = await StoreKit.getPurchasesAsync();
++        
++        if (purchases.length > 0) {
++          // 最新の購入を使用
++          receipt = purchases[0].receipt;
++        }
++      } else {
++        // Android: Google Play Billing
++        await InAppPurchases.connectAsync();
++        const { responseCode, results } = await InAppPurchases.getPurchaseHistoryAsync();
++        
++        if (responseCode === InAppPurchases.IAPResponseCode.OK && results.length > 0) {
++          // 最新の購入を使用
++          receipt = results[0].purchaseToken;
++        }
++      }
++      
++      if (receipt) {
++        // レシート検証
++        return await verifyReceipt(receipt, Platform.OS as 'ios' | 'android');
++      }
++      
++      return { success: false, message: 'No purchases found' };
++    } catch (error) {
++      console.error('Restore purchases failed:', error);
++      return { success: false, message: error.message };
++    }
++  };
++  ```
++
++##### 環境判定と切替
++- `config/env.ts` - 開発/本番モード判定
++  ```typescript
++  // config/env.ts
++  import Constants from 'expo-constants';
++
++  // 環境変数またはビルド設定から開発モードかどうかを判定
++  export const isDevelopmentMode = () => {
++    // Expoの場合
++    if (Constants.expoConfig?.extra?.isDev) {
++      return true;
++    }
++    
++    // __DEV__グローバル変数（React Native）
++    if (typeof __DEV__ !== 'undefined' && __DEV__) {
++      return true;
++    }
++    
++    // プロセス環境変数（Node.js）
++    if (process.env.NODE_ENV === 'development') {
++      return true;
++    }
++    
++    return false;
++  };
++  ```
++
++- `screens/SubscriptionScreen.tsx` - 環境に応じたUI切替
++  ```typescript
++  // screens/SubscriptionScreen.tsx
++  import React from 'react';
++  import { View, ScrollView } from 'react-native';
++  import { isDevelopmentMode } from '../config/env';
++  import { PlanCards } from '../components/PlanCards';
++  import { DevPlanSwitcher } from '../components/DevPlanSwitcher';
++  import { ProductList } from '../components/ProductList';
++  
++  export const SubscriptionScreen = () => {
++    const isDevMode = isDevelopmentMode();
++    
++    return (
++      <ScrollView>
++        <PlanCards />
++        
++        {isDevMode ? (
++          // 開発モード: 簡易切替UI
++          <DevPlanSwitcher />
++        ) : (
++          // 本番モード: 決済UI
++          <ProductList />
++        )}
++      </ScrollView>
++    );
++  };
++  ```
++
+ ## 2. APIキー管理バックエンド
+ 
+ ### 2.1 Per-User APIキープロビジョニング
+@@ -3752,15 +4001,59 @@ export const generateAIAssist = async ({
+ 
+ ## 8. 実装タイムライン
+ 
+-| タスク | 担当 | 期限 |
+-|--------|------|------|
+-| UIパディング & テーマリファクタ | FE | **T+3d** |
+-| クォータHUD & 警告バナー | FE | **T+5d** |
+-| ローカルモデルインストーラー | BE | **T+7d** |
+-| チャットコピー/共有フック | FE | **T+7d** |
+-| 画像タブ & トグル | FE | **T+10d** |
+-| ノートモジュールMVP | FE/BE | **T+12d** |
+-| プラン対応クォータエンドツーエンド | FE/BE | **T+14d** |
++### 8.1 実装順序と理由
++
++以下の順序で実装を進めることで、依存関係を考慮しつつ効率的に開発を進めることができます。
++
++1. **UI一貫性のためのリファクタリング** (セクション3)
++   - 理由: 他の機能実装の基盤となるUIコンポーネントとテーマを先に整備
++   - 成果物: `ui/theme.ts`、パディング統一、スタイル集中化
++
++2. **価格設定とクォータ制限の更新** (セクション1)
++   - 理由: 他の機能のプラン別制限の基盤となるため優先度が高い
++   - 成果物: プラン構成、Tierシステム、Auto Router機能、クォータ管理
++
++3. **APIキー管理のバックエンドサービス実装** (セクション2)
++   - 理由: セキュリティ面で重要かつ他のAPI機能の前提条件
++   - 成果物: APIキー発行・管理、使用量ロギング
++
++4. **ローカルモデル管理機能** (セクション4)
++   - 理由: オフライン機能の基盤となり、ユーザー体験向上に重要
++   - 成果物: ダウンロード管理、ストレージチェック、モデル切替
++
++5. **チャットのコピー/共有機能** (セクション6)
++   - 理由: 比較的独立した機能で、ノート機能の前に実装すべき
++   - 成果物: メッセージアクション、コピー/共有/保存機能
++
++6. **画像生成機能の強化** (セクション5)
++   - 理由: 複雑な機能だが、ノート機能より先に実装すべき
++   - 成果物: マルチプロバイダー対応、UI改善、クォータ連携
++
++7. **AIアシスト付きノート機能** (セクション7)
++   - 理由: 最も複雑で他機能への依存が多いため最後に実装
++   - 成果物: ノートエディタ、AIアシスト、タグ管理
++
++### 8.2 詳細タイムライン
++
++| フェーズ | タスク | 担当 | 期限 | 依存関係 |
++|---------|--------|------|------|----------|
++| **1** | UIテーマシステム構築 | FE | **T+2d** | なし |
++| **1** | パディング・スタイル統一 | FE | **T+3d** | UIテーマ |
++| **2** | プラン・Tier定義実装 | FE/BE | **T+4d** | UIテーマ |
++| **2** | Auto Router機能実装 | FE/BE | **T+5d** | プラン定義 |
++| **2** | クォータ管理システム | FE/BE | **T+6d** | プラン定義 |
++| **3** | APIキー管理バックエンド | BE | **T+7d** | クォータ管理 |
++| **3** | 使用量ロギング | BE | **T+8d** | APIキー管理 |
++| **4** | ローカルモデルダウンロード | FE/BE | **T+10d** | UIテーマ |
++| **4** | ローカルモデル管理UI | FE | **T+11d** | ローカルモデルDL |
++| **5** | メッセージアクションUI | FE | **T+12d** | UIテーマ |
++| **5** | コピー/共有機能 | FE | **T+13d** | メッセージアクション |
++| **6** | 画像生成UI改善 | FE | **T+15d** | UIテーマ |
++| **6** | マルチプロバイダー対応 | BE | **T+16d** | APIキー管理 |
++| **7** | ノートエディタ基本実装 | FE | **T+18d** | UIテーマ |
++| **7** | AIアシスト機能 | FE/BE | **T+20d** | クォータ管理、APIキー |
++| **7** | ノート画像保存機能 | FE | **T+21d** | ノートエディタ |
++| **統合** | 最終テスト・バグ修正 | FE/BE | **T+23d** | すべて |
+ 
+ ## 9. 実装方針
+ 

@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import useColors from '../constants/colors';
+import { theme } from '../ui/theme';
 import SwipeableRow from '../components/SwipeableRow';
 import DeleteConfirmDialog from '../components/DeleteConfirmDialog';
 import { Chat } from '../store/chatStore';
@@ -83,6 +84,7 @@ export default function ChatsScreen() {
     container: {
       flex: 1,
       backgroundColor: colors.background,
+      paddingTop: theme.safeArea.top,
     },
     listContent: {
       padding: 16,

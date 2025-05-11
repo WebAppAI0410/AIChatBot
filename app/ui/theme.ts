@@ -1,3 +1,5 @@
+import { Platform, StatusBar } from 'react-native';
+
 export const theme = {
   colors: {
     primary: '#005E36',
@@ -52,10 +54,10 @@ export const theme = {
   },
   
   safeArea: {
-    top: 'env(safe-area-inset-top, 0px)',
-    bottom: 'env(safe-area-inset-bottom, 0px)',
-    left: 'env(safe-area-inset-left, 0px)',
-    right: 'env(safe-area-inset-right, 0px)',
+    top: Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 0,
+    bottom: Platform.OS === 'ios' ? 34 : 0,
+    left: 0,
+    right: 0,
   },
   
   typography: {

@@ -9,15 +9,18 @@ import {
   KeyboardAvoidingView, 
   Platform,
   Keyboard,
-  Dimensions
+  Dimensions,
+  SafeAreaView
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import useColors from '../constants/colors';
 import { MODELS } from '../constants/models';
 import ModelSelectModal from '../components/ModelSelectModal';
 import LocalModelInstallModal from '../components/LocalModelInstallModal';
+import Header from '../components/Header';
+import theme from '../ui/theme';
 
 const SUGGESTIONS = [
   'AIについて教えてください',
@@ -102,6 +105,17 @@ export default function NewChatScreen() {
     setSelectedModelId(modelId);
   };
 
+  const ModelSelectButton = () => (
+    <TouchableOpacity
+      style={styles.modelSelectButton}
+      onPress={() => setShowModelSelect(true)}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    >
+      <Text style={styles.modelSelectButtonText}>{selectedModel?.name}</Text>
+      <Ionicons name="chevron-down" size={16} color={colors.textOnPrimary} />
+    </TouchableOpacity>
+  );
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -133,37 +147,14 @@ export default function NewChatScreen() {
       fontSize: 14,
       color: colors.text,
     },
-    modelInfoContainer: {
-      padding: 16,
-      backgroundColor: colors.lightGray,
-      borderRadius: 8,
-      marginBottom: 16,
-    },
-    fixedModelBar: {
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: colors.background,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.lightGray,
-      zIndex: 10,
-    },
-    fixedModelBarTitle: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      marginBottom: 2,
-      color: colors.text,
-    },
-    fixedModelBarDesc: {
-      fontSize: 13,
-      color: colors.secondaryText,
-      marginBottom: 4,
-    },
     localModelBanner: {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: `${colors.accentBlue}20`,
       padding: 12,
       borderRadius: 8,
+      margin: 16,
+      marginTop: 0,
     },
     localModelText: {
       fontSize: 14,
@@ -200,22 +191,38 @@ export default function NewChatScreen() {
     sendButtonDisabled: {
       backgroundColor: colors.lightGray,
     },
+    modelSelectButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.xs,
+      borderRadius: theme.radius.lg,
+    },
+    modelSelectButtonText: {
+      marginRight: theme.spacing.xs,
+      fontSize: theme.fontSizes.sm,
+      fontWeight: '500',
+      color: colors.textOnPrimary,
+    },
   });
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      {/* 上部固定モデル選択バー */}
-      <TouchableOpacity
-        style={styles.fixedModelBar}
-        onPress={() => setShowModelSelect(true)}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.fixedModelBarTitle}>現在のモデル: {selectedModel?.name}</Text>
-        <Text style={styles.fixedModelBarDesc}>タップしてモデルを選択</Text>
+    <>
+      <Stack.Screen
+        options={{
+          headerShown: false,
+        }}
+      />
+      
+      <SafeAreaView style={styles.container}>
+        <Header
+          title="新規チャット"
+          showBack={false}
+          onTitleEdit={undefined}
+          rightComponent={<ModelSelectButton />}
+        />
+        
         {localModelStatus !== 'ready' && (
           <View style={styles.localModelBanner}>
             <Ionicons name="information-circle-outline" size={20} color={colors.accentBlue} />
@@ -224,58 +231,68 @@ export default function NewChatScreen() {
             </Text>
           </View>
         )}
-      </TouchableOpacity>
-      <ScrollView 
-        ref={scrollViewRef}
-        style={styles.suggestionsContainer}
-        contentContainerStyle={{ 
-          paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : 20 
-        }}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-      >
-        <Text style={styles.suggestionsTitle}>おすすめの質問</Text>
-        <View style={styles.chipContainer}>
-          {SUGGESTIONS.map((suggestion, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.chip}
-              onPress={() => handleSendMessage(suggestion)}
-            >
-              <Text style={styles.chipText}>{suggestion}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
-      <View style={[styles.inputContainer, keyboardHeight > 0 && { paddingBottom: Platform.OS === 'ios' ? 8 : 0 }]}>
-        <TextInput
-          style={styles.input}
-          placeholder="メッセージを入力..."
-          value={input}
-          onChangeText={setInput}
-          multiline
-          placeholderTextColor={colors.secondaryText}
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
-          disabled={!input.trim()}
-          onPress={() => handleSendMessage(input)}
+        
+        <KeyboardAvoidingView 
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-          <Ionicons name="send" size={24} color={input.trim() ? colors.background : colors.gray} />
-        </TouchableOpacity>
-      </View>
-      {/* モデル選択モーダル */}
-      <ModelSelectModal
-        visible={showModelSelect}
-        onClose={() => setShowModelSelect(false)}
-        onSelectModel={handleSelectModel}
-        currentModelId={selectedModelId}
-      />
-      {/* ローカルモデルインストールモーダル */}
-      <LocalModelInstallModal
-        visible={showLocalModelInstall}
-        onClose={() => setShowLocalModelInstall(false)}
-      />
-    </KeyboardAvoidingView>
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.suggestionsContainer}
+            contentContainerStyle={{ 
+              paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : 20 
+            }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
+            <Text style={styles.suggestionsTitle}>おすすめの質問</Text>
+            <View style={styles.chipContainer}>
+              {SUGGESTIONS.map((suggestion, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.chip}
+                  onPress={() => handleSendMessage(suggestion)}
+                >
+                  <Text style={styles.chipText}>{suggestion}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+          
+          <View style={[styles.inputContainer, keyboardHeight > 0 && { paddingBottom: Platform.OS === 'ios' ? 8 : 0 }]}>
+            <TextInput
+              style={styles.input}
+              placeholder="メッセージを入力..."
+              value={input}
+              onChangeText={setInput}
+              multiline
+              placeholderTextColor={colors.secondaryText}
+            />
+            <TouchableOpacity
+              style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
+              disabled={!input.trim()}
+              onPress={() => handleSendMessage(input)}
+            >
+              <Ionicons name="send" size={24} color={input.trim() ? colors.background : colors.gray} />
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+        
+        {/* モデル選択モーダル */}
+        <ModelSelectModal
+          visible={showModelSelect}
+          onClose={() => setShowModelSelect(false)}
+          onSelectModel={handleSelectModel}
+          currentModelId={selectedModelId}
+        />
+        
+        {/* ローカルモデルインストールモーダル */}
+        <LocalModelInstallModal
+          visible={showLocalModelInstall}
+          onClose={() => setShowLocalModelInstall(false)}
+        />
+      </SafeAreaView>
+    </>
   );
 }

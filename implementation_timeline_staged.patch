@@ -1,0 +1,385 @@
+diff --git "a/\344\277\256\346\255\243\350\250\210\347\224\273.md" "b/\344\277\256\346\255\243\350\250\210\347\224\273.md"
+index 2a9015b..5178b13 100644
+--- "a/\344\277\256\346\255\243\350\250\210\347\224\273.md"
++++ "b/\344\277\256\346\255\243\350\250\210\347\224\273.md"
+@@ -140,31 +140,31 @@ const renderAutoModelOption = () => {
+     <TouchableOpacity
+       style={[
+         styles.modelItem,
+-        'auto' === currentModelId && styles.selectedModelItem,
++        'openrouter/auto' === currentModelId && styles.selectedModelItem,
+       ]}
+-      onPress={() => handleModelSelect({ id: 'auto', isAuto: true })}
++      onPress={() => handleModelSelect({ id: 'openrouter/auto', isAuto: true })}
+     >
+       <View style={styles.modelInfo}>
+         <Text style={[
+           styles.modelName,
+-          'auto' === currentModelId && styles.selectedModelName,
++          'openrouter/auto' === currentModelId && styles.selectedModelName,
+         ]}>
+           Auto (最適なモデルを自動選択)
+         </Text>
+         <Text style={[
+           styles.modelDescription,
+-          'auto' === currentModelId && styles.selectedModelDescription,
++          'openrouter/auto' === currentModelId && styles.selectedModelDescription,
+         ]}>
+           サーバー負荷と可用性に基づいて最適なモデルを選択
+         </Text>
+       </View>
+       
+       <View style={styles.modelRight}>
+-        {'auto' === currentModelId ? (
++        {'openrouter/auto' === currentModelId ? (
+           <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+         ) : (
+           <View style={styles.radioOuter}>
+-            {'auto' === currentModelId && <View style={styles.radioInner} />}
++            {'openrouter/auto' === currentModelId && <View style={styles.radioInner} />}
+           </View>
+         )}
+       </View>
+@@ -174,7 +174,7 @@ const renderAutoModelOption = () => {
+ 
+ // FlatListのdataに追加
+ const modelData = [
+-  { id: 'auto', name: 'Auto', isAuto: true },
++  { id: 'openrouter/auto', name: 'Auto', isAuto: true },
+   ...filteredModels
+ ];
+ ```
+@@ -186,7 +186,7 @@ const modelData = [
+ if (useAutoRouter) {
+   const userPlan = userState.plan;
+   const params = {
+-    model: "auto",
++    model: "openrouter/auto", // 公式ドキュメント確認済み
+     route: userPlan // プラン別ルーティング設定
+   };
+   
+@@ -432,6 +432,255 @@ if (useAutoRouter) {
+   };
+   ```
+ 
++#### 開発モード・本番モードのプラン切替
++開発モードと本番モードでのプラン切替機能を実装します。開発モードではタップ1つで即時切替を可能にし、本番モードでは適切な決済処理を実装します。
++
++##### 開発モード実装
++- `screens/SettingsScreen.tsx` - 開発モード用の簡易プラン切替UI
++  ```typescript
++  // screens/SettingsScreen.tsx (開発モード部分)
++  import React from 'react';
++  import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
++  import { useStore } from '../store';
++  import { PLANS } from '../constants/plans';
++  import theme from '../ui/theme';
++
++  const DevPlanSwitcher = () => {
++    const { plan, setPlan, updateQuotaLimits } = useStore();
++    
++    // 開発モードでのプラン切替処理
++    const switchPlan = (newPlan: string) => {
++      setPlan(newPlan);
++      updateQuotaLimits();
++      // 開発モードではレシート検証をスキップ
++    };
++    
++    return (
++      <View style={styles.container}>
++        <Text style={styles.title}>開発モード: プラン切替</Text>
++        
++        {Object.entries(PLANS).map(([planId, planData]) => (
++          <TouchableOpacity
++            key={planId}
++            style={[
++              styles.planButton,
++              plan === planId && styles.activePlan
++            ]}
++            onPress={() => switchPlan(planId)}
++          >
++            <Text style={[
++              styles.planText,
++              plan === planId && styles.activePlanText
++            ]}>
++              {planData.name}
++            </Text>
++          </TouchableOpacity>
++        ))}
++        
++        <Text style={styles.note}>
++          ※開発モードでは支払い処理をスキップします
++        </Text>
++      </View>
++    );
++  };
++  
++  const styles = StyleSheet.create({
++    container: {
++      marginVertical: theme.spacing.lg,
++      padding: theme.spacing.md,
++      backgroundColor: theme.colors.background.light,
++      borderRadius: theme.borderRadius.md,
++    },
++    title: {
++      fontSize: theme.typography.heading2.fontSize,
++      fontWeight: 'bold',
++      marginBottom: theme.spacing.md,
++    },
++    planButton: {
++      padding: theme.spacing.md,
++      marginVertical: theme.spacing.xs,
++      borderRadius: theme.borderRadius.sm,
++      backgroundColor: theme.colors.gray[200],
++    },
++    activePlan: {
++      backgroundColor: theme.colors.primary,
++    },
++    planText: {
++      fontSize: theme.typography.body.fontSize,
++      color: theme.colors.text.primary.light,
++    },
++    activePlanText: {
++      color: theme.colors.text.inverse,
++      fontWeight: 'bold',
++    },
++    note: {
++      marginTop: theme.spacing.md,
++      fontSize: theme.typography.caption.fontSize,
++      color: theme.colors.text.secondary.light,
++      fontStyle: 'italic',
++    },
++  });
++  ```
++
++##### 本番モード実装
++- `services/subscription.ts` - 本番モード用の決済処理
++  ```typescript
++  // services/subscription.ts (本番モード部分)
++  import * as StoreKit from 'expo-store-kit';
++  import * as InAppPurchases from 'expo-in-app-purchases';
++  import { Platform } from 'react-native';
++  import { supabase } from './supabase';
++  import { PLANS } from '../constants/plans';
++  import useStore from '../store';
++
++  // プラン購入処理
++  export const purchasePlan = async (planId: string, period: 'monthly' | 'halfyearly' | 'yearly') => {
++    try {
++      // プラン情報取得
++      const plan = PLANS[planId];
++      if (!plan || !plan.periods || !plan.periods[period]) {
++        throw new Error('Invalid plan or period');
++      }
++      
++      const productId = plan.periods[period].id;
++      
++      // プラットフォーム別の購入処理
++      if (Platform.OS === 'ios') {
++        // iOS: StoreKit 2
++        await StoreKit.requestPermissions();
++        const products = await StoreKit.getProductsAsync([productId]);
++        
++        if (products.length === 0) {
++          throw new Error('Product not found');
++        }
++        
++        const purchase = await StoreKit.purchaseItemAsync(productId);
++        
++        if (purchase.resultCode === StoreKit.PurchaseResultCode.SUCCESS) {
++          // レシート検証
++          return await verifyReceipt(purchase.receipt, 'ios');
++        } else {
++          throw new Error(`Purchase failed: ${purchase.resultCode}`);
++        }
++      } else {
++        // Android: Google Play Billing
++        await InAppPurchases.connectAsync();
++        const products = await InAppPurchases.getProductsAsync([productId]);
++        
++        if (products.length === 0) {
++          throw new Error('Product not found');
++        }
++        
++        const { responseCode, results } = await InAppPurchases.purchaseItemAsync(productId);
++        
++        if (responseCode === InAppPurchases.IAPResponseCode.OK) {
++          const purchase = results[0];
++          // レシート検証
++          return await verifyReceipt(purchase.purchaseToken, 'android');
++        } else {
++          throw new Error(`Purchase failed: ${responseCode}`);
++        }
++      }
++    } catch (error) {
++      console.error('Purchase failed:', error);
++      return { success: false, message: error.message };
++    }
++  };
++  
++  // 購入状態の復元
++  export const restorePurchases = async () => {
++    try {
++      let receipt;
++      
++      if (Platform.OS === 'ios') {
++        // iOS: StoreKit 2
++        await StoreKit.requestPermissions();
++        const purchases = await StoreKit.getPurchasesAsync();
++        
++        if (purchases.length > 0) {
++          // 最新の購入を使用
++          receipt = purchases[0].receipt;
++        }
++      } else {
++        // Android: Google Play Billing
++        await InAppPurchases.connectAsync();
++        const { responseCode, results } = await InAppPurchases.getPurchaseHistoryAsync();
++        
++        if (responseCode === InAppPurchases.IAPResponseCode.OK && results.length > 0) {
++          // 最新の購入を使用
++          receipt = results[0].purchaseToken;
++        }
++      }
++      
++      if (receipt) {
++        // レシート検証
++        return await verifyReceipt(receipt, Platform.OS as 'ios' | 'android');
++      }
++      
++      return { success: false, message: 'No purchases found' };
++    } catch (error) {
++      console.error('Restore purchases failed:', error);
++      return { success: false, message: error.message };
++    }
++  };
++  ```
++
++##### 環境判定と切替
++- `config/env.ts` - 開発/本番モード判定
++  ```typescript
++  // config/env.ts
++  import Constants from 'expo-constants';
++
++  // 環境変数またはビルド設定から開発モードかどうかを判定
++  export const isDevelopmentMode = () => {
++    // Expoの場合
++    if (Constants.expoConfig?.extra?.isDev) {
++      return true;
++    }
++    
++    // __DEV__グローバル変数（React Native）
++    if (typeof __DEV__ !== 'undefined' && __DEV__) {
++      return true;
++    }
++    
++    // プロセス環境変数（Node.js）
++    if (process.env.NODE_ENV === 'development') {
++      return true;
++    }
++    
++    return false;
++  };
++  ```
++
++- `screens/SubscriptionScreen.tsx` - 環境に応じたUI切替
++  ```typescript
++  // screens/SubscriptionScreen.tsx
++  import React from 'react';
++  import { View, ScrollView } from 'react-native';
++  import { isDevelopmentMode } from '../config/env';
++  import { PlanCards } from '../components/PlanCards';
++  import { DevPlanSwitcher } from '../components/DevPlanSwitcher';
++  import { ProductList } from '../components/ProductList';
++  
++  export const SubscriptionScreen = () => {
++    const isDevMode = isDevelopmentMode();
++    
++    return (
++      <ScrollView>
++        <PlanCards />
++        
++        {isDevMode ? (
++          // 開発モード: 簡易切替UI
++          <DevPlanSwitcher />
++        ) : (
++          // 本番モード: 決済UI
++          <ProductList />
++        )}
++      </ScrollView>
++    );
++  };
++  ```
++
+ ## 2. APIキー管理バックエンド
+ 
+ ### 2.1 Per-User APIキープロビジョニング
+@@ -3752,15 +4001,59 @@ export const generateAIAssist = async ({
+ 
+ ## 8. 実装タイムライン
+ 
+-| タスク | 担当 | 期限 |
+-|--------|------|------|
+-| UIパディング & テーマリファクタ | FE | **T+3d** |
+-| クォータHUD & 警告バナー | FE | **T+5d** |
+-| ローカルモデルインストーラー | BE | **T+7d** |
+-| チャットコピー/共有フック | FE | **T+7d** |
+-| 画像タブ & トグル | FE | **T+10d** |
+-| ノートモジュールMVP | FE/BE | **T+12d** |
+-| プラン対応クォータエンドツーエンド | FE/BE | **T+14d** |
++### 8.1 実装順序と理由
++
++以下の順序で実装を進めることで、依存関係を考慮しつつ効率的に開発を進めることができます。
++
++1. **UI一貫性のためのリファクタリング** (セクション3)
++   - 理由: 他の機能実装の基盤となるUIコンポーネントとテーマを先に整備
++   - 成果物: `ui/theme.ts`、パディング統一、スタイル集中化
++
++2. **価格設定とクォータ制限の更新** (セクション1)
++   - 理由: 他の機能のプラン別制限の基盤となるため優先度が高い
++   - 成果物: プラン構成、Tierシステム、Auto Router機能、クォータ管理
++
++3. **APIキー管理のバックエンドサービス実装** (セクション2)
++   - 理由: セキュリティ面で重要かつ他のAPI機能の前提条件
++   - 成果物: APIキー発行・管理、使用量ロギング
++
++4. **ローカルモデル管理機能** (セクション4)
++   - 理由: オフライン機能の基盤となり、ユーザー体験向上に重要
++   - 成果物: ダウンロード管理、ストレージチェック、モデル切替
++
++5. **チャットのコピー/共有機能** (セクション6)
++   - 理由: 比較的独立した機能で、ノート機能の前に実装すべき
++   - 成果物: メッセージアクション、コピー/共有/保存機能
++
++6. **画像生成機能の強化** (セクション5)
++   - 理由: 複雑な機能だが、ノート機能より先に実装すべき
++   - 成果物: マルチプロバイダー対応、UI改善、クォータ連携
++
++7. **AIアシスト付きノート機能** (セクション7)
++   - 理由: 最も複雑で他機能への依存が多いため最後に実装
++   - 成果物: ノートエディタ、AIアシスト、タグ管理
++
++### 8.2 詳細タイムライン
++
++| フェーズ | タスク | 担当 | 期限 | 依存関係 |
++|---------|--------|------|------|----------|
++| **1** | UIテーマシステム構築 | FE | **T+2d** | なし |
++| **1** | パディング・スタイル統一 | FE | **T+3d** | UIテーマ |
++| **2** | プラン・Tier定義実装 | FE/BE | **T+4d** | UIテーマ |
++| **2** | Auto Router機能実装 | FE/BE | **T+5d** | プラン定義 |
++| **2** | クォータ管理システム | FE/BE | **T+6d** | プラン定義 |
++| **3** | APIキー管理バックエンド | BE | **T+7d** | クォータ管理 |
++| **3** | 使用量ロギング | BE | **T+8d** | APIキー管理 |
++| **4** | ローカルモデルダウンロード | FE/BE | **T+10d** | UIテーマ |
++| **4** | ローカルモデル管理UI | FE | **T+11d** | ローカルモデルDL |
++| **5** | メッセージアクションUI | FE | **T+12d** | UIテーマ |
++| **5** | コピー/共有機能 | FE | **T+13d** | メッセージアクション |
++| **6** | 画像生成UI改善 | FE | **T+15d** | UIテーマ |
++| **6** | マルチプロバイダー対応 | BE | **T+16d** | APIキー管理 |
++| **7** | ノートエディタ基本実装 | FE | **T+18d** | UIテーマ |
++| **7** | AIアシスト機能 | FE/BE | **T+20d** | クォータ管理、APIキー |
++| **7** | ノート画像保存機能 | FE | **T+21d** | ノートエディタ |
++| **統合** | 最終テスト・バグ修正 | FE/BE | **T+23d** | すべて |
+ 
+ ## 9. 実装方針
+ 

@@ -19,10 +19,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import useColors from '../constants/colors';
 import { MODELS } from '../constants/models';
+import { theme } from '../ui/theme';
 import { fetchChatCompletion, ChatMessage as ApiChatMessage } from '../services/api';
 import { Message } from '../store/chatStore';
 import ModelSelectModal from '../components/ModelSelectModal';
 import LocalModelInstallModal from '../components/LocalModelInstallModal';
+import Header from '../components/Header';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -254,10 +256,10 @@ export default function ChatScreen() {
       alignItems: 'center',
       justifyContent: 'space-between',
       backgroundColor: colors.primary,
-      paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
+      paddingTop: theme.safeArea.top,
       paddingBottom: 12,
       paddingHorizontal: 16,
-      height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
+      height: 60 + theme.safeArea.top,
     },
     backButton: {
       width: 40,
@@ -466,81 +468,17 @@ export default function ChatScreen() {
       />
       
       <SafeAreaView style={styles.container}>
-        {/* Custom Header with Safe Area for Notch */}
-        <View style={styles.headerContainer}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => router.back()}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Ionicons name="chevron-back" size={24} color={colors.textOnPrimary} />
-          </TouchableOpacity>
-          
-          {isEditingTitle ? (
-            <View style={styles.editTitleContainer}>
-              <TextInput
-                style={styles.editTitleInput}
-                value={editTitle}
-                onChangeText={setEditTitle}
-                multiline
-                numberOfLines={2}
-                maxLength={50}
-                autoFocus
-                onSubmitEditing={() => {
-                  if (editTitle.trim()) {
-                    updateChatTitle(chat.id, editTitle.trim());
-                    setIsEditingTitle(false);
-                  }
-                }}
-                blurOnSubmit={true}
-                returnKeyType="done"
-              />
-              <TouchableOpacity
-                style={styles.titleEditIcon}
-                onPress={() => {
-                  if (editTitle.trim()) {
-                    updateChatTitle(chat.id, editTitle.trim());
-                    setIsEditingTitle(false);
-                  }
-                }}
-              >
-                <Ionicons name="checkmark" size={22} color={colors.textOnPrimary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.titleEditIcon}
-                onPress={() => setIsEditingTitle(false)}
-              >
-                <Ionicons name="close" size={22} color={colors.textOnPrimary} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.titleTouchable}
-              onPress={() => {
-                setEditTitle(chat.title);
-                setIsEditingTitle(true);
-              }}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={styles.headerTitle}
-                numberOfLines={2}
-                ellipsizeMode="tail"
-              >
-                {chat.title}
-              </Text>
-              <Ionicons name="pencil" size={18} color={colors.textOnPrimary} style={styles.titleEditIcon} />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity 
-            onPress={handleModelSelect} 
-            style={styles.modelButton}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Text style={styles.modelButtonText}>{currentModel.name}</Text>
-            <Ionicons name="chevron-down" size={16} color={colors.textOnPrimary} />
-          </TouchableOpacity>
-        </View>
+        {/* Use Header component for consistent styling */}
+        <Header
+          title={chat.title}
+          showBack={true}
+          showModelSelect={true}
+          onModelSelect={handleModelSelect}
+          currentModelName={currentModel.name}
+          onTitleEdit={(newTitle) => {
+            updateChatTitle(chat.id, newTitle);
+          }}
+        />
         
         <KeyboardAvoidingView
           style={styles.keyboardAvoidingContainer}

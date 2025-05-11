@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { useStore } from '../store';
 import useColors from '../constants/colors';
+import Header from '../components/Header';
 
 type PlanOption = {
   id: 'free' | 'lite' | 'heavy';
@@ -351,22 +352,12 @@ export default function SubscriptionScreen() {
       />
       
       <SafeAreaView style={styles.container}>
-        {/* Custom Header with Safe Area for Notch */}
-        <View style={styles.headerContainer}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => router.navigate('/(tabs)/settings')}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Ionicons name="chevron-back" size={24} color={colors.textOnPrimary} />
-          </TouchableOpacity>
-          
-          <Text style={styles.headerTitle}>
-            サブスクリプション
-          </Text>
-          
-          <View style={styles.headerRight} />
-        </View>
+        {/* Use Header component for consistent styling */}
+        <Header
+          title="サブスクリプション"
+          showBack={true}
+          onTitleEdit={undefined}
+        />
         
         <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.content}>
           <Text style={styles.title}>サブスクリプションプラン</Text>

@@ -13,6 +13,7 @@ import {
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import useColors from '../constants/colors';
+import Header from '../components/Header';
 
 export default function HelpScreen() {
   const router = useRouter();
@@ -179,22 +180,12 @@ export default function HelpScreen() {
       />
       
       <SafeAreaView style={styles.container}>
-        {/* Custom Header with Safe Area for Notch */}
-        <View style={styles.headerContainer}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => router.navigate('/(tabs)/settings')}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Ionicons name="chevron-back" size={24} color={colors.textOnPrimary} />
-          </TouchableOpacity>
-          
-          <Text style={styles.headerTitle}>
-            使い方
-          </Text>
-          
-          <View style={styles.headerRight} />
-        </View>
+        {/* Use Header component for consistent styling */}
+        <Header
+          title="使い方"
+          showBack={true}
+          onTitleEdit={undefined}
+        />
         
         <ScrollView style={styles.scrollContainer}>
           <View style={styles.header}>

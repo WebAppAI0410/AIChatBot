@@ -10,7 +10,7 @@ import { useStore } from './store';
 import { useColors } from './constants/colors';
 import config from '../tamagui.config';
 import { useColorScheme } from 'react-native';
-import { ThemeProvider } from './ui/ThemeProvider';
+import { ThemeProvider, useTheme } from './ui/ThemeProvider';
 
 // ColorsType型を定義
 import type { lightColors } from './constants/colors';
@@ -59,6 +59,8 @@ export default function RootLayout() {
 
 export function TabsLayout() {
   const colors = useColors();
+  const { theme } = useTheme();
+  
   return (
     <Tabs
       screenOptions={{
@@ -67,11 +69,33 @@ export function TabsLayout() {
         tabBarStyle: {
           backgroundColor: colors.background,
           borderTopColor: colors.lightGray,
+          height: 60 + theme.safeArea.bottom,
+          paddingBottom: theme.safeArea.bottom,
+          paddingTop: theme.spacing.xs,
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 3,
+        },
+        tabBarItemStyle: {
+          paddingVertical: theme.spacing.xs,
+        },
+        tabBarLabelStyle: {
+          fontSize: theme.fontSizes.xs,
+          fontWeight: '500',
+          marginBottom: theme.spacing.xs,
         },
         headerStyle: {
           backgroundColor: colors.primary,
+          height: 60 + theme.safeArea.top,
         },
+        headerShown: false,
         headerTintColor: colors.textOnPrimary,
+        headerTitleStyle: {
+          fontSize: theme.fontSizes.lg,
+          fontWeight: 'bold',
+        },
       }}
     >
       <Tabs.Screen

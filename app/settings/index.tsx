@@ -1,9 +1,11 @@
 import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Switch } from 'react-native';
-import { useRouter } from 'expo-router';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Switch, SafeAreaView } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import useColors from '../constants/colors';
+import Header from '../components/Header';
+import theme from '../ui/theme';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -41,6 +43,10 @@ export default function SettingsScreen() {
   
   const styles = StyleSheet.create({
     container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContainer: {
       flex: 1,
       backgroundColor: colors.background,
     },
@@ -154,10 +160,25 @@ export default function SettingsScreen() {
   });
   
   return (
-    <ScrollView style={styles.container}>
-      {/* User Profile */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>アカウント</Text>
+    <>
+      <Stack.Screen
+        options={{
+          headerShown: false,
+        }}
+      />
+      
+      <SafeAreaView style={styles.container}>
+        {/* Use Header component for consistent styling */}
+        <Header
+          title="設定"
+          showBack={false}
+          onTitleEdit={undefined}
+        />
+        
+        <ScrollView style={styles.scrollContainer}>
+          {/* User Profile */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>アカウント</Text>
         
         {isAuthenticated ? (
           <View style={styles.profileContainer}>
@@ -241,7 +262,9 @@ export default function SettingsScreen() {
           <Text style={styles.infoLabel}>利用規約</Text>
           <Ionicons name="open-outline" size={20} color={colors.gray} />
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </>
   );
 }
