@@ -12,10 +12,12 @@ import {
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
 
 export default function HelpScreen() {
   const router = useRouter();
+  const colors = useColors();
+  
   const helpSections = [
     {
       title: 'チャットの始め方',
@@ -48,6 +50,125 @@ export default function HelpScreen() {
       content: '無料プランでは基本的な機能が利用可能です。より高度なモデルや機能を利用するには、Liteプラン（月額780円）またはHeavyプラン（月額1,980円）へのアップグレードが必要です。',
     },
   ];
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    headerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.primary,
+      paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
+      paddingBottom: 12,
+      paddingHorizontal: 16,
+      height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      color: colors.background,
+      fontSize: 18,
+      fontWeight: '600',
+      flex: 1,
+      textAlign: 'center',
+      marginHorizontal: 10,
+    },
+    headerRight: {
+      width: 40,
+    },
+    scrollContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      padding: 20,
+      paddingBottom: 16,
+    },
+    contentTitle: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 8,
+    },
+    headerSubtitle: {
+      fontSize: 16,
+      color: colors.secondaryText,
+    },
+    section: {
+      marginBottom: 20,
+      paddingHorizontal: 16,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    iconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: `${colors.primary}20`,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    sectionContent: {
+      fontSize: 16,
+      lineHeight: 24,
+      color: colors.secondaryText,
+      paddingLeft: 52,
+    },
+    supportSection: {
+      marginTop: 20,
+      marginBottom: 20,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+    },
+    supportTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 16,
+    },
+    supportButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 8,
+    },
+    supportButtonText: {
+      color: colors.background,
+      fontSize: 16,
+      fontWeight: '500',
+      marginLeft: 8,
+    },
+    versionContainer: {
+      padding: 16,
+      alignItems: 'center',
+      marginTop: 24,
+      marginBottom: 40,
+    },
+    versionText: {
+      fontSize: 14,
+      color: colors.gray,
+    },
+  });
 
   return (
     <>
@@ -109,122 +230,3 @@ export default function HelpScreen() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.primary,
-    paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    color: colors.background,
-    fontSize: 18,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'center',
-    marginHorizontal: 10,
-  },
-  headerRight: {
-    width: 40,
-  },
-  scrollContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    padding: 20,
-    paddingBottom: 16,
-  },
-  contentTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: colors.darkGray,
-  },
-  section: {
-    marginBottom: 20,
-    paddingHorizontal: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 194, 106, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  sectionContent: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: colors.darkGray,
-    paddingLeft: 52,
-  },
-  supportSection: {
-    marginTop: 20,
-    marginBottom: 20,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  supportTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 16,
-  },
-  supportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  supportButtonText: {
-    color: colors.background,
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  versionContainer: {
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 40,
-  },
-  versionText: {
-    fontSize: 14,
-    color: colors.gray,
-  },
-});

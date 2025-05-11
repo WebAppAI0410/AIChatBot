@@ -17,7 +17,7 @@ import {
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
 import { MODELS } from '../constants/models';
 import { fetchChatCompletion, ChatMessage as ApiChatMessage } from '../services/api';
 import { Message } from '../store/chatStore';
@@ -35,6 +35,7 @@ export default function ChatScreen() {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   
+  const colors = useColors();
   const chats = useStore(state => state.chats);
   const addMessage = useStore(state => state.addMessage);
   const markChatAsRead = useStore(state => state.markChatAsRead);
@@ -243,6 +244,186 @@ export default function ChatScreen() {
     }
   };
   
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    headerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.primary,
+      paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
+      paddingBottom: 12,
+      paddingHorizontal: 16,
+      height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      color: colors.background,
+      fontSize: 18,
+      fontWeight: '600',
+      flex: 1,
+      textAlign: 'center',
+      marginHorizontal: 10,
+      paddingVertical: 2,
+    },
+    keyboardAvoidingContainer: {
+      flex: 1,
+    },
+    messageList: {
+      padding: 16,
+      paddingBottom: 8,
+    },
+    messageContainer: {
+      marginBottom: 16,
+      flexDirection: 'row',
+    },
+    userMessageContainer: {
+      justifyContent: 'flex-end',
+    },
+    assistantMessageContainer: {
+      justifyContent: 'flex-start',
+    },
+    messageBubble: {
+      maxWidth: '80%',
+      padding: 12,
+      borderRadius: 16,
+    },
+    userMessageBubble: {
+      backgroundColor: colors.primary,
+      borderBottomRightRadius: 4,
+    },
+    assistantMessageBubble: {
+      backgroundColor: colors.card,
+      borderBottomLeftRadius: 4,
+    },
+    messageText: {
+      fontSize: 16,
+      lineHeight: 22,
+    },
+    userMessageText: {
+      color: colors.background,
+    },
+    assistantMessageText: {
+      color: colors.text,
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      padding: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      backgroundColor: colors.background,
+      alignItems: 'flex-end',
+    },
+    input: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      maxHeight: 120,
+      fontSize: 16,
+      color: colors.text,
+    },
+    sendButton: {
+      backgroundColor: colors.primary,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: 8,
+    },
+    sendButtonDisabled: {
+      backgroundColor: colors.lightGray,
+    },
+    loadingButton: {
+      backgroundColor: colors.primary,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: 8,
+    },
+    modelButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+    },
+    modelButtonText: {
+      color: colors.background,
+      marginRight: 4,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    titleTouchable: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 40,
+    },
+    titleEditIcon: {
+      marginLeft: 6,
+      marginRight: 6,
+    },
+    editTitleContainer: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 40,
+    },
+    editTitleInput: {
+      flex: 1,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      color: colors.background,
+      fontSize: 18,
+      fontWeight: '600',
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      marginRight: 4,
+      maxHeight: 48,
+    },
+    loadingContainer: {
+      alignItems: 'center',
+      margin: 16,
+    },
+    modelInfo: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      backgroundColor: colors.card,
+      borderRadius: 8,
+      marginBottom: 16,
+      marginHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    modelName: {
+      color: colors.text,
+      fontWeight: 'bold',
+    },
+    modelTap: {
+      color: colors.secondaryText,
+      fontSize: 12,
+    },
+  });
+  
   const renderMessage = ({ item }: { item: Message }) => {
     const isUser = item.role === 'user';
     
@@ -269,7 +450,7 @@ export default function ChatScreen() {
   if (!chat) {
     return (
       <View style={styles.container}>
-        <Text>Chat not found</Text>
+        <Text style={{ color: colors.text }}>Chat not found</Text>
       </View>
     );
   }
@@ -425,158 +606,3 @@ export default function ChatScreen() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.primary,
-    paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    color: colors.background,
-    fontSize: 18,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'center',
-    marginHorizontal: 10,
-    paddingVertical: 2,
-  },
-  keyboardAvoidingContainer: {
-    flex: 1,
-  },
-  messageList: {
-    padding: 16,
-    paddingBottom: 8,
-  },
-  messageContainer: {
-    marginBottom: 16,
-    flexDirection: 'row',
-  },
-  userMessageContainer: {
-    justifyContent: 'flex-end',
-  },
-  assistantMessageContainer: {
-    justifyContent: 'flex-start',
-  },
-  messageBubble: {
-    maxWidth: '80%',
-    padding: 12,
-    borderRadius: 16,
-  },
-  userMessageBubble: {
-    backgroundColor: colors.primary,
-    borderBottomRightRadius: 4,
-  },
-  assistantMessageBubble: {
-    backgroundColor: colors.lightGray,
-    borderBottomLeftRadius: 4,
-  },
-  messageText: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  userMessageText: {
-    color: colors.background,
-  },
-  assistantMessageText: {
-    color: colors.text,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.lightGray,
-    alignItems: 'flex-end',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: colors.lightGray,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    maxHeight: 120,
-    fontSize: 16,
-  },
-  sendButton: {
-    backgroundColor: colors.primary,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  sendButtonDisabled: {
-    backgroundColor: colors.lightGray,
-  },
-  loadingButton: {
-    backgroundColor: colors.primary,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  modelButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  modelButtonText: {
-    color: colors.background,
-    marginRight: 4,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  titleTouchable: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 40,
-  },
-  titleEditIcon: {
-    marginLeft: 6,
-    marginRight: 6,
-  },
-  editTitleContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 40,
-  },
-  editTitleInput: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    color: colors.background,
-    fontSize: 18,
-    fontWeight: '600',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginRight: 4,
-    maxHeight: 48,
-  },
-});

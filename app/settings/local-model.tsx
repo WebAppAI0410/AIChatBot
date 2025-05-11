@@ -14,11 +14,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import * as FileSystem from 'expo-file-system';
 import { useStore } from '../store';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
 import LocalModelInstallModal from '../components/LocalModelInstallModal';
 
 export default function LocalModelScreen() {
   const router = useRouter();
+  const colors = useColors();
   const [showInstallModal, setShowInstallModal] = useState(false);
   
   const localModelStatus = useStore(state => state.localModelStatus);
@@ -65,6 +66,192 @@ export default function LocalModelScreen() {
       ]
     );
   };
+  
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    headerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.primary,
+      paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
+      paddingBottom: 12,
+      paddingHorizontal: 16,
+      height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      color: colors.background,
+      fontSize: 18,
+      fontWeight: '600',
+      flex: 1,
+      textAlign: 'center',
+      marginHorizontal: 10,
+    },
+    headerRight: {
+      width: 40,
+    },
+    scrollContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    contentHeader: {
+      padding: 24,
+      alignItems: 'center',
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      marginTop: 16,
+      color: colors.text,
+    },
+    subtitle: {
+      fontSize: 16,
+      textAlign: 'center',
+      color: colors.secondaryText,
+      marginTop: 8,
+      lineHeight: 22,
+    },
+    modelCard: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 16,
+      margin: 16,
+      marginTop: 0,
+      shadowColor: colors.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    modelInfo: {
+      marginBottom: 16,
+    },
+    modelName: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      marginBottom: 8,
+      color: colors.text,
+    },
+    modelDescription: {
+      fontSize: 14,
+      color: colors.secondaryText,
+      marginBottom: 16,
+      lineHeight: 20,
+    },
+    modelDetails: {
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingTop: 16,
+    },
+    detailItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    detailLabel: {
+      fontSize: 14,
+      color: colors.secondaryText,
+    },
+    detailValue: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: colors.text,
+    },
+    statusBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 16,
+      alignSelf: 'flex-start',
+    },
+    readyBadge: {
+      backgroundColor: `${colors.success}20`,
+    },
+    downloadingBadge: {
+      backgroundColor: `${colors.warning}20`,
+    },
+    notInstalledBadge: {
+      backgroundColor: `${colors.lightGray}`,
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    progressContainer: {
+      marginVertical: 16,
+    },
+    progressBarContainer: {
+      height: 8,
+      backgroundColor: colors.lightGray,
+      borderRadius: 4,
+      overflow: 'hidden',
+      marginBottom: 8,
+    },
+    progressBar: {
+      height: '100%',
+      backgroundColor: colors.primary,
+    },
+    progressText: {
+      fontSize: 14,
+      fontWeight: '500',
+      textAlign: 'right',
+      color: colors.text,
+    },
+    actionContainer: {
+      marginTop: 8,
+    },
+    button: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 12,
+      borderRadius: 8,
+    },
+    installButton: {
+      backgroundColor: colors.primary,
+    },
+    cancelButton: {
+      backgroundColor: colors.warning,
+    },
+    uninstallButton: {
+      backgroundColor: colors.error,
+    },
+    buttonText: {
+      color: colors.background,
+      fontSize: 16,
+      fontWeight: '500',
+      marginLeft: 8,
+    },
+    infoSection: {
+      padding: 16,
+      margin: 16,
+      marginTop: 0,
+      backgroundColor: colors.card,
+      borderRadius: 12,
+    },
+    infoTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      marginBottom: 8,
+      color: colors.text,
+    },
+    infoText: {
+      fontSize: 14,
+      color: colors.secondaryText,
+      lineHeight: 20,
+      marginBottom: 16,
+    },
+  });
   
   return (
     <>
@@ -209,183 +396,3 @@ export default function LocalModelScreen() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.primary,
-    paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    color: colors.background,
-    fontSize: 18,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'center',
-    marginHorizontal: 10,
-  },
-  headerRight: {
-    width: 40,
-  },
-  scrollContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  contentHeader: {
-    alignItems: 'center',
-    padding: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.darkGray,
-    textAlign: 'center',
-  },
-  modelCard: {
-    margin: 16,
-    padding: 16,
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.lightGray,
-    shadowColor: colors.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  modelInfo: {
-    marginBottom: 16,
-  },
-  modelName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  modelDescription: {
-    fontSize: 16,
-    color: colors.darkGray,
-    marginBottom: 16,
-    lineHeight: 22,
-  },
-  modelDetails: {
-    backgroundColor: colors.lightGray,
-    padding: 12,
-    borderRadius: 8,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  detailLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  detailValue: {
-    fontSize: 16,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  readyBadge: {
-    backgroundColor: colors.success,
-  },
-  downloadingBadge: {
-    backgroundColor: colors.warning,
-  },
-  notInstalledBadge: {
-    backgroundColor: colors.gray,
-  },
-  statusText: {
-    color: colors.background,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  progressContainer: {
-    marginBottom: 16,
-  },
-  progressBarContainer: {
-    height: 12,
-    backgroundColor: colors.lightGray,
-    borderRadius: 6,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: colors.primary,
-  },
-  progressText: {
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  actionContainer: {
-    alignItems: 'center',
-  },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    minWidth: 200,
-    justifyContent: 'center',
-  },
-  installButton: {
-    backgroundColor: colors.primary,
-  },
-  uninstallButton: {
-    backgroundColor: colors.error,
-  },
-  cancelButton: {
-    backgroundColor: colors.error,
-  },
-  buttonText: {
-    color: colors.background,
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  infoSection: {
-    padding: 16,
-    marginBottom: 24,
-  },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  infoText: {
-    fontSize: 16,
-    lineHeight: 22,
-    color: colors.darkGray,
-  },
-});

@@ -3,7 +3,7 @@ import { FlatList, StyleSheet, Text, TouchableOpacity, View, Image, TextInput } 
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
 import SwipeableRow from '../components/SwipeableRow';
 import DeleteConfirmDialog from '../components/DeleteConfirmDialog';
 import { Chat } from '../store/chatStore';
@@ -19,6 +19,8 @@ const DEFAULT_ICON_NAMES = [
 
 export default function ChatsScreen() {
   const router = useRouter();
+  const colors = useColors(); // 動的カラーを取得
+  
   const chats = useStore(state => state.chats);
   const updateChatTitle = useStore(state => state.updateChatTitle);
   const confirmDeleteChat = useStore(state => state.confirmDeleteChat);
@@ -75,6 +77,79 @@ export default function ChatsScreen() {
       updateChatIcon(iconEditTargetId, icon);
     }
   };
+
+  // 動的スタイルを定義
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    listContent: {
+      padding: 16,
+    },
+    chatItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.lightGray,
+      backgroundColor: colors.background,
+    },
+    avatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: colors.lightGray,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    chatInfo: {
+      flex: 1,
+    },
+    chatTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 4,
+      color: colors.text,
+    },
+    chatPreview: {
+      fontSize: 14,
+      color: colors.secondaryText,
+    },
+    unreadBadge: {
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      minWidth: 24,
+      height: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 6,
+    },
+    unreadText: {
+      color: colors.background,
+      fontSize: 12,
+      fontWeight: 'bold',
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24,
+    },
+    emptyText: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      marginTop: 16,
+      marginBottom: 8,
+      color: colors.text,
+    },
+    emptySubtext: {
+      fontSize: 14,
+      textAlign: 'center',
+      color: colors.secondaryText,
+    },
+  });
 
   const renderChatItem = ({ item }: { item: Chat }) => (
     <SwipeableRow onDelete={() => handleDelete(item.id)}>
@@ -189,73 +264,3 @@ export default function ChatsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  listContent: {
-    padding: 16,
-  },
-  chatItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-    backgroundColor: colors.background,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.lightGray,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  chatInfo: {
-    flex: 1,
-  },
-  chatTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  chatPreview: {
-    fontSize: 14,
-    color: colors.darkGray,
-  },
-  unreadBadge: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  unreadText: {
-    color: colors.background,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: colors.darkGray,
-    textAlign: 'center',
-  },
-});

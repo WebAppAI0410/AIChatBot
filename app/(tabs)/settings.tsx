@@ -2,13 +2,72 @@ import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
 
 // アイコン名の型を定義
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const colors = useColors();  // 動的カラーを取得
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      padding: 16,
+      paddingBottom: 8,
+    },
+    headerTitle: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    optionsContainer: {
+      marginTop: 8,
+    },
+    optionItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.lightGray,
+      backgroundColor: colors.card,
+    },
+    optionIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: `${colors.primary}20`,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 16,
+    },
+    optionTextContainer: {
+      flex: 1,
+    },
+    optionTitle: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: colors.text,
+      marginBottom: 4,
+    },
+    optionDescription: {
+      fontSize: 14,
+      color: colors.secondaryText,
+    },
+    versionContainer: {
+      padding: 16,
+      alignItems: 'center',
+      marginTop: 24,
+    },
+    versionText: {
+      fontSize: 14,
+      color: colors.gray,
+    },
+  });
 
   const settingsOptions = [
     {
@@ -80,61 +139,3 @@ export default function SettingsScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    padding: 16,
-    paddingBottom: 8,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  optionsContainer: {
-    marginTop: 8,
-  },
-  optionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-    backgroundColor: '#FFFFFF',
-  },
-  optionIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 194, 106, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  optionTextContainer: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  optionDescription: {
-    fontSize: 14,
-    color: colors.darkGray,
-  },
-  versionContainer: {
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  versionText: {
-    fontSize: 14,
-    color: colors.gray,
-  },
-});

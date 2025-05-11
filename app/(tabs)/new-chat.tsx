@@ -14,7 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
 import { MODELS } from '../constants/models';
 import ModelSelectModal from '../components/ModelSelectModal';
 import LocalModelInstallModal from '../components/LocalModelInstallModal';
@@ -29,6 +29,8 @@ const SUGGESTIONS = [
 
 export default function NewChatScreen() {
   const router = useRouter();
+  const colors = useColors(); // 動的カラーを取得
+  
   const [input, setInput] = useState('');
   const createChat = useStore(state => state.createChat);
   const addMessage = useStore(state => state.addMessage);
@@ -100,6 +102,106 @@ export default function NewChatScreen() {
     setSelectedModelId(modelId);
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    suggestionsContainer: {
+      flex: 1,
+      padding: 16,
+    },
+    suggestionsTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      marginBottom: 12,
+      color: colors.text,
+    },
+    chipContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginBottom: 24,
+    },
+    chip: {
+      backgroundColor: colors.lightGray,
+      borderRadius: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      margin: 4,
+    },
+    chipText: {
+      fontSize: 14,
+      color: colors.text,
+    },
+    modelInfoContainer: {
+      padding: 16,
+      backgroundColor: colors.lightGray,
+      borderRadius: 8,
+      marginBottom: 16,
+    },
+    fixedModelBar: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: colors.background,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.lightGray,
+      zIndex: 10,
+    },
+    fixedModelBarTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 2,
+      color: colors.text,
+    },
+    fixedModelBarDesc: {
+      fontSize: 13,
+      color: colors.secondaryText,
+      marginBottom: 4,
+    },
+    localModelBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: `${colors.accentBlue}20`,
+      padding: 12,
+      borderRadius: 8,
+    },
+    localModelText: {
+      fontSize: 14,
+      color: colors.accentBlue,
+      marginLeft: 8,
+      flex: 1,
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      padding: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.lightGray,
+      backgroundColor: colors.background,
+    },
+    input: {
+      flex: 1,
+      backgroundColor: colors.lightGray,
+      borderRadius: 20,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      maxHeight: 120,
+      fontSize: 16,
+      color: colors.text,
+    },
+    sendButton: {
+      backgroundColor: colors.primary,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: 8,
+    },
+    sendButtonDisabled: {
+      backgroundColor: colors.lightGray,
+    },
+  });
+
   return (
     <KeyboardAvoidingView 
       style={styles.container}
@@ -152,6 +254,7 @@ export default function NewChatScreen() {
           value={input}
           onChangeText={setInput}
           multiline
+          placeholderTextColor={colors.secondaryText}
         />
         <TouchableOpacity
           style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
@@ -176,99 +279,3 @@ export default function NewChatScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  suggestionsContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  suggestionsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 24,
-  },
-  chip: {
-    backgroundColor: colors.lightGray,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    margin: 4,
-  },
-  chipText: {
-    fontSize: 14,
-  },
-  modelInfoContainer: {
-    padding: 16,
-    backgroundColor: colors.lightGray,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  fixedModelBar: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-    zIndex: 10,
-  },
-  fixedModelBarTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  fixedModelBarDesc: {
-    fontSize: 13,
-    color: colors.darkGray,
-    marginBottom: 4,
-  },
-  localModelBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
-    padding: 12,
-    borderRadius: 8,
-  },
-  localModelText: {
-    fontSize: 14,
-    color: colors.accentBlue,
-    marginLeft: 8,
-    flex: 1,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.lightGray,
-    alignItems: 'flex-end',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: colors.lightGray,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    maxHeight: 120,
-    fontSize: 16,
-  },
-  sendButton: {
-    backgroundColor: colors.primary,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  sendButtonDisabled: {
-    backgroundColor: colors.lightGray,
-  },
-});

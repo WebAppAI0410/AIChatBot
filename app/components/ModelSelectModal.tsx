@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
 import { MODELS, ModelType } from '../constants/models';
 
 type ModelSelectModalProps = {
@@ -28,6 +28,7 @@ export default function ModelSelectModal({
 }: ModelSelectModalProps) {
   const localModelStatus = useStore(state => state.localModelStatus);
   const plan = useStore(state => state.plan);
+  const colors = useColors(); // 動的カラーを取得
   
   const handleModelSelect = (model: ModelType) => {
     if (model.isLocal && localModelStatus !== 'ready') {
@@ -67,6 +68,136 @@ export default function ModelSelectModal({
         return null;
     }
   };
+  
+  const styles = StyleSheet.create({
+    modalContainer: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    modalContent: {
+      backgroundColor: colors.background,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      maxHeight: '80%',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.lightGray,
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    closeButton: {
+      padding: 4,
+    },
+    modelList: {
+      padding: 16,
+    },
+    modelItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      marginBottom: 8,
+      backgroundColor: colors.lightGray,
+    },
+    selectedModelItem: {
+      backgroundColor: `${colors.primary}20`,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    disabledModelItem: {
+      opacity: 0.7,
+    },
+    modelInfo: {
+      flex: 1,
+      marginRight: 12,
+    },
+    modelName: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 4,
+      color: colors.text,
+    },
+    selectedModelName: {
+      color: colors.primary,
+    },
+    disabledModelName: {
+      color: colors.gray,
+    },
+    modelDescription: {
+      fontSize: 14,
+      color: colors.secondaryText,
+    },
+    selectedModelDescription: {
+      color: colors.secondaryText,
+    },
+    disabledModelDescription: {
+      color: colors.gray,
+    },
+    modelRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    radioOuter: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: colors.gray,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    radioInner: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: colors.primary,
+    },
+    badge: {
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 12,
+      marginRight: 8,
+    },
+    notInstalledBadge: {
+      backgroundColor: colors.lightGray,
+      borderWidth: 1,
+      borderColor: colors.gray,
+    },
+    downloadingBadge: {
+      backgroundColor: colors.warning,
+    },
+    readyBadge: {
+      backgroundColor: colors.success,
+    },
+    badgeText: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: colors.background,
+    },
+    premiumBadge: {
+      backgroundColor: colors.accentBlue,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 12,
+      marginRight: 8,
+    },
+    premiumBadgeText: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: colors.background,
+    },
+  });
   
   const renderModelItem = ({ item }: { item: ModelType }) => {
     const isSelected = item.id === currentModelId;
@@ -157,129 +288,3 @@ export default function ModelSelectModal({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  modelList: {
-    padding: 16,
-  },
-  modelItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: colors.lightGray,
-  },
-  selectedModelItem: {
-    backgroundColor: `${colors.primary}20`,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  disabledModelItem: {
-    opacity: 0.7,
-  },
-  modelInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  modelName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  selectedModelName: {
-    color: colors.primary,
-  },
-  disabledModelName: {
-    color: colors.gray,
-  },
-  modelDescription: {
-    fontSize: 14,
-    color: colors.darkGray,
-  },
-  selectedModelDescription: {
-    color: colors.darkGray,
-  },
-  disabledModelDescription: {
-    color: colors.gray,
-  },
-  modelRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  radioOuter: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.gray,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.primary,
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 8,
-  },
-  notInstalledBadge: {
-    backgroundColor: colors.gray,
-  },
-  downloadingBadge: {
-    backgroundColor: colors.warning,
-  },
-  readyBadge: {
-    backgroundColor: colors.success,
-  },
-  badgeText: {
-    color: colors.background,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  premiumBadge: {
-    backgroundColor: colors.accentBlue,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 8,
-  },
-  premiumBadgeText: {
-    color: colors.background,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-});

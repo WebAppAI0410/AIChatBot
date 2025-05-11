@@ -13,14 +13,108 @@ import {
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
 
 export default function NotesSettingsScreen() {
   const router = useRouter();
+  const colors = useColors();
   const [autoSave, setAutoSave] = useState(true);
   const [cloudSync, setCloudSync] = useState(false);
   const [categorizeNotes, setCategorizeNotes] = useState(true);
   const [showInChat, setShowInChat] = useState(true);
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    headerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.primary,
+      paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
+      paddingBottom: 12,
+      paddingHorizontal: 16,
+      height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      color: colors.background,
+      fontSize: 18,
+      fontWeight: '600',
+      flex: 1,
+      textAlign: 'center',
+      marginHorizontal: 10,
+    },
+    headerRight: {
+      width: 40,
+    },
+    scrollContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    section: {
+      marginBottom: 24,
+      paddingHorizontal: 16,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      marginBottom: 12,
+      marginTop: 16,
+      color: colors.text,
+    },
+    optionItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderRadius: 8,
+      marginBottom: 8,
+      backgroundColor: colors.card,
+    },
+    optionTextContainer: {
+      flex: 1,
+    },
+    optionTitle: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: colors.text,
+      marginBottom: 4,
+    },
+    optionDescription: {
+      fontSize: 14,
+      color: colors.secondaryText,
+    },
+    actionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderRadius: 8,
+      marginBottom: 8,
+      backgroundColor: colors.card,
+    },
+    actionButtonText: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: colors.primary,
+      marginLeft: 12,
+    },
+    dangerButton: {
+      borderWidth: 1,
+      borderColor: colors.error,
+    },
+    dangerButtonText: {
+      color: colors.error,
+    },
+  });
 
   const handleClearNotes = () => {
     Alert.alert(
@@ -155,96 +249,3 @@ export default function NotesSettingsScreen() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.primary,
-    paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    color: colors.background,
-    fontSize: 18,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'center',
-    marginHorizontal: 10,
-  },
-  headerRight: {
-    width: 40,
-  },
-  scrollContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  section: {
-    marginBottom: 24,
-    paddingHorizontal: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-    marginTop: 16,
-    color: colors.text,
-  },
-  optionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: '#F5F5F5',
-  },
-  optionTextContainer: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  optionDescription: {
-    fontSize: 14,
-    color: colors.darkGray,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: '#F5F5F5',
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.primary,
-    marginLeft: 12,
-  },
-  dangerButton: {
-    borderWidth: 1,
-    borderColor: colors.error,
-  },
-  dangerButtonText: {
-    color: colors.error,
-  },
-});

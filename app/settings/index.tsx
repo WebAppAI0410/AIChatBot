@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Switch } from 're
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -13,6 +13,7 @@ export default function SettingsScreen() {
   const theme = useStore(state => state.theme);
   const setTheme = useStore(state => state.setTheme);
   const localModelStatus = useStore(state => state.localModelStatus);
+  const colors = useColors();
   
   const handleThemeChange = (value: boolean) => {
     setTheme(value ? 'dark' : 'light');
@@ -37,6 +38,120 @@ export default function SettingsScreen() {
       email: null
     });
   };
+  
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    section: {
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.lightGray,
+    },
+    sectionTitle: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: colors.darkGray,
+      marginBottom: 16,
+      textTransform: 'uppercase',
+    },
+    profileContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    avatar: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 16,
+    },
+    profileInfo: {
+      flex: 1,
+    },
+    profileEmail: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 4,
+    },
+    profilePlan: {
+      fontSize: 14,
+      color: colors.darkGray,
+    },
+    signOutButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      backgroundColor: colors.lightGray,
+    },
+    signOutText: {
+      fontSize: 14,
+      color: colors.darkGray,
+    },
+    signInButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      padding: 12,
+      borderRadius: 8,
+      justifyContent: 'center',
+    },
+    signInText: {
+      color: colors.background,
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginLeft: 8,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.lightGray,
+    },
+    menuItemLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    menuIcon: {
+      marginRight: 16,
+    },
+    menuText: {
+      fontSize: 16,
+    },
+    menuItemRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    modelStatusBadge: {
+      backgroundColor: colors.success,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    modelStatusText: {
+      color: colors.background,
+      fontSize: 12,
+      fontWeight: 'bold',
+    },
+    infoItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 12,
+    },
+    infoLabel: {
+      fontSize: 16,
+    },
+    infoValue: {
+      fontSize: 16,
+      color: colors.darkGray,
+    },
+  });
   
   return (
     <ScrollView style={styles.container}>
@@ -130,117 +245,3 @@ export default function SettingsScreen() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  section: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors.darkGray,
-    marginBottom: 16,
-    textTransform: 'uppercase',
-  },
-  profileContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  profileEmail: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  profilePlan: {
-    fontSize: 14,
-    color: colors.darkGray,
-  },
-  signOutButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: colors.lightGray,
-  },
-  signOutText: {
-    fontSize: 14,
-    color: colors.darkGray,
-  },
-  signInButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    padding: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
-  },
-  signInText: {
-    color: colors.background,
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-  },
-  menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  menuIcon: {
-    marginRight: 16,
-  },
-  menuText: {
-    fontSize: 16,
-  },
-  menuItemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  modelStatusBadge: {
-    backgroundColor: colors.success,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  modelStatusText: {
-    color: colors.background,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-  },
-  infoLabel: {
-    fontSize: 16,
-  },
-  infoValue: {
-    fontSize: 16,
-    color: colors.darkGray,
-  },
-});
