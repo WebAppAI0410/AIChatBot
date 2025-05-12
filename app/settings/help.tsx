@@ -172,26 +172,24 @@ export default function HelpScreen() {
   });
 
   return (
-    <>
+    <View style={styles.container}>
       <Stack.Screen
         options={{
           headerShown: false,
         }}
       />
       
-      <SafeAreaView style={styles.container}>
-        {/* Use Header component for consistent styling */}
-        <Header
-          title="使い方"
-          showBack={true}
-          onTitleEdit={undefined}
-        />
-        
-        <ScrollView style={styles.scrollContainer}>
-          <View style={styles.header}>
-            <Text style={styles.contentTitle}>AI ChatBotの使い方</Text>
-            <Text style={styles.headerSubtitle}>基本的な機能と操作方法</Text>
-          </View>
+      <Header
+        title="使い方"
+        showBack={true}
+        onBackPress={() => router.replace('/(tabs)/settings')}
+      />
+      
+      <ScrollView style={styles.scrollContainer}>
+        <View style={styles.header}>
+          <Text style={styles.contentTitle}>AI ChatBotの使い方</Text>
+          <Text style={styles.headerSubtitle}>基本的な機能と操作方法</Text>
+        </View>
 
         {helpSections.map((section, index) => (
           <View key={index} style={styles.section}>
@@ -217,7 +215,6 @@ export default function HelpScreen() {
           <Text style={styles.versionText}>バージョン 1.0.0</Text>
         </View>
       </ScrollView>
-      </SafeAreaView>
-    </>
+    </View>
   );
 }

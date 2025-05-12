@@ -78,10 +78,7 @@ export default function LocalModelScreen() {
       alignItems: 'center',
       justifyContent: 'space-between',
       backgroundColor: colors.primary,
-      paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
-      paddingBottom: 12,
       paddingHorizontal: 16,
-      height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
     },
     backButton: {
       width: 40,
@@ -255,135 +252,132 @@ export default function LocalModelScreen() {
   });
   
   return (
-    <>
+    <View style={styles.container}>
       <Stack.Screen
         options={{
           headerShown: false,
         }}
       />
       
-      <SafeAreaView style={styles.container}>
-        {/* Use Header component for consistent styling */}
-        <Header
-          title="ローカルモデル管理"
-          showBack={true}
-          onTitleEdit={undefined}
-        />
-        
-        <ScrollView style={styles.scrollContainer}>
-          <View style={styles.contentHeader}>
-            <Ionicons name="save-outline" size={48} color={colors.primary} />
-            <Text style={styles.title}>ローカルモデル管理</Text>
-            <Text style={styles.subtitle}>
-              ローカルモデルをインストールすると、インターネット接続なしでAIチャットを使用できます。
-            </Text>
-          </View>
+      <Header
+        title="ローカルモデル"
+        showBack={true}
+        onBackPress={() => router.replace('/(tabs)/settings')}
+      />
       
-      <View style={styles.modelCard}>
-        <View style={styles.modelInfo}>
-          <Text style={styles.modelName}>Qwen3:4B</Text>
-          <Text style={styles.modelDescription}>
-            Alibaba Cloudが開発した軽量で高性能な多言語モデル。日本語にも対応しています。
+      <ScrollView style={styles.scrollContainer}>
+        <View style={styles.contentHeader}>
+          <Ionicons name="server-outline" size={48} color={colors.primary} />
+          <Text style={styles.title}>ローカルモデル</Text>
+          <Text style={styles.subtitle}>
+            Qwen3:4Bモデルをデバイスに保存して、オフラインでも利用できます
           </Text>
-          
-          <View style={styles.modelDetails}>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>サイズ:</Text>
-              <Text style={styles.detailValue}>10GB</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>コンテキスト長:</Text>
-              <Text style={styles.detailValue}>8,192トークン</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>ステータス:</Text>
-              <View style={[
-                styles.statusBadge,
-                localModelStatus === 'ready' ? styles.readyBadge :
-                localModelStatus === 'downloading' ? styles.downloadingBadge :
-                styles.notInstalledBadge
-              ]}>
-                <Text style={styles.statusText}>
-                  {localModelStatus === 'ready' ? 'インストール済み' :
-                   localModelStatus === 'downloading' ? 'ダウンロード中' :
-                   '未インストール'}
-                </Text>
+        </View>
+        
+        <View style={styles.modelCard}>
+          <View style={styles.modelInfo}>
+            <Text style={styles.modelName}>Qwen3:4B</Text>
+            <Text style={styles.modelDescription}>
+              Alibaba Cloudが開発した軽量で高性能な多言語モデル。日本語にも対応しています。
+            </Text>
+            
+            <View style={styles.modelDetails}>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>サイズ:</Text>
+                <Text style={styles.detailValue}>10GB</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>コンテキスト長:</Text>
+                <Text style={styles.detailValue}>8,192トークン</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>ステータス:</Text>
+                <View style={[
+                  styles.statusBadge,
+                  localModelStatus === 'ready' ? styles.readyBadge :
+                  localModelStatus === 'downloading' ? styles.downloadingBadge :
+                  styles.notInstalledBadge
+                ]}>
+                  <Text style={styles.statusText}>
+                    {localModelStatus === 'ready' ? 'インストール済み' :
+                     localModelStatus === 'downloading' ? 'ダウンロード中' :
+                     '未インストール'}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
-        
-        {localModelStatus === 'downloading' && (
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBarContainer}>
-              <View 
-                style={[
-                  styles.progressBar, 
-                  { width: `${downloadProgress * 100}%` }
-                ]} 
-              />
-            </View>
-            <Text style={styles.progressText}>
-              {Math.round(downloadProgress * 100)}%
-            </Text>
-          </View>
-        )}
-        
-        <View style={styles.actionContainer}>
-          {localModelStatus === 'not_installed' && (
-            <TouchableOpacity
-              style={[styles.button, styles.installButton]}
-              onPress={handleInstall}
-            >
-              <Ionicons name="cloud-download-outline" size={20} color={colors.background} />
-              <Text style={styles.buttonText}>インストール</Text>
-            </TouchableOpacity>
-          )}
           
           {localModelStatus === 'downloading' && (
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={() => {
-                useStore.getState().cancelDownload();
-              }}
-            >
-              <Ionicons name="close-circle-outline" size={20} color={colors.background} />
-              <Text style={styles.buttonText}>キャンセル</Text>
-            </TouchableOpacity>
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBarContainer}>
+                <View 
+                  style={[
+                    styles.progressBar, 
+                    { width: `${downloadProgress * 100}%` }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {Math.round(downloadProgress * 100)}%
+              </Text>
+            </View>
           )}
           
-          {localModelStatus === 'ready' && (
-            <TouchableOpacity
-              style={[styles.button, styles.uninstallButton]}
-              onPress={handleUninstall}
-            >
-              <Ionicons name="trash-outline" size={20} color={colors.background} />
-              <Text style={styles.buttonText}>アンインストール</Text>
-            </TouchableOpacity>
-          )}
+          <View style={styles.actionContainer}>
+            {localModelStatus === 'not_installed' && (
+              <TouchableOpacity
+                style={[styles.button, styles.installButton]}
+                onPress={handleInstall}
+              >
+                <Ionicons name="cloud-download-outline" size={20} color={colors.background} />
+                <Text style={styles.buttonText}>インストール</Text>
+              </TouchableOpacity>
+            )}
+            
+            {localModelStatus === 'downloading' && (
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={() => {
+                  useStore.getState().cancelDownload();
+                }}
+              >
+                <Ionicons name="close-circle-outline" size={20} color={colors.background} />
+                <Text style={styles.buttonText}>キャンセル</Text>
+              </TouchableOpacity>
+            )}
+            
+            {localModelStatus === 'ready' && (
+              <TouchableOpacity
+                style={[styles.button, styles.uninstallButton]}
+                onPress={handleUninstall}
+              >
+                <Ionicons name="trash-outline" size={20} color={colors.background} />
+                <Text style={styles.buttonText}>アンインストール</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
-      
-      <View style={styles.infoSection}>
-        <Text style={styles.infoTitle}>ローカルモデルについて</Text>
-        <Text style={styles.infoText}>
-          ローカルモデルは、デバイス上で直接実行されるAIモデルです。インターネット接続がなくても使用でき、プライバシーを保護します。ただし、クラウドモデルと比較すると、性能が若干劣る場合があります。
-        </Text>
         
-        <Text style={styles.infoTitle}>使用上の注意</Text>
-        <Text style={styles.infoText}>
-          • ローカルモデルのダウンロードには、Wi-Fi接続を推奨します。{'\n'}
-          • モデルのインストールには約10GBの空き容量が必要です。{'\n'}
-          • バッテリー消費を抑えるため、充電中の使用を推奨します。
-        </Text>
-      </View>
-      
-      <LocalModelInstallModal
-        visible={showInstallModal}
-        onClose={() => setShowInstallModal(false)}
-      />
-    </ScrollView>
-      </SafeAreaView>
-    </>
+        <View style={styles.infoSection}>
+          <Text style={styles.infoTitle}>ローカルモデルについて</Text>
+          <Text style={styles.infoText}>
+            ローカルモデルは、デバイス上で直接実行されるAIモデルです。インターネット接続がなくても使用でき、プライバシーを保護します。ただし、クラウドモデルと比較すると、性能が若干劣る場合があります。
+          </Text>
+          
+          <Text style={styles.infoTitle}>使用上の注意</Text>
+          <Text style={styles.infoText}>
+            • ローカルモデルのダウンロードには、Wi-Fi接続を推奨します。{'\n'}
+            • モデルのインストールには約10GBの空き容量が必要です。{'\n'}
+            • バッテリー消費を抑えるため、充電中の使用を推奨します。
+          </Text>
+        </View>
+        
+        <LocalModelInstallModal
+          visible={showInstallModal}
+          onClose={() => setShowInstallModal(false)}
+        />
+      </ScrollView>
+    </View>
   );
 }

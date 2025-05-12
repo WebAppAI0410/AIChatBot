@@ -120,6 +120,7 @@ export default function NewChatScreen() {
     container: {
       flex: 1,
       backgroundColor: colors.background,
+      paddingTop: 0,
     },
     suggestionsContainer: {
       flex: 1,
@@ -208,91 +209,88 @@ export default function NewChatScreen() {
   });
 
   return (
-    <>
+    <View style={styles.container}>
       <Stack.Screen
         options={{
           headerShown: false,
         }}
       />
       
-      <SafeAreaView style={styles.container}>
-        <Header
-          title="新規チャット"
-          showBack={false}
-          onTitleEdit={undefined}
-          rightComponent={<ModelSelectButton />}
-        />
-        
-        {localModelStatus !== 'ready' && (
-          <View style={styles.localModelBanner}>
-            <Ionicons name="information-circle-outline" size={20} color={colors.accentBlue} />
-            <Text style={styles.localModelText}>
-              ローカルモデル (Qwen3:4B) をインストールすると、オフラインでも使用できます
-            </Text>
-          </View>
-        )}
-        
-        <KeyboardAvoidingView 
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      <Header
+        title="新規チャット"
+        showBack={false}
+        rightComponent={<ModelSelectButton />}
+      />
+      
+      {localModelStatus !== 'ready' && (
+        <View style={styles.localModelBanner}>
+          <Ionicons name="information-circle-outline" size={20} color={colors.accentBlue} />
+          <Text style={styles.localModelText}>
+            ローカルモデル (Qwen3:4B) をインストールすると、オフラインでも使用できます
+          </Text>
+        </View>
+      )}
+      
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.suggestionsContainer}
+          contentContainerStyle={{ 
+            paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : 20 
+          }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
-          <ScrollView 
-            ref={scrollViewRef}
-            style={styles.suggestionsContainer}
-            contentContainerStyle={{ 
-              paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : 20 
-            }}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-          >
-            <Text style={styles.suggestionsTitle}>おすすめの質問</Text>
-            <View style={styles.chipContainer}>
-              {SUGGESTIONS.map((suggestion, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.chip}
-                  onPress={() => handleSendMessage(suggestion)}
-                >
-                  <Text style={styles.chipText}>{suggestion}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-          
-          <View style={[styles.inputContainer, keyboardHeight > 0 && { paddingBottom: Platform.OS === 'ios' ? 8 : 0 }]}>
-            <TextInput
-              style={styles.input}
-              placeholder="メッセージを入力..."
-              value={input}
-              onChangeText={setInput}
-              multiline
-              placeholderTextColor={colors.secondaryText}
-            />
-            <TouchableOpacity
-              style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
-              disabled={!input.trim()}
-              onPress={() => handleSendMessage(input)}
-            >
-              <Ionicons name="send" size={24} color={input.trim() ? colors.background : colors.gray} />
-            </TouchableOpacity>
+          <Text style={styles.suggestionsTitle}>おすすめの質問</Text>
+          <View style={styles.chipContainer}>
+            {SUGGESTIONS.map((suggestion, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.chip}
+                onPress={() => handleSendMessage(suggestion)}
+              >
+                <Text style={styles.chipText}>{suggestion}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        </KeyboardAvoidingView>
+        </ScrollView>
         
-        {/* モデル選択モーダル */}
-        <ModelSelectModal
-          visible={showModelSelect}
-          onClose={() => setShowModelSelect(false)}
-          onSelectModel={handleSelectModel}
-          currentModelId={selectedModelId}
-        />
-        
-        {/* ローカルモデルインストールモーダル */}
-        <LocalModelInstallModal
-          visible={showLocalModelInstall}
-          onClose={() => setShowLocalModelInstall(false)}
-        />
-      </SafeAreaView>
-    </>
+        <View style={[styles.inputContainer, keyboardHeight > 0 && { paddingBottom: Platform.OS === 'ios' ? 8 : 0 }]}>
+          <TextInput
+            style={styles.input}
+            placeholder="メッセージを入力..."
+            value={input}
+            onChangeText={setInput}
+            multiline
+            placeholderTextColor={colors.secondaryText}
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
+            disabled={!input.trim()}
+            onPress={() => handleSendMessage(input)}
+          >
+            <Ionicons name="send" size={24} color={input.trim() ? colors.background : colors.gray} />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+      
+      {/* モデル選択モーダル */}
+      <ModelSelectModal
+        visible={showModelSelect}
+        onClose={() => setShowModelSelect(false)}
+        onSelectModel={handleSelectModel}
+        currentModelId={selectedModelId}
+      />
+      
+      {/* ローカルモデルインストールモーダル */}
+      <LocalModelInstallModal
+        visible={showLocalModelInstall}
+        onClose={() => setShowLocalModelInstall(false)}
+      />
+    </View>
   );
 }

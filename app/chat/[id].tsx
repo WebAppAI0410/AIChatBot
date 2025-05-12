@@ -246,6 +246,20 @@ export default function ChatScreen() {
     }
   };
   
+  const handleToggleEditTitle = () => {
+    if (chat) {
+      setEditTitle(chat.title);
+      setIsEditingTitle(!isEditingTitle);
+    }
+  };
+
+  const handleSaveTitle = () => {
+    if (chat && editTitle.trim()) {
+      updateChatTitle(chat.id, editTitle);
+      setIsEditingTitle(false);
+    }
+  };
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -320,33 +334,29 @@ export default function ChatScreen() {
     },
     inputContainer: {
       flexDirection: 'row',
-      padding: 12,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      backgroundColor: colors.background,
+      padding: 8,
       alignItems: 'flex-end',
+      backgroundColor: colors.card,
+      borderTopWidth: 1,
+      borderTopColor: colors.lightGray,
     },
     input: {
       flex: 1,
+      maxHeight: 120,
+      minHeight: 40,
+      padding: 12,
       backgroundColor: colors.card,
       borderRadius: 20,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      maxHeight: 120,
-      fontSize: 16,
+      marginRight: 8,
       color: colors.text,
     },
     sendButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       backgroundColor: colors.primary,
-      width: 44,
-      height: 44,
-      borderRadius: 22,
       justifyContent: 'center',
       alignItems: 'center',
-      marginLeft: 8,
-    },
-    sendButtonDisabled: {
-      backgroundColor: colors.lightGray,
     },
     loadingButton: {
       backgroundColor: colors.primary,
@@ -361,15 +371,17 @@ export default function ChatScreen() {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: 'rgba(255, 255, 255, 0.2)',
-      paddingHorizontal: 12,
+      paddingHorizontal: 10,
       paddingVertical: 6,
       borderRadius: 16,
+      maxWidth: 120,
+      width: 'auto',
     },
     modelButtonText: {
       color: colors.textOnPrimary,
       marginRight: 4,
-      fontSize: 14,
-      fontWeight: '500',
+      fontSize: 12,
+      maxWidth: 80,
     },
     titleTouchable: {
       flex: 1,
@@ -383,46 +395,33 @@ export default function ChatScreen() {
       marginRight: 6,
     },
     editTitleContainer: {
-      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: 40,
-    },
-    editTitleInput: {
-      flex: 1,
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      color: colors.textOnPrimary,
-      fontSize: 18,
-      fontWeight: '600',
-      borderRadius: 8,
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      marginRight: 4,
-      maxHeight: 48,
-    },
-    loadingContainer: {
-      alignItems: 'center',
-      margin: 16,
-    },
-    modelInfo: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
+      padding: 8,
       backgroundColor: colors.card,
-      borderRadius: 8,
-      marginBottom: 16,
-      marginHorizontal: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.lightGray,
     },
-    modelName: {
+    titleInput: {
+      flex: 1,
+      padding: 8,
+      fontSize: 16,
       color: colors.text,
-      fontWeight: 'bold',
     },
-    modelTap: {
-      color: colors.secondaryText,
-      fontSize: 12,
+    titleSaveButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      backgroundColor: colors.primary,
+      borderRadius: 4,
+      marginLeft: 8,
+    },
+    titleSaveText: {
+      color: colors.textOnPrimary,
+      fontWeight: '500',
+    },
+    messagesContainer: {
+      padding: 16,
+      paddingBottom: 32,
     },
   });
   
@@ -459,88 +458,106 @@ export default function ChatScreen() {
   
   const currentModel = MODELS.find(model => model.id === chat.modelId) || MODELS[0];
   
+  const ModelSelectButton = () => {
+    return (
+      <TouchableOpacity
+        style={styles.modelButton}
+        onPress={handleModelSelect}
+      >
+        <Text style={styles.modelButtonText} numberOfLines={1} ellipsizeMode="tail">
+          {currentModel.name}
+        </Text>
+        <Ionicons name="chevron-down" size={16} color={colors.textOnPrimary} />
+      </TouchableOpacity>
+    );
+  };
+  
   return (
-    <>
+    <View style={styles.container}>
       <Stack.Screen
         options={{
           headerShown: false,
         }}
       />
       
-      <SafeAreaView style={styles.container}>
-        {/* Use Header component for consistent styling */}
-        <Header
-          title={chat.title}
-          showBack={true}
-          showModelSelect={true}
-          onModelSelect={handleModelSelect}
-          currentModelName={currentModel.name}
-          onTitleEdit={(newTitle) => {
-            updateChatTitle(chat.id, newTitle);
-          }}
-        />
-        
-        <KeyboardAvoidingView
-          style={styles.keyboardAvoidingContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        >
-          <FlatList
-            ref={flatListRef}
-            data={chat.messages}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.messageList}
-            onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
-            extraData={chat.messages.length}
-            removeClippedSubviews={false}
-            maxToRenderPerBatch={10}
-            windowSize={10}
-            initialNumToRender={15}
-            scrollEventThrottle={16}
-          />
-          
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="メッセージを入力..."
-              value={input}
-              onChangeText={setInput}
-              multiline
-              editable={!isLoading}
-            />
-            {isLoading ? (
-              <View style={styles.loadingButton}>
-                <ActivityIndicator color={colors.textOnPrimary} />
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
-                onPress={handleSend}
-                disabled={!input.trim()}
-              >
-                <Ionicons name="send" size={24} color={input.trim() ? colors.textOnPrimary : colors.gray} />
-              </TouchableOpacity>
-            )}
-          </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+      <Header
+        title={chat?.title || 'チャット'}
+        showBack={true}
+        onTitleEdit={handleToggleEditTitle}
+        onBackPress={() => router.replace('/(tabs)/chats')}
+        rightComponent={<ModelSelectButton />}
+      />
       
-      {/* Modals */}
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        {chat && (
+          <>
+            {isEditingTitle && (
+              <View style={styles.editTitleContainer}>
+                <TextInput
+                  style={styles.titleInput}
+                  value={editTitle}
+                  onChangeText={setEditTitle}
+                  placeholder="チャットのタイトルを入力"
+                  placeholderTextColor={colors.gray}
+                  autoFocus
+                />
+                <TouchableOpacity 
+                  style={styles.titleSaveButton} 
+                  onPress={handleSaveTitle}
+                >
+                  <Text style={styles.titleSaveText}>保存</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <FlatList
+              ref={flatListRef}
+              data={chat.messages}
+              keyExtractor={(item, index) => `${item.role}-${index}`}
+              renderItem={renderMessage}
+              contentContainerStyle={styles.messagesContainer}
+            />
+          
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="メッセージを入力"
+                placeholderTextColor={colors.gray}
+                value={input}
+                onChangeText={setInput}
+                multiline
+              />
+              <TouchableOpacity 
+                style={styles.sendButton} 
+                onPress={handleSend}
+                disabled={isLoading || !input.trim()}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Ionicons name="send" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </KeyboardAvoidingView>
+      
       <ModelSelectModal
         visible={showModelSelect}
         onClose={() => setShowModelSelect(false)}
         onSelectModel={handleSelectModel}
-        currentModelId={chat.modelId}
+        currentModelId={chat?.modelId || 'gpt-3.5-turbo'}
       />
       
       <LocalModelInstallModal
         visible={showLocalModelInstall}
-        onClose={() => {
-          setShowLocalModelInstall(false);
-          setSelectedModelId(null);
-        }}
+        onClose={() => setShowLocalModelInstall(false)}
       />
-    </>
+    </View>
   );
 }

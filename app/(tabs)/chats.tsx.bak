@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View, Image, TextInput } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import useColors from '../constants/colors';
@@ -9,7 +9,6 @@ import SwipeableRow from '../components/SwipeableRow';
 import DeleteConfirmDialog from '../components/DeleteConfirmDialog';
 import { Chat } from '../store/chatStore';
 import IconSelectModal from '../components/IconSelectModal';
-import Header from '../components/Header';
 
 // Ioniconsのデフォルトアイコン名リスト（20種）
 const DEFAULT_ICON_NAMES = [
@@ -85,6 +84,7 @@ export default function ChatsScreen() {
     container: {
       flex: 1,
       backgroundColor: colors.background,
+      paddingTop: theme.safeArea.top,
     },
     listContent: {
       padding: 16,
@@ -224,17 +224,6 @@ export default function ChatsScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen
-        options={{
-          headerShown: false,
-        }}
-      />
-      
-      <Header 
-        title="Home"
-        showBack={false}
-      />
-      
       {chats.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="chatbubbles-outline" size={64} color={colors.gray} />

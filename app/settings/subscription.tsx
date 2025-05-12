@@ -96,10 +96,7 @@ export default function SubscriptionScreen() {
       alignItems: 'center',
       justifyContent: 'space-between',
       backgroundColor: colors.primary,
-      paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
-      paddingBottom: 12,
       paddingHorizontal: 16,
-      height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
     },
     backButton: {
       width: 40,
@@ -344,34 +341,29 @@ export default function SubscriptionScreen() {
   };
   
   return (
-    <>
+    <View style={styles.container}>
       <Stack.Screen
         options={{
           headerShown: false,
         }}
       />
       
-      <SafeAreaView style={styles.container}>
-        {/* Use Header component for consistent styling */}
-        <Header
-          title="サブスクリプション"
-          showBack={true}
-          onTitleEdit={undefined}
-        />
-        
-        <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.content}>
+      <Header
+        title="サブスクリプション"
+        showBack={true}
+        onBackPress={() => router.replace('/(tabs)/settings')}
+      />
+      
+      <ScrollView style={styles.scrollContainer}>
+        <View style={styles.content}>
           <Text style={styles.title}>サブスクリプションプラン</Text>
           <Text style={styles.subtitle}>
-            あなたのニーズに合ったプランを選択してください
+            {isAuthenticated ? '現在のプラン: ' + PLANS.find(p => p.id === plan)?.name : 'ログインしてプランを選択してください'}
           </Text>
           
-          {PLANS.map(renderPlanCard)}
-          
-          <Text style={styles.disclaimer}>
-            ※ トークン数は毎月1日にリセットされます。画像生成回数は毎日0時にリセットされます。
-          </Text>
-        </ScrollView>
-      </SafeAreaView>
-    </>
+          {PLANS.map(planOption => renderPlanCard(planOption))}
+        </View>
+      </ScrollView>
+    </View>
   );
 }

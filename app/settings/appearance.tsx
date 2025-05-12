@@ -164,127 +164,124 @@ export default function AppearanceScreen() {
   });
 
   return (
-    <>
+    <View style={styles.container}>
       <Stack.Screen
         options={{
           headerShown: false,
         }}
       />
       
-      <SafeAreaView style={styles.container}>
-        {/* Use Header component for consistent styling */}
-        <Header
-          title="画面カスタマイズ"
-          showBack={true}
-          onTitleEdit={undefined}
-        />
-        
-        <ScrollView style={styles.scrollContainer}>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>テーマ</Text>
-            {themeOptions.map((option) => (
-              <TouchableOpacity
-                key={option.id}
+      <Header
+        title="画面カスタマイズ"
+        showBack={true}
+        onBackPress={() => router.replace('/(tabs)/settings')}
+      />
+      
+      <ScrollView style={styles.scrollContainer}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>テーマ</Text>
+          {themeOptions.map((option) => (
+            <TouchableOpacity
+              key={option.id}
+              style={[
+                styles.optionItem,
+                theme === option.id && styles.selectedOption,
+              ]}
+              onPress={() => setTheme(option.id as 'light' | 'dark' | 'system')}
+            >
+              <Ionicons
+                name={option.icon as any}
+                size={24}
+                color={theme === option.id ? colors.textOnPrimary : colors.text}
+              />
+              <Text
                 style={[
-                  styles.optionItem,
-                  theme === option.id && styles.selectedOption,
+                  styles.optionText,
+                  theme === option.id && styles.selectedOptionText,
                 ]}
-                onPress={() => setTheme(option.id as 'light' | 'dark' | 'system')}
               >
-                <Ionicons
-                  name={option.icon as any}
-                  size={24}
-                  color={theme === option.id ? colors.textOnPrimary : colors.text}
-                />
-                <Text
-                  style={[
-                    styles.optionText,
-                    theme === option.id && styles.selectedOptionText,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-                {theme === option.id && (
-                  <Ionicons name="checkmark" size={24} color={colors.textOnPrimary} />
+                {option.label}
+              </Text>
+              {theme === option.id && (
+                <Ionicons name="checkmark" size={24} color={colors.textOnPrimary} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>カラーテーマ</Text>
+          <View style={styles.colorThemeContainer}>
+            {colorThemes.map((theme) => (
+              <TouchableOpacity
+                key={theme.id}
+                style={[
+                  styles.colorOption,
+                  { backgroundColor: theme.color },
+                  theme.id === colorTheme && styles.selectedColorOption,
+                ]}
+                onPress={() => setColorTheme(theme.id as 'green' | 'blue' | 'orange' | 'purple')}
+              >
+                {theme.id === colorTheme && (
+                  <Ionicons name="checkmark" size={20} color="#FFFFFF" />
                 )}
               </TouchableOpacity>
             ))}
           </View>
+        </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>カラーテーマ</Text>
-            <View style={styles.colorThemeContainer}>
-              {colorThemes.map((theme) => (
-                <TouchableOpacity
-                  key={theme.id}
-                  style={[
-                    styles.colorOption,
-                    { backgroundColor: theme.color },
-                    theme.id === colorTheme && styles.selectedColorOption,
-                  ]}
-                  onPress={() => setColorTheme(theme.id as 'green' | 'blue' | 'orange' | 'purple')}
-                >
-                  {theme.id === colorTheme && (
-                    <Ionicons name="checkmark" size={20} color="#FFFFFF" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>文字サイズ</Text>
-            <View style={styles.fontSizeContainer}>
-              {fontSizeOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.id}
-                  style={[
-                    styles.fontSizeOption,
-                    fontSize === option.id && styles.selectedFontSizeOption,
-                  ]}
-                  onPress={() => setFontSize(option.id as 'small' | 'medium' | 'large')}
-                >
-                  <Text
-                    style={[
-                      styles.fontSizeText,
-                      fontSize === option.id && styles.selectedFontSizeText,
-                      { fontSize: option.id === 'small' ? 14 : option.id === 'medium' ? 16 : 18 }
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>言語</Text>
-            {languageOptions.map((option) => (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>文字サイズ</Text>
+          <View style={styles.fontSizeContainer}>
+            {fontSizeOptions.map((option) => (
               <TouchableOpacity
                 key={option.id}
                 style={[
-                  styles.optionItem,
-                  language === option.id && styles.selectedOption,
+                  styles.fontSizeOption,
+                  fontSize === option.id && styles.selectedFontSizeOption,
                 ]}
-                onPress={() => setLanguage(option.id as 'ja' | 'en')}
+                onPress={() => setFontSize(option.id as 'small' | 'medium' | 'large')}
               >
                 <Text
                   style={[
-                    styles.optionText,
-                    language === option.id && styles.selectedOptionText,
+                    styles.fontSizeText,
+                    fontSize === option.id && styles.selectedFontSizeText,
+                    { fontSize: option.id === 'small' ? 14 : option.id === 'medium' ? 16 : 18 }
                   ]}
                 >
                   {option.label}
                 </Text>
-                {language === option.id && (
-                  <Ionicons name="checkmark" size={24} color={colors.textOnPrimary} />
-                )}
               </TouchableOpacity>
             ))}
           </View>
-        </ScrollView>
-      </SafeAreaView>
-    </>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>言語</Text>
+          {languageOptions.map((option) => (
+            <TouchableOpacity
+              key={option.id}
+              style={[
+                styles.optionItem,
+                language === option.id && styles.selectedOption,
+              ]}
+              onPress={() => setLanguage(option.id as 'ja' | 'en')}
+            >
+              <Text
+                style={[
+                  styles.optionText,
+                  language === option.id && styles.selectedOptionText,
+                ]}
+              >
+                {option.label}
+              </Text>
+              {language === option.id && (
+                <Ionicons name="checkmark" size={24} color={colors.textOnPrimary} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
   );
 }

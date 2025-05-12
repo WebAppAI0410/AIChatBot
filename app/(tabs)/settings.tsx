@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { Link, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import useColors from '../constants/colors';
@@ -105,49 +105,46 @@ export default function SettingsScreen() {
   ];
 
   return (
-    <>
+    <View style={styles.container}>
       <Stack.Screen
         options={{
           headerShown: false,
         }}
       />
       
-      <SafeAreaView style={styles.container}>
-        <Header
-          title="設定"
-          showBack={false}
-          onTitleEdit={undefined}
-        />
-        
-        <ScrollView style={styles.scrollContainer}>
-          <View style={styles.optionsContainer}>
-            {settingsOptions.map((option, index) => (
-              <Link
-                key={index}
-                href={option.route}
-                asChild
+      <Header
+        title="設定"
+        showBack={false}
+      />
+      
+      <ScrollView style={styles.scrollContainer}>
+        <View style={styles.optionsContainer}>
+          {settingsOptions.map((option, index) => (
+            <Link
+              key={index}
+              href={option.route}
+              asChild
+            >
+              <TouchableOpacity
+                style={styles.optionItem}
               >
-                <TouchableOpacity
-                  style={styles.optionItem}
-                >
-                  <View style={styles.optionIconContainer}>
-                    <Ionicons name={option.icon} size={24} color={colors.primary} />
-                  </View>
-                  <View style={styles.optionTextContainer}>
-                    <Text style={styles.optionTitle}>{option.title}</Text>
-                    <Text style={styles.optionDescription}>{option.description}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.gray} />
-                </TouchableOpacity>
-              </Link>
-            ))}
-          </View>
+                <View style={styles.optionIconContainer}>
+                  <Ionicons name={option.icon} size={24} color={colors.primary} />
+                </View>
+                <View style={styles.optionTextContainer}>
+                  <Text style={styles.optionTitle}>{option.title}</Text>
+                  <Text style={styles.optionDescription}>{option.description}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.gray} />
+              </TouchableOpacity>
+            </Link>
+          ))}
+        </View>
 
-          <View style={styles.versionContainer}>
-            <Text style={styles.versionText}>バージョン 1.0.0</Text>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </>
+        <View style={styles.versionContainer}>
+          <Text style={styles.versionText}>バージョン 1.0.0</Text>
+        </View>
+      </ScrollView>
+    </View>
   );
 }

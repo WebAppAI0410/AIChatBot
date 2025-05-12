@@ -3,9 +3,31 @@ import { StyleSheet, View, Text, SafeAreaView, ScrollView, TouchableOpacity } fr
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
-import { colors } from '../constants/colors';
+import useColors from '../constants/colors';
+import Header from '../components/Header';
 
-const ProgressBar = ({ percentage, color, label }) => (
+// 型定義を追加
+type ProgressBarProps = {
+  percentage: number;
+  color: string;
+  label: string;
+};
+
+type UsageCounterProps = {
+  label: string;
+  current: number;
+  limit: number;
+  isPremium?: boolean;
+  isUnlimited?: boolean;
+};
+
+type UpgradeButtonProps = {
+  label: string;
+  style?: any;
+  onPress: () => void;
+};
+
+const ProgressBar: React.FC<ProgressBarProps> = ({ percentage, color, label }) => (
   <View style={[styles.progressBarContainer]}>
     <View style={[styles.progressBarBackground]}>
       <View
@@ -22,33 +44,46 @@ const ProgressBar = ({ percentage, color, label }) => (
   </View>
 );
 
-const UsageCounter = ({ label, current, limit, isPremium = false, isUnlimited = false }) => (
-  <View style={styles.usageCounterContainer}>
-    <View style={styles.usageCounterLeft}>
-      <Text style={styles.usageCounterLabel}>{label}</Text>
-      {isPremium && (
-        <View style={styles.premiumBadge}>
-          <Text style={styles.premiumBadgeText}>Premium</Text>
-        </View>
-      )}
+const UsageCounter: React.FC<UsageCounterProps> = ({ label, current, limit, isPremium = false, isUnlimited = false }) => {
+  const colors = useColors();
+  
+  return (
+    <View style={styles.usageCounterContainer}>
+      <View style={styles.usageCounterLeft}>
+        <Text style={[styles.usageCounterLabel, { color: colors.text }]}>{label}</Text>
+        {isPremium && (
+          <View style={[styles.premiumBadge, { backgroundColor: colors.primary }]}>
+            <Text style={[styles.premiumBadgeText, { color: colors.background }]}>Premium</Text>
+          </View>
+        )}
+      </View>
+      <Text style={[styles.usageCounterValue, { color: colors.text }]}>
+        {isUnlimited ? `${current}/${limit}` : `${current}/${limit}`}
+      </Text>
     </View>
-    <Text style={styles.usageCounterValue}>
-      {isUnlimited ? `${current}/${limit}` : `${current}/${limit}`}
-    </Text>
-  </View>
-);
+  );
+};
 
-const UpgradeButton = ({ label, style, onPress }) => (
-  <TouchableOpacity 
-    style={[styles.upgradeButton, style]} 
-    onPress={onPress}
-  >
-    <Text style={styles.upgradeButtonText}>{label}</Text>
-  </TouchableOpacity>
-);
+const UpgradeButton: React.FC<UpgradeButtonProps> = ({ label, style, onPress }) => {
+  const colors = useColors();
+  
+  return (
+    <TouchableOpacity 
+      style={[
+        styles.upgradeButton, 
+        { backgroundColor: colors.primary },
+        style
+      ]} 
+      onPress={onPress}
+    >
+      <Text style={[styles.upgradeButtonText, { color: colors.background }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+};
 
 export default function UsageScreen() {
   const router = useRouter();
+  const colors = useColors();
   const {
     plan,
     monthlyTokensUsed,
@@ -77,37 +112,60 @@ export default function UsageScreen() {
     router.push('/settings/subscription');
   };
 
+  // スタイルをコンポーネント内で定義して動的に色を適用できるようにする
+  const dynamicStyles = {
+    container: {
+      backgroundColor: colors.background,
+    },
+    title: {
+      color: colors.text,
+    },
+    subtitle: {
+      color: colors.secondaryText,
+    },
+    sectionTitle: {
+      color: colors.text,
+    },
+    progressBarLabel: {
+      color: colors.darkGray,
+    },
+    usageCounterContainer: {
+      borderBottomColor: colors.lightGray,
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, dynamicStyles.container]}>
       <Stack.Screen
         options={{
-          headerShown: true,
-          headerTitle: '使用量',
-          headerLeft: () => (
-            <TouchableOpacity 
-              onPress={() => router.back()}
-              style={styles.backButton}
-            >
-              <Ionicons name="chevron-back" size={24} color={colors.background} />
-            </TouchableOpacity>
-          ),
-          headerStyle: {
-            backgroundColor: colors.primary,
-          },
-          headerTintColor: colors.background,
+          headerShown: false,
         }}
       />
+      
+      <Header 
+        title="使用量" 
+        showBack={true}
+        onBackPress={() => router.replace('/(tabs)/settings')}
+      />
 
-      <ScrollView style={styles.scrollView}>
+      <ScrollView style={styles.scrollContainer}>
+        <View style={styles.contentHeader}>
+          <Ionicons name="analytics-outline" size={48} color={colors.primary} />
+          <Text style={[styles.title, dynamicStyles.title]}>使用量</Text>
+          <Text style={[styles.subtitle, dynamicStyles.subtitle]}>
+            現在のプラン使用状況
+          </Text>
+        </View>
+        
         <View style={styles.content}>
-          <Text style={styles.sectionTitle}>トークン使用量</Text>
+          <Text style={[styles.sectionTitle, dynamicStyles.sectionTitle]}>トークン使用量</Text>
           <ProgressBar
             percentage={tokenPercentage}
             color={tokenWarning ? colors.warning : colors.primary}
             label={`${monthlyTokensUsed.toLocaleString()}/${monthlyTokensLimit.toLocaleString()}`}
           />
 
-          <Text style={[styles.sectionTitle, styles.marginTop]}>画像生成</Text>
+          <Text style={[styles.sectionTitle, styles.marginTop, dynamicStyles.sectionTitle]}>画像生成</Text>
           <View style={styles.usageCountersContainer}>
             <UsageCounter
               label="DALL-E"
@@ -124,7 +182,7 @@ export default function UsageScreen() {
             />
           </View>
 
-          <Text style={[styles.sectionTitle, styles.marginTop]}>AIアシスト</Text>
+          <Text style={[styles.sectionTitle, styles.marginTop, dynamicStyles.sectionTitle]}>AIアシスト</Text>
           <ProgressBar
             percentage={(aiAssistUsage / aiAssistLimit) * 100}
             color={colors.accentBlue}
@@ -140,17 +198,31 @@ export default function UsageScreen() {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
-  scrollView: {
+  scrollContainer: {
     flex: 1,
+  },
+  contentHeader: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 16,
+  },
+  subtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 22,
   },
   content: {
     padding: 16,
@@ -166,7 +238,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text,
     marginBottom: 8,
   },
   marginTop: {
@@ -188,7 +259,6 @@ const styles = StyleSheet.create({
   },
   progressBarLabel: {
     fontSize: 14,
-    color: colors.darkGray,
     marginTop: 4,
   },
   usageCountersContainer: {
@@ -200,7 +270,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
   },
   usageCounterLeft: {
     flexDirection: 'row',
@@ -208,33 +277,27 @@ const styles = StyleSheet.create({
   },
   usageCounterLabel: {
     fontSize: 16,
-    color: colors.text,
   },
   usageCounterValue: {
     fontSize: 16,
-    color: colors.text,
   },
   premiumBadge: {
-    backgroundColor: colors.primary,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
     marginLeft: 8,
   },
   premiumBadgeText: {
-    color: colors.background,
     fontSize: 12,
     fontWeight: '500',
   },
   upgradeButton: {
-    backgroundColor: colors.primary,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 24,
   },
   upgradeButtonText: {
-    color: colors.background,
     fontSize: 16,
     fontWeight: '600',
   },

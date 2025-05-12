@@ -13,6 +13,8 @@ type HeaderProps = {
   currentModelName?: string;
   onTitleEdit?: (newTitle: string) => void;
   rightComponent?: React.ReactNode;
+  customBackRoute?: string;
+  onBackPress?: () => void;
 };
 
 const Header: React.FC<HeaderProps> = ({
@@ -23,6 +25,8 @@ const Header: React.FC<HeaderProps> = ({
   currentModelName,
   onTitleEdit,
   rightComponent,
+  customBackRoute,
+  onBackPress,
 }) => {
   const router = useRouter();
   const colors = useColors();
@@ -30,7 +34,13 @@ const Header: React.FC<HeaderProps> = ({
   const [editTitle, setEditTitle] = React.useState(title);
 
   const handleBackPress = () => {
-    router.back();
+    if (onBackPress) {
+      onBackPress();
+    } else if (customBackRoute) {
+      router.push(customBackRoute);
+    } else {
+      router.back();
+    }
   };
 
   const startTitleEdit = () => {
@@ -72,8 +82,7 @@ const Header: React.FC<HeaderProps> = ({
             style={[styles.editTitleInput, { color: colors.textOnPrimary }]}
             value={editTitle}
             onChangeText={setEditTitle}
-            multiline
-            numberOfLines={2}
+            multiline={false}
             maxLength={50}
             autoFocus
             onSubmitEditing={saveTitleEdit}
@@ -101,7 +110,7 @@ const Header: React.FC<HeaderProps> = ({
         >
           <Text
             style={[styles.title, { color: colors.textOnPrimary }]}
-            numberOfLines={2}
+            numberOfLines={1}
             ellipsizeMode="tail"
           >
             {title}
@@ -171,6 +180,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     marginHorizontal: theme.spacing.sm,
+    maxWidth: '80%', // タイトルの最大幅を制限
   },
   titleEditIcon: {
     marginLeft: theme.spacing.xs,
@@ -199,15 +209,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.lg,
-    marginTop: -4, // Adjust vertical position to center in blue area
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 16,
+    maxWidth: 100,
   },
   modelButtonText: {
-    marginRight: theme.spacing.xs,
-    fontSize: theme.fontSizes.sm,
+    fontSize: 12,
     fontWeight: '500',
+    color: 'white',
+    marginRight: 4,
+    maxWidth: 70,
   },
   rightComponentContainer: {
     marginLeft: theme.spacing.sm,

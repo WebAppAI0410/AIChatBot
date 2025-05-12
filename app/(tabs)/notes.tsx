@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import useColors from '../constants/colors';
 import Header from '../components/Header';
@@ -33,27 +33,24 @@ export default function NotesScreen() {
   });
   
   return (
-    <>
+    <View style={styles.container}>
       <Stack.Screen
         options={{
           headerShown: false,
         }}
       />
       
-      <SafeAreaView style={styles.container}>
-        <Header
-          title="ノート"
-          showBack={false}
-          onTitleEdit={undefined}
-        />
-        
-        <View style={styles.content}>
-          <Text style={styles.title}>Notes Screen</Text>
-          <Text style={styles.description}>
-            This screen will display saved notes from chat conversations.
-          </Text>
-        </View>
-      </SafeAreaView>
-    </>
+      <Header
+        title="ノート"
+        showBack={false}
+      />
+      
+      <View style={styles.content}>
+        <Text style={styles.title}>Notes Screen</Text>
+        <Text style={styles.description}>
+          This screen will display saved notes from chat conversations.
+        </Text>
+      </View>
+    </View>
   );
 }

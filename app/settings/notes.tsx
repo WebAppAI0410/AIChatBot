@@ -143,100 +143,97 @@ export default function NotesSettingsScreen() {
   };
 
   return (
-    <>
+    <View style={styles.container}>
       <Stack.Screen
         options={{
           headerShown: false,
         }}
       />
       
-      <SafeAreaView style={styles.container}>
-        {/* Use Header component for consistent styling */}
-        <Header
-          title="ノート機能設定"
-          showBack={true}
-          onTitleEdit={undefined}
-        />
+      <Header
+        title="ノート機能設定"
+        showBack={true}
+        onBackPress={() => router.replace('/(tabs)/settings')}
+      />
+      
+      <ScrollView style={styles.scrollContainer}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>一般設定</Text>
         
-        <ScrollView style={styles.scrollContainer}>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>一般設定</Text>
+          <View style={styles.optionItem}>
+            <View style={styles.optionTextContainer}>
+              <Text style={styles.optionTitle}>自動保存</Text>
+              <Text style={styles.optionDescription}>チャット中に自動的にノートを保存します</Text>
+            </View>
+            <Switch
+              value={autoSave}
+              onValueChange={setAutoSave}
+              trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
+              thumbColor={autoSave ? colors.primary : '#f4f3f4'}
+            />
+          </View>
           
-            <View style={styles.optionItem}>
-              <View style={styles.optionTextContainer}>
-                <Text style={styles.optionTitle}>自動保存</Text>
-                <Text style={styles.optionDescription}>チャット中に自動的にノートを保存します</Text>
-              </View>
-              <Switch
-                value={autoSave}
-                onValueChange={setAutoSave}
-                trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
-                thumbColor={autoSave ? colors.primary : '#f4f3f4'}
-              />
+          <View style={styles.optionItem}>
+            <View style={styles.optionTextContainer}>
+              <Text style={styles.optionTitle}>クラウド同期</Text>
+              <Text style={styles.optionDescription}>ノートをクラウドに同期します（プレミアム機能）</Text>
             </View>
-            
-            <View style={styles.optionItem}>
-              <View style={styles.optionTextContainer}>
-                <Text style={styles.optionTitle}>クラウド同期</Text>
-                <Text style={styles.optionDescription}>ノートをクラウドに同期します（プレミアム機能）</Text>
-              </View>
-              <Switch
-                value={cloudSync}
-                onValueChange={setCloudSync}
-                trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
-                thumbColor={cloudSync ? colors.primary : '#f4f3f4'}
-                disabled={true}
-              />
-            </View>
-            
-            <View style={styles.optionItem}>
-              <View style={styles.optionTextContainer}>
-                <Text style={styles.optionTitle}>ノートの分類</Text>
-                <Text style={styles.optionDescription}>AIによるノートの自動分類</Text>
-              </View>
-              <Switch
-                value={categorizeNotes}
-                onValueChange={setCategorizeNotes}
-                trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
-                thumbColor={categorizeNotes ? colors.primary : '#f4f3f4'}
-              />
-            </View>
-            
-            <View style={styles.optionItem}>
-              <View style={styles.optionTextContainer}>
-                <Text style={styles.optionTitle}>チャット内表示</Text>
-                <Text style={styles.optionDescription}>チャット中にノートを表示します</Text>
-              </View>
-              <Switch
-                value={showInChat}
-                onValueChange={setShowInChat}
-                trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
-                thumbColor={showInChat ? colors.primary : '#f4f3f4'}
-              />
-            </View>
+            <Switch
+              value={cloudSync}
+              onValueChange={setCloudSync}
+              trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
+              thumbColor={cloudSync ? colors.primary : '#f4f3f4'}
+              disabled={true}
+            />
           </View>
+          
+          <View style={styles.optionItem}>
+            <View style={styles.optionTextContainer}>
+              <Text style={styles.optionTitle}>ノートの分類</Text>
+              <Text style={styles.optionDescription}>AIによるノートの自動分類</Text>
+            </View>
+            <Switch
+              value={categorizeNotes}
+              onValueChange={setCategorizeNotes}
+              trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
+              thumbColor={categorizeNotes ? colors.primary : '#f4f3f4'}
+            />
+          </View>
+          
+          <View style={styles.optionItem}>
+            <View style={styles.optionTextContainer}>
+              <Text style={styles.optionTitle}>チャット内表示</Text>
+              <Text style={styles.optionDescription}>チャット中にノートを表示します</Text>
+            </View>
+            <Switch
+              value={showInChat}
+              onValueChange={setShowInChat}
+              trackColor={{ false: colors.lightGray, true: colors.primaryLight }}
+              thumbColor={showInChat ? colors.primary : '#f4f3f4'}
+            />
+          </View>
+        </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>データ管理</Text>
-            
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleExportNotes}
-            >
-              <Ionicons name="download-outline" size={24} color={colors.primary} />
-              <Text style={styles.actionButtonText}>ノートをエクスポート</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.actionButton, styles.dangerButton]}
-              onPress={handleClearNotes}
-            >
-              <Ionicons name="trash-outline" size={24} color={colors.error} />
-              <Text style={[styles.actionButtonText, styles.dangerButtonText]}>すべてのノートを削除</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>データ管理</Text>
+          
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleExportNotes}
+          >
+            <Ionicons name="download-outline" size={24} color={colors.primary} />
+            <Text style={styles.actionButtonText}>ノートをエクスポート</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.actionButton, styles.dangerButton]}
+            onPress={handleClearNotes}
+          >
+            <Ionicons name="trash-outline" size={24} color={colors.error} />
+            <Text style={[styles.actionButtonText, styles.dangerButtonText]}>すべてのノートを削除</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
