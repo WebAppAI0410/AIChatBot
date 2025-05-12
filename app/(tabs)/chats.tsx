@@ -48,11 +48,15 @@ export default function ChatsScreen() {
   
   const searchInputRef = useRef<TextInput>(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchBarRef = useRef<any>(null);  // SearchBarRefへの参照を追加
   
   // 検索結果に基づいたチャットリスト
   const filteredChats = searchQuery 
     ? chats.filter(chat => 
-        chat.title.toLowerCase().includes(searchQuery.toLowerCase())
+        chat.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        chat.messages.some(msg => 
+          msg.content.toLowerCase().includes(searchQuery.toLowerCase())
+        )
       )
     : chats;
   
@@ -128,6 +132,7 @@ export default function ChatsScreen() {
   
   // 検索用コールバック
   const handleSearch = (text: string) => {
+    console.log('Search triggered with:', text);
     setSearchQuery(text);
   };
   
@@ -136,13 +141,26 @@ export default function ChatsScreen() {
     handleOpenChat(chatId);
   };
   
+  // キャンセルボタン処理
+  const handleSearchCancel = () => {
+    setSearchQuery('');
+  };
+  
   // チャットリスト表示用コンポーネント
   const ChatsList = () => (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.searchContainer}>
+      <View style={[
+        styles.searchContainer,
+        { backgroundColor: colors.card }
+      ]}>
         <SearchBar 
+          ref={searchBarRef}
           placeholder="チャットを検索..."
           onSearch={handleSearch}
+          onCancel={handleSearchCancel}
+          delayMs={500}
+          showCancelButton={searchQuery.length > 0}
+          containerStyle={styles.searchBarContainer}
         />
       </View>
         
@@ -372,9 +390,19 @@ export default function ChatsScreen() {
       paddingBottom: 20,
     },
     searchContainer: {
-      padding: 16,
-      paddingBottom: 8,
-      backgroundColor: colors.background,
+      paddingTop: 12,
+      paddingBottom: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      elevation: 1,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 1,
+    },
+    searchBarContainer: {
+      paddingVertical: 4,
+      paddingHorizontal: 12,
     },
     searchInputWrapper: {
       flexDirection: 'row',

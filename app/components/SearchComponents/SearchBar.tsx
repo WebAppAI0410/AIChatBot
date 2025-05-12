@@ -65,14 +65,28 @@ const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(({
   
   return (
     <View style={[styles.container, containerStyle]}>
-      <View style={styles.searchContainer}>
+      <View style={[
+        styles.searchContainer,
+        { backgroundColor: colors.background }
+      ]}>
         <SearchInput
           ref={searchInputRef}
           placeholder={placeholder}
           onSearch={onSearch}
           initialValue={initialValue}
           delayMs={delayMs}
-          containerStyle={styles.searchInputContainer}
+          containerStyle={{
+            flex: 1,
+            borderRadius: theme.radius.lg,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.card,
+            elevation: 2,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.1,
+            shadowRadius: 1,
+          }}
         />
       </View>
       
@@ -95,23 +109,23 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
   },
   searchContainer: {
     flex: 1,
-  },
-  searchInputContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(142, 142, 147, 0.12)',
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden',
   },
   cancelButton: {
     paddingLeft: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
+    paddingVertical: theme.spacing.sm,
+    height: '100%',
+    justifyContent: 'center',
   },
   cancelText: {
     fontSize: theme.fontSizes.md,
-    fontWeight: '400',
+    fontWeight: '500',
   }
 });
 
