@@ -11,6 +11,7 @@ import { useColors } from './constants/colors';
 import config from '../tamagui.config';
 import { useColorScheme } from 'react-native';
 import { ThemeProvider, useTheme } from './ui/ThemeProvider';
+import { OrientationProvider } from './providers/OrientationProvider';
 
 // ColorsType型を定義
 import type { lightColors } from './constants/colors';
@@ -46,8 +47,10 @@ export default function RootLayout() {
           <Theme name={activeTheme}>
             <ColorsContext.Provider value={colors}>
               <ThemeProvider>
-                <StatusBar style={activeTheme === 'dark' ? 'light' : 'dark'} />
-                <Slot />
+                <OrientationProvider>
+                  <StatusBar style={activeTheme === 'dark' ? 'light' : 'dark'} />
+                  <Slot />
+                </OrientationProvider>
               </ThemeProvider>
             </ColorsContext.Provider>
           </Theme>

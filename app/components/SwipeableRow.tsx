@@ -7,11 +7,23 @@ import useColors from '../constants/colors';
 interface SwipeableRowProps {
   children: React.ReactNode;
   onDelete: () => void;
+  onLongPress?: () => void;
 }
 
-const SwipeableRow: React.FC<SwipeableRowProps> = ({ children, onDelete }) => {
+const SwipeableRow: React.FC<SwipeableRowProps> = ({ children, onDelete, onLongPress }) => {
   const swipeableRef = useRef<Swipeable>(null);
   const colors = useColors(); // 動的カラーを取得
+
+  // 子要素にlongPressイベントを伝播させるためのラッパー
+  const childrenWithLongPress = onLongPress
+    ? React.Children.map(children, child => 
+        React.isValidElement(child) 
+          ? React.cloneElement(child as React.ReactElement<any>, { 
+              onLongPress 
+            })
+          : child
+      )
+    : children;
 
   const styles = StyleSheet.create({
     rightActionsContainer: {
@@ -67,7 +79,7 @@ const SwipeableRow: React.FC<SwipeableRowProps> = ({ children, onDelete }) => {
       rightThreshold={40}
       renderRightActions={renderRightActions}
     >
-      {children}
+      {childrenWithLongPress}
     </Swipeable>
   );
 };
