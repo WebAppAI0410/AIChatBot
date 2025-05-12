@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View, Image, TextInput } from 'react-native';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View, Image, TextInput, Keyboard } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
@@ -48,7 +48,8 @@ export default function ChatsScreen() {
   
   const searchInputRef = useRef<TextInput>(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const searchBarRef = useRef<any>(null);  // SearchBarRefへの参照を追加
+  const searchBarRef = useRef<SearchBarRef>(null);  // 型を明示的に指定
+  const pendingSearchRef = useRef<string | null>(null); // 保留中の検索テキスト
   
   // 検索結果に基づいたチャットリスト
   const filteredChats = searchQuery 
@@ -66,6 +67,21 @@ export default function ChatsScreen() {
     if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
+  
+  // キーボードイベント監視
+  useEffect(() => {
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      // 保留中の検索があれば実行
+      if (pendingSearchRef.current !== null) {
+        setSearchQuery(pendingSearchRef.current);
+        pendingSearchRef.current = null;
+      }
+    });
+
+    return () => {
+      keyboardDidHideListener.remove();
+    };
+  }, []);
   
   const handleOpenChat = (chatId: string) => {
     if (layout.twoColumn) {
@@ -130,9 +146,26 @@ export default function ChatsScreen() {
   const selectedChat = chats.find(chat => chat.id === selectedChatId);
   const iconEditChat = chats.find(chat => chat.id === iconEditChatId);
   
-  // 検索用コールバック
+  // 検索用コールバック - IME対応
   const handleSearch = (text: string) => {
     console.log('Search triggered with:', text);
+    
+    // 入力テキストを保持
+    pendingSearchRef.current = text;
+    
+    // テキストが空の場合は初期状態に戻す
+    if (!text) {
+      setSearchQuery('');
+      pendingSearchRef.current = null;
+      return;
+    }
+    
+    // テキスト入力中にフォーカスを維持
+    if (searchBarRef.current?.getValue() !== text) {
+      searchBarRef.current?.focus();
+    }
+    
+    // 検索実行（キーボードは閉じない）
     setSearchQuery(text);
   };
   
@@ -144,139 +177,167 @@ export default function ChatsScreen() {
   // キャンセルボタン処理
   const handleSearchCancel = () => {
     setSearchQuery('');
+    pendingSearchRef.current = null;
+    searchBarRef.current?.blur();
+  };
+  
+  // 検索バーをフォーカスする
+  const focusSearchBar = () => {
+    searchBarRef.current?.focus();
+    setIsSearchFocused(true);
+  };
+  
+  // フォーカス変更ハンドラ
+  const handleSearchFocus = () => {
+    setIsSearchFocused(true);
+  };
+  
+  const handleSearchBlur = () => {
+    setIsSearchFocused(false);
+    // ブラー時に保留中の検索を実行
+    if (pendingSearchRef.current !== null) {
+      setSearchQuery(pendingSearchRef.current);
+      pendingSearchRef.current = null;
+    }
+    
+    // フォーカス解除時は必ずキーボードを閉じる
+    Keyboard.dismiss();
   };
   
   // チャットリスト表示用コンポーネント
   const ChatsList = () => (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[
-        styles.searchContainer,
-        { backgroundColor: colors.card }
-      ]}>
+      {/* 固定位置の検索バーコンテナ */}
+      <View style={styles.searchBarWrapper}>
         <SearchBar 
           ref={searchBarRef}
           placeholder="チャットを検索..."
           onSearch={handleSearch}
           onCancel={handleSearchCancel}
-          delayMs={500}
+          onCustomFocus={handleSearchFocus}
+          onCustomBlur={handleSearchBlur}
+          delayMs={300}
           showCancelButton={searchQuery.length > 0}
           containerStyle={styles.searchBarContainer}
         />
       </View>
-        
-      {sortedChats.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
-            {searchQuery ? 'チャットが見つかりませんでした' : 'チャットがありません'}
-          </Text>
-          <TouchableOpacity 
-            style={[styles.newChatButton, { backgroundColor: colors.primary }]}
-            onPress={handleCreateNewChat}
-          >
-            <Ionicons name="add" size={24} color={colors.background} />
-            <Text style={[styles.newChatButtonText, { color: colors.background }]}>
-              新しいチャットを作成
+      
+      {/* チャットリスト - 検索バー分の余白を上部に追加 */}
+      <View style={styles.listWrapper}>
+        {sortedChats.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
+              {searchQuery ? 'チャットが見つかりませんでした' : 'チャットがありません'}
             </Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <FlatList
-          data={sortedChats}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <SwipeableRow
-              onDelete={() => {
-                setChatToDelete(item.id);
-                setShowDeleteDialog(true);
-              }}
+            <TouchableOpacity 
+              style={[styles.newChatButton, { backgroundColor: colors.primary }]}
+              onPress={handleCreateNewChat}
             >
-              <TouchableOpacity
-                style={[
-                  styles.chatItem, 
-                  { backgroundColor: colors.card },
-                  selectedChatId === item.id && styles.selectedChatItem
-                ]}
-                onPress={() => handleOpenChat(item.id)}
-                activeOpacity={0.7}
+              <Ionicons name="add" size={24} color={colors.background} />
+              <Text style={[styles.newChatButtonText, { color: colors.background }]}>
+                新しいチャットを作成
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            data={sortedChats}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.listContent}
+            renderItem={({ item }) => (
+              <SwipeableRow
+                onDelete={() => {
+                  setChatToDelete(item.id);
+                  setShowDeleteDialog(true);
+                }}
               >
-                <TouchableOpacity 
-                  style={styles.chatIconContainer}
-                  onPress={() => openIconEditor(item.id)}
+                <TouchableOpacity
+                  style={[
+                    styles.chatItem, 
+                    { backgroundColor: colors.card },
+                    selectedChatId === item.id && styles.selectedChatItem
+                  ]}
+                  onPress={() => handleOpenChat(item.id)}
+                  activeOpacity={0.7}
                 >
-                  {item.iconType === 'custom' && item.iconUri ? (
-                    <Image 
-                      source={{ uri: item.iconUri }} 
-                      style={{ width: 28, height: 28, borderRadius: 14 }} 
-                    />
-                  ) : (
-                    <Ionicons 
-                      name={(item.iconId || "chatbubbles-outline") as any} 
-                      size={24} 
-                      color={colors.primary} 
-                    />
-                  )}
-                </TouchableOpacity>
-                <View style={styles.chatInfo}>
-                  <View style={styles.chatTitleRow}>
-                    {editingChatId === item.id ? (
-                      <View style={styles.editTitleContainer}>
-                        <TextInput
-                          style={[styles.editTitleInput, { color: colors.text, backgroundColor: `${colors.card}80` }]}
-                          value={editTitle}
-                          onChangeText={setEditTitle}
-                          onSubmitEditing={saveEditing}
-                          onBlur={() => setEditingChatId(null)}
-                          autoFocus
-                          selectTextOnFocus
-                        />
-                        <TouchableOpacity onPress={saveEditing}>
-                          <Ionicons name="checkmark" size={20} color={colors.primary} />
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <>
-                        <Text 
-                          style={[
-                            styles.chatTitle, 
-                            { color: colors.text },
-                            item.unreadCount > 0 && styles.unreadText
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {item.title}
-                        </Text>
-                        <TouchableOpacity 
-                          style={styles.editButton}
-                          onPress={() => startEditing(item.id, item.title)}
-                        >
-                          <Ionicons name="pencil-outline" size={18} color={colors.gray} />
-                        </TouchableOpacity>
-                        {item.unreadCount > 0 && (
-                          <View style={[styles.unreadBadge, { backgroundColor: colors.primary }]}>
-                            <Text style={[styles.unreadBadgeText, { color: colors.background }]}>新着</Text>
-                          </View>
-                        )}
-                      </>
-                    )}
-                  </View>
-                  <Text 
-                    style={[styles.chatPreview, { color: colors.secondaryText }]}
-                    numberOfLines={2}
+                  <TouchableOpacity 
+                    style={styles.chatIconContainer}
+                    onPress={() => openIconEditor(item.id)}
                   >
-                    {item.messages.length > 0 
-                      ? item.messages[item.messages.length - 1].content.substring(0, 60) 
-                      : '新しいチャット'}
+                    {item.iconType === 'custom' && item.iconUri ? (
+                      <Image 
+                        source={{ uri: item.iconUri }} 
+                        style={{ width: 28, height: 28, borderRadius: 14 }} 
+                      />
+                    ) : (
+                      <Ionicons 
+                        name={(item.iconId || "chatbubbles-outline") as any} 
+                        size={24} 
+                        color={colors.primary} 
+                      />
+                    )}
+                  </TouchableOpacity>
+                  <View style={styles.chatInfo}>
+                    <View style={styles.chatTitleRow}>
+                      {editingChatId === item.id ? (
+                        <View style={styles.editTitleContainer}>
+                          <TextInput
+                            style={[styles.editTitleInput, { color: colors.text, backgroundColor: `${colors.card}80` }]}
+                            value={editTitle}
+                            onChangeText={setEditTitle}
+                            onSubmitEditing={saveEditing}
+                            onBlur={() => setEditingChatId(null)}
+                            autoFocus
+                            selectTextOnFocus
+                          />
+                          <TouchableOpacity onPress={saveEditing}>
+                            <Ionicons name="checkmark" size={20} color={colors.primary} />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <>
+                          <Text 
+                            style={[
+                              styles.chatTitle, 
+                              { color: colors.text },
+                              item.unreadCount > 0 && styles.unreadText
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {item.title}
+                          </Text>
+                          <TouchableOpacity 
+                            style={styles.editButton}
+                            onPress={() => startEditing(item.id, item.title)}
+                          >
+                            <Ionicons name="pencil-outline" size={18} color={colors.gray} />
+                          </TouchableOpacity>
+                          {item.unreadCount > 0 && (
+                            <View style={[styles.unreadBadge, { backgroundColor: colors.primary }]}>
+                              <Text style={[styles.unreadBadgeText, { color: colors.background }]}>新着</Text>
+                            </View>
+                          )}
+                        </>
+                      )}
+                    </View>
+                    <Text 
+                      style={[styles.chatPreview, { color: colors.secondaryText }]}
+                      numberOfLines={2}
+                    >
+                      {item.messages.length > 0 
+                        ? item.messages[item.messages.length - 1].content.substring(0, 60) 
+                        : '新しいチャット'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.chatTime, { color: colors.gray }]}>
+                    {new Date(item.updatedAt).toLocaleDateString('ja-JP')}
                   </Text>
-                </View>
-                <Text style={[styles.chatTime, { color: colors.gray }]}>
-                  {new Date(item.updatedAt).toLocaleDateString('ja-JP')}
-                </Text>
-              </TouchableOpacity>
-            </SwipeableRow>
-          )}
-          contentContainerStyle={styles.listContent}
-        />
-      )}
+                </TouchableOpacity>
+              </SwipeableRow>
+            )}
+          />
+        )}
+      </View>
     </View>
   );
   
@@ -386,40 +447,35 @@ export default function ChatsScreen() {
       flex: 1,
       backgroundColor: colors.background,
     },
-    listContent: {
-      paddingBottom: 20,
-    },
-    searchContainer: {
-      paddingTop: 12,
-      paddingBottom: 16,
+    searchBarWrapper: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+      backgroundColor: colors.card,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
-      elevation: 1,
+      height: 65, // 検索バーの高さ（固定）
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 1,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
     },
     searchBarContainer: {
-      paddingVertical: 4,
-      paddingHorizontal: 12,
+      paddingVertical: theme.spacing.xs,
+      paddingHorizontal: theme.spacing.md,
+      height: 48, // 内部の検索バーの高さを固定
+      marginTop: 8, // 上部に少しスペースを追加
+      marginBottom: 8, // 下部にも少しスペースを追加
     },
-    searchInputWrapper: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.card,
-      borderRadius: 8,
-      padding: 8,
-      paddingHorizontal: 12,
-    },
-    searchIcon: {
-      marginRight: 8,
-    },
-    searchInput: {
+    listWrapper: {
       flex: 1,
-      height: 36,
-      color: colors.text,
-      fontSize: 16,
+      paddingTop: 65, // 検索バーの高さと同じ
+    },
+    listContent: {
+      paddingBottom: 20,
     },
     chatItem: {
       flexDirection: 'row',
