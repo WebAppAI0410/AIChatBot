@@ -47,3 +47,4 @@ yarn-error.*
 # Supabase
 supabase/.branches/
 supabase/.temp/
+修正計画/
