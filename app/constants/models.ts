@@ -31,6 +31,7 @@ export const MODELS: ModelType[] = [
     isAuto: true
   },
   
+  // Tier 0 (無料) モデル
   {
     id: 'google/gemini-2.5-pro-exp',
     name: 'Gemini 2.5 Pro Exp',
@@ -73,6 +74,7 @@ export const MODELS: ModelType[] = [
     provider: 'local'
   },
   
+  // Tier 1 (一般的なモデル)
   {
     id: 'openai/gpt-4o-mini',
     name: 'GPT-4o mini',
@@ -136,11 +138,33 @@ export const MODELS: ModelType[] = [
     planTier: 'free',
     provider: 'google'
   },
+  
+  // Tier 1 (Liteプラン以上)
   {
-    id: 'openai/gpt-4o-mini-high',
-    name: '4o-mini-high',
-    description: 'Enhanced version of 4o-mini',
-    contextLength: 16000,
+    id: 'openai/o4-mini',
+    name: 'o4-mini',
+    description: 'Compact reasoning model optimized for fast, cost-efficient performance',
+    contextLength: 200000,
+    isPremium: true,
+    tier: 1,
+    planTier: 'lite',
+    provider: 'openai'
+  },
+  {
+    id: 'openai/o4-mini-high',
+    name: 'o4-mini-high',
+    description: 'o4-mini with reasoning_effort set to high',
+    contextLength: 200000,
+    isPremium: true,
+    tier: 1,
+    planTier: 'lite',
+    provider: 'openai'
+  },
+  {
+    id: 'openai/o3',
+    name: 'o3',
+    description: 'Well-rounded model for math, science, coding, and visual reasoning',
+    contextLength: 200000,
     isPremium: true,
     tier: 1,
     planTier: 'lite',
@@ -157,6 +181,7 @@ export const MODELS: ModelType[] = [
     provider: 'google'
   },
   
+  // Tier 2 (Premium)
   {
     id: 'openai/gpt-4o',
     name: 'GPT-4o',
@@ -200,9 +225,9 @@ export const MODELS: ModelType[] = [
     provider: 'anthropic'
   },
   {
-    id: 'anthropic/claude-3.7-sonnet-thinking',
+    id: 'anthropic/claude-3.7-sonnet:thinking',
     name: 'Claude 3.7 Sonnet Thinking',
-    description: 'Claude model with enhanced reasoning',
+    description: 'Claude model with extended step-by-step reasoning',
     contextLength: 200000,
     isPremium: true,
     tier: 2,

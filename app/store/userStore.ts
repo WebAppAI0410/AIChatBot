@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 
-export type UserPlan = 'free' | 'lite' | 'heavy';
+export type UserPlan = 'free' | 'lite' | 'premium';
 
 export interface UserState {
   isAuthenticated: boolean;
@@ -22,14 +22,14 @@ export interface UserState {
 
 const TOKEN_LIMITS = {
   free: 10000,
-  lite: 150000,
-  heavy: 1500000,
+  lite: 300000,
+  premium: 1500000,
 };
 
 const IMAGE_GEN_LIMITS = {
   free: 5,
-  lite: 20,
-  heavy: 75,
+  lite: 15,
+  premium: 50,
 };
 
 export const createUserSlice: StateCreator<

@@ -15,9 +15,11 @@ import { Stack, useRouter } from 'expo-router';
 import { useStore } from '../store';
 import useColors from '../constants/colors';
 import Header from '../components/Header';
+import DevPlanSwitcher from '../components/DevPlanSwitcher';
+import { isDevelopmentMode } from '../config/env';
 
 type PlanOption = {
-  id: 'free' | 'lite' | 'heavy';
+  id: 'free' | 'lite' | 'premium';
   name: string;
   price: string;
   features: string[];
@@ -46,10 +48,10 @@ const PLANS: PlanOption[] = [
   {
     id: 'lite',
     name: 'Liteプラン',
-    price: '¥780 / 月',
+    price: '¥980 / 月',
     features: [
-      '月間150,000トークン',
-      '1日20回の画像生成',
+      '月間300,000トークン',
+      '1日15回の画像生成',
       '高性能AIモデルへのアクセス',
       'ローカルモデル対応',
     ],
@@ -60,12 +62,12 @@ const PLANS: PlanOption[] = [
     ],
   },
   {
-    id: 'heavy',
-    name: 'Heavyプラン',
-    price: '¥1,980 / 月',
+    id: 'premium',
+    name: 'Premiumプラン',
+    price: '¥3,980 / 月',
     features: [
       '月間1,500,000トークン',
-      '1日75回の画像生成',
+      '1日50回の画像生成',
       '最高性能AIモデルへのアクセス',
       'ローカルモデル対応',
     ],
@@ -85,6 +87,7 @@ export default function SubscriptionScreen() {
   const isAuthenticated = useStore(state => state.isAuthenticated);
   const plan = useStore(state => state.plan);
   const setPlan = useStore(state => state.setPlan);
+  const isDevMode = isDevelopmentMode();
   
   const styles = StyleSheet.create({
     container: {
@@ -233,7 +236,7 @@ export default function SubscriptionScreen() {
     },
   });
   
-  const handleSelectPlan = (planId: 'free' | 'lite' | 'heavy') => {
+  const handleSelectPlan = (planId: 'free' | 'lite' | 'premium') => {
     if (!isAuthenticated && planId !== 'free') {
       Alert.alert(
         'アカウントが必要です',
@@ -275,14 +278,14 @@ export default function SubscriptionScreen() {
     
     Alert.alert(
       'プランをアップグレード',
-      `${planId === 'lite' ? 'Lite' : 'Heavy'}プランにアップグレードしますか？`,
+      `${planId === 'lite' ? 'Lite' : 'Premium'}プランにアップグレードしますか？`,
       [
         { text: 'キャンセル', style: 'cancel' },
         { 
           text: 'アップグレード', 
           onPress: () => {
             setPlan(planId);
-            Alert.alert('アップグレードしました', `${planId === 'lite' ? 'Lite' : 'Heavy'}プランに変更されました。`);
+            Alert.alert('アップグレードしました', `${planId === 'lite' ? 'Lite' : 'Premium'}プランに変更されました。`);
           }
         }
       ]
@@ -355,6 +358,10 @@ export default function SubscriptionScreen() {
       />
       
       <ScrollView style={styles.scrollContainer}>
+        {isDevMode && (
+          <DevPlanSwitcher />
+        )}
+        
         <View style={styles.content}>
           <Text style={styles.title}>サブスクリプションプラン</Text>
           <Text style={styles.subtitle}>
