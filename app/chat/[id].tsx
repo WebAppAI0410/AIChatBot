@@ -94,14 +94,6 @@ export default function ChatScreen() {
         content: msg.content,
       }));
       
-      const hasSystemMessage = apiMessages.some(msg => msg.role === 'system');
-      if (!hasSystemMessage) {
-        apiMessages.unshift({
-          role: 'system',
-          content: 'あなたは親切で役立つAIアシスタントです。ユーザーの質問に日本語で簡潔に答えてください。',
-        });
-      }
-      
       (async () => {
         setIsLoading(true);
         try {
@@ -162,14 +154,6 @@ export default function ChatScreen() {
           content: trimmedInput,
         }
       ];
-      
-      const hasSystemMessage = apiMessages.some(msg => msg.role === 'system');
-      if (!hasSystemMessage) {
-        apiMessages.unshift({
-          role: 'system',
-          content: 'あなたは親切で役立つAIアシスタントです。ユーザーの質問に日本語で簡潔に答えてください。',
-        });
-      }
       
       console.log('Sending API request with model:', chat.modelId);
       

@@ -114,17 +114,89 @@ export const fetchChatCompletion = async (
     
     const systemMessageIndex = processedMessages.findIndex(m => m.role === 'system');
     
+    // モデル情報を取得
+    const modelInfo = MODELS.find(m => m.id === modelId || m.id === actualModelId);
+    
+    // モデルの推奨用途を決定する関数
+    const getRecommendedUseCase = (model: typeof modelInfo) => {
+      if (!model) return '一般的な質問応答';
+      
+      if (model.isLocal) {
+        return 'オフライン環境での利用、プライバシーを重視する質問';
+      }
+      
+      if (model.contextLength >= 100000) {
+        return '長文の分析、複雑な文脈を必要とする質問';
+      } else if (model.contextLength >= 32000) {
+        return '中程度の複雑さの質問、複数の文脈を含む会話';
+      } else {
+        return '一般的な質問応答、短い会話';
+      }
+    };
+    
+    // モデル情報を含むシステムプロンプトを作成
+    const getEnhancedSystemPrompt = () => {
+      let basePrompt = `あなたは丁寧で信頼性の高いAIアシスタントです。以下のガイドラインに従って応答してください：
+
+1. 必ず日本語で回答してください。
+2. 敬語を適切に使用し、丁寧な口調を維持してください。
+3. 正確な情報を提供するよう努め、不確かな場合はその旨を明示してください。
+4. 専門用語を使う場合は、わかりやすい説明を添えてください。
+5. 質問の意図が不明確な場合は、丁寧に確認してください。
+6. 複雑な質問には段階的に説明し、要点を明確にしてください。
+7. ユーザーの問題解決に役立つ具体的な情報やアドバイスを提供してください。
+8. 文化的背景や価値観に配慮した応答を心がけてください。
+
+日本語のニュアンスについて:
+- 「〜と思います」「〜かもしれません」などの表現を適切に使って、断定的すぎない表現を心がけてください。
+- 質問の文脈に応じて、カジュアルさと丁寧さのバランスを調整してください。
+- 説明が長くなる場合は、「まず〜」「次に〜」「最後に〜」など、構造化された説明を心がけてください。
+- 専門的な説明には、できるだけ日常的な例えを用いて理解を助けてください。
+
+よくある質問パターンへの対応:
+- 「〜とは？」→定義と例を簡潔に説明してください。
+- 「〜の違いは？」→比較表やポイントを箇条書きで示してください。
+- 「〜のやり方」→具体的な手順を段階的に説明してください。
+- 「おすすめは？」→複数の選択肢と各々の特徴を提示してください。
+- 「〜について教えて」→基本情報から詳細へと段階的に説明してください。
+
+自分自身について質問された場合:
+あなたはAIアシスタントであり、感情や意識は持ちませんが、ユーザーの役に立つために設計されていることを丁寧に説明してください。自分の能力と限界について正直に伝えてください。`;
+      
+      if (modelInfo) {
+        basePrompt += `\n\nあなたの技術情報:
+- モデル名: ${modelInfo.name}
+- 説明: ${modelInfo.description}
+- コンテキスト長: ${modelInfo.contextLength.toLocaleString()}トークン
+- プロバイダー: ${modelInfo.provider || 'OpenRouter'}
+- 利用制限: ${modelInfo.dailyLimit ? `1日${modelInfo.dailyLimit}回まで` : '制限なし'}
+- 実行環境: ${modelInfo.isLocal ? 'デバイス上（オフライン）' : 'クラウド上（オンライン）'}
+- 推奨用途: ${getRecommendedUseCase(modelInfo)}`;
+      }
+      
+      return basePrompt;
+    };
+    
     if (systemMessageIndex === -1) {
       processedMessages.unshift({
         role: 'system',
-        content: 'あなたは親切で役立つAIアシスタントです。ユーザーの質問に日本語で簡潔に答えてください。'
+        content: getEnhancedSystemPrompt()
       });
-      console.log('Added default system message');
+      console.log('Added enhanced system message with model info');
     } 
     else if (systemMessageIndex > 0) {
+      // 既存のシステムメッセージがある場合は先頭に移動
       const systemMessage = processedMessages.splice(systemMessageIndex, 1)[0];
       processedMessages.unshift(systemMessage);
       console.log('Moved system message to first position');
+    }
+    else {
+      // 既存のシステムメッセージがある場合でも、モデル情報を付加する
+      const existingSystemMsg = processedMessages[0];
+      if (!existingSystemMsg.content.includes("あなたの情報:") && modelInfo) {
+        existingSystemMsg.content = getEnhancedSystemPrompt();
+        console.log('Updated system message with model info');
+      }
     }
     
     console.log('First message role:', processedMessages[0].role);
