@@ -135,17 +135,15 @@ export default function ModelSelectModal({
     if (availableTiers.includes(1)) {
       availableModels = [...availableModels, ...groupedModels.tier1];
     } else if (plan === 'free') {
-      const tier1Models = groupedModels.tier1.filter(m => m.dailyLimit);
-      if (tier1Models.length > 0) {
-        availableModels = [...availableModels, tier1Models[0]];
-      }
+      const tier1Models = groupedModels.tier1.filter(m => m.planTier === 'free' && m.dailyLimit);
+      availableModels = [...availableModels, ...tier1Models];
     }
     
     if (availableTiers.includes(2)) {
       if (plan === 'premium') {
         availableModels = [...availableModels, ...groupedModels.tier2];
       } else {
-        const tier2Models = groupedModels.tier2.filter(m => m.dailyLimit);
+        const tier2Models = groupedModels.tier2.filter(m => m.planTier === 'free' && m.dailyLimit);
         availableModels = [...availableModels, ...tier2Models];
       }
     }

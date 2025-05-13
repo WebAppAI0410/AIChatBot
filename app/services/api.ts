@@ -73,12 +73,17 @@ const normalizeModelId = (modelId: string): string => {
     return `openai/${modelId}`;
   }
   
+  // ショートハンド表記のサポート
   if (modelId === '4o-mini' || modelId === 'gpt-4o-mini') {
     return 'openai/gpt-4o-mini';
   }
   
   if (modelId === '4.1-mini' || modelId === 'gpt-4.1-mini') {
     return 'openai/gpt-4.1-mini';
+  }
+  
+  if (modelId === '4.1-nano' || modelId === 'gpt-4.1-nano') {
+    return 'openai/gpt-4.1-nano';
   }
   
   return `openai/${modelId}`;

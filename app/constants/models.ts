@@ -33,7 +33,7 @@ export const MODELS: ModelType[] = [
   
   // Tier 0 (無料) モデル
   {
-    id: 'google/gemini-2.5-pro-exp',
+    id: 'google/gemini-2.5-pro-exp-03-25',
     name: 'Gemini 2.5 Pro Exp',
     description: 'Google\'s experimental model with free access',
     contextLength: 1000000,
@@ -43,7 +43,7 @@ export const MODELS: ModelType[] = [
     provider: 'google'
   },
   {
-    id: 'google/gemini-2.0-flash-exp',
+    id: 'google/gemini-2.0-flash-exp:free',
     name: 'Gemini 2.0 Flash Exp',
     description: 'Fast Google model with free access',
     contextLength: 32000,
@@ -53,7 +53,7 @@ export const MODELS: ModelType[] = [
     provider: 'google'
   },
   {
-    id: 'deepseek/deepseek-r1-zero',
+    id: 'deepseek/deepseek-r1-zero:free',
     name: 'DeepSeek R1 Zero',
     description: 'Free version of DeepSeek R1',
     contextLength: 32000,
@@ -109,7 +109,7 @@ export const MODELS: ModelType[] = [
     dailyLimit: 2
   },
   {
-    id: 'deepseek/deepseek-v3',
+    id: 'deepseek/deepseek-v3-base:free',
     name: 'DeepSeek V3',
     description: 'Powerful model from DeepSeek',
     contextLength: 32000,
@@ -183,7 +183,7 @@ export const MODELS: ModelType[] = [
   
   // Tier 2 (Premium)
   {
-    id: 'openai/gpt-4o',
+    id: 'openai/gpt-4o-2024-11-20',
     name: 'GPT-4o',
     description: 'Advanced model with strong reasoning capabilities',
     contextLength: 128000,
