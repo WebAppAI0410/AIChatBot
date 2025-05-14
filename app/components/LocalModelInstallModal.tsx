@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import { useStore } from '../store';
 import useColors from '../constants/colors';
+import { ModelStatus } from '../store/localModelStore';
 
 type LocalModelInstallModalProps = {
   visible: boolean;
@@ -31,20 +32,20 @@ export default function LocalModelInstallModal({
   const [progress, setProgress] = useState(0);
   
   const colors = useColors();
-  const localModelStatus = useStore(state => state.localModelStatus);
-  const startDownload = useStore(state => state.startDownload);
-  const cancelDownload = useStore(state => state.cancelDownload);
-  const setLocalModelStatus = useStore(state => state.setLocalModelStatus);
-  const setDownloadProgress = useStore(state => state.setDownloadProgress);
-  const setLocalModelPath = useStore(state => state.setLocalModelPath);
+  const localModelStatus = useStore(state => state.localModel.modelStatus);
+  const startDownload = useStore(state => state.localModel.startDownload);
+  const cancelDownload = useStore(state => state.localModel.cancelDownload);
+  const setLocalModelStatus = useStore(state => state.localModel.setModelStatus);
+  const setDownloadProgress = useStore(state => state.localModel.setDownloadProgress);
+  const setLocalModelPath = useStore(state => state.localModel.setLocalModelPath);
   
   useEffect(() => {
-    if (visible && localModelStatus === 'not_installed') {
+    if (visible && localModelStatus === 'not_downloaded') {
       setIsDownloading(false);
       setDownloadProgress(0);
     } else if (visible && localModelStatus === 'downloading') {
       setIsDownloading(true);
-      setDownloadProgress(useStore.getState().downloadProgress);
+      setDownloadProgress(useStore.getState().localModel.downloadProgress);
     }
   }, [visible, localModelStatus]);
   
@@ -201,7 +202,7 @@ export default function LocalModelInstallModal({
         handleDownloadComplete();
       } else {
         setDownloadProgress(progress);
-        useStore.getState().setDownloadProgress(progress);
+        useStore.getState().localModel.setDownloadProgress(progress);
       }
     }, 300);
   };

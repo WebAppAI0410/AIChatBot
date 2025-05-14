@@ -7,6 +7,9 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "developmentClient": {
+      "silentLaunch": false
+    },
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -20,7 +23,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#005E36"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.AIChatBot"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -29,6 +33,12 @@
     "plugins": [
       "expo-router"
     ],
-    "scheme": "aichatbot"
+    "scheme": "aichatbot",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "97efa3ae-8736-4578-a744-fb1ece94ac55"
+      }
+    }
   }
 }

@@ -18,17 +18,18 @@ import { useStore } from '../store';
 import useColors from '../constants/colors';
 import LocalModelInstallModal from '../components/LocalModelInstallModal';
 import Header from '../components/Header';
+import LicenseAttributionSection from '../components/LicenseAttributionSection';
 
 export default function LocalModelScreen() {
   const router = useRouter();
   const colors = useColors();
   const [showInstallModal, setShowInstallModal] = useState(false);
   
-  const localModelStatus = useStore(state => state.localModelStatus);
-  const localModelPath = useStore(state => state.localModelPath);
-  const downloadProgress = useStore(state => state.downloadProgress);
-  const setLocalModelStatus = useStore(state => state.setLocalModelStatus);
-  const setLocalModelPath = useStore(state => state.setLocalModelPath);
+  const modelStatus = useStore(state => state.localModel.modelStatus);
+  const modelPath = useStore(state => state.localModel.modelPath);
+  const downloadProgress = useStore(state => state.localModel.downloadProgress);
+  const setModelStatus = useStore(state => state.localModel.setModelStatus);
+  const setModelPath = useStore(state => state.localModel.setLocalModelPath);
   
   const handleInstall = () => {
     setShowInstallModal(true);
@@ -45,12 +46,12 @@ export default function LocalModelScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              if (localModelPath) {
-                console.log(`Would delete files at: ${localModelPath}`);
+              if (modelPath) {
+                console.log(`Would delete files at: ${modelPath}`);
               }
               
-              setLocalModelStatus('not_installed');
-              setLocalModelPath(null);
+              setModelStatus('not_downloaded');
+              setModelPath(null);
               
               Alert.alert(
                 'アンインストール完了',
@@ -295,13 +296,13 @@ export default function LocalModelScreen() {
                 <Text style={styles.detailLabel}>ステータス:</Text>
                 <View style={[
                   styles.statusBadge,
-                  localModelStatus === 'ready' ? styles.readyBadge :
-                  localModelStatus === 'downloading' ? styles.downloadingBadge :
+                  modelStatus === 'ready' ? styles.readyBadge :
+                  modelStatus === 'downloading' ? styles.downloadingBadge :
                   styles.notInstalledBadge
                 ]}>
                   <Text style={styles.statusText}>
-                    {localModelStatus === 'ready' ? 'インストール済み' :
-                     localModelStatus === 'downloading' ? 'ダウンロード中' :
+                    {modelStatus === 'ready' ? 'インストール済み' :
+                     modelStatus === 'downloading' ? 'ダウンロード中' :
                      '未インストール'}
                   </Text>
                 </View>
@@ -309,7 +310,7 @@ export default function LocalModelScreen() {
             </View>
           </View>
           
-          {localModelStatus === 'downloading' && (
+          {modelStatus === 'downloading' && (
             <View style={styles.progressContainer}>
               <View style={styles.progressBarContainer}>
                 <View 
@@ -326,7 +327,7 @@ export default function LocalModelScreen() {
           )}
           
           <View style={styles.actionContainer}>
-            {localModelStatus === 'not_installed' && (
+            {modelStatus === 'not_downloaded' && (
               <TouchableOpacity
                 style={[styles.button, styles.installButton]}
                 onPress={handleInstall}
@@ -336,11 +337,11 @@ export default function LocalModelScreen() {
               </TouchableOpacity>
             )}
             
-            {localModelStatus === 'downloading' && (
+            {modelStatus === 'downloading' && (
               <TouchableOpacity
                 style={[styles.button, styles.cancelButton]}
                 onPress={() => {
-                  useStore.getState().cancelDownload();
+                  useStore.getState().localModel.cancelDownload();
                 }}
               >
                 <Ionicons name="close-circle-outline" size={20} color={colors.background} />
@@ -348,7 +349,7 @@ export default function LocalModelScreen() {
               </TouchableOpacity>
             )}
             
-            {localModelStatus === 'ready' && (
+            {modelStatus === 'ready' && (
               <TouchableOpacity
                 style={[styles.button, styles.uninstallButton]}
                 onPress={handleUninstall}
@@ -376,19 +377,7 @@ export default function LocalModelScreen() {
         
         <View style={styles.infoSection}>
           <Text style={styles.infoTitle}>ライセンス情報</Text>
-          <Text style={styles.infoText}>
-            このアプリはAlibabaが開発したQwen3モデルを使用しています。
-          </Text>
-          <Text style={[styles.infoText, { fontStyle: 'italic' }]}>
-            ライセンス: Qwen3 License Agreement
-          </Text>
-          <TouchableOpacity
-            onPress={() => Linking.openURL('https://huggingface.co/Qwen/Qwen3-4B-GGUF')}
-          >
-            <Text style={[styles.infoText, { color: colors.primary, textDecorationLine: 'underline' }]}>
-              https://huggingface.co/Qwen/Qwen3-4B-GGUF
-            </Text>
-          </TouchableOpacity>
+          <LicenseAttributionSection />
         </View>
         
         <LocalModelInstallModal

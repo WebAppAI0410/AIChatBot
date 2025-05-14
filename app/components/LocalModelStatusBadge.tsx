@@ -1,106 +1,131 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import theme from '../ui/theme';
+import { View, Text, Pressable, Alert, StyleSheet, ActivityIndicator } from 'react-native';
+import { useStore } from '../store';
 import useColors from '../constants/colors';
 
-export type ModelStatus = 'not_installed' | 'downloading' | 'ready' | 'error';
-
-type LocalModelStatusBadgeProps = {
-  status: ModelStatus;
-  progress?: number;
-  compact?: boolean;
+type BadgeContent = {
+  icon: string;
+  label: string;
+  color: string;
 };
 
-const LocalModelStatusBadge: React.FC<LocalModelStatusBadgeProps> = ({
-  status,
-  progress = 0,
-  compact = false,
-}) => {
+/**
+ * ローカルモデルの状態を表示するバッジコンポーネント
+ * @returns コンポーネント
+ */
+const LocalModelStatusBadge = () => {
   const colors = useColors();
   
-  const getStatusConfig = () => {
-    switch (status) {
-      case 'not_installed':
-        return {
-          label: compact ? '未' : '未インストール',
-          icon: 'cloud-download-outline',
-          color: theme.componentStyles.badge.notInstalled.backgroundColor,
-        };
+  // Storeから状態を取得（localModelスライスから正しく取得）
+  const modelStatus = useStore(state => state.localModel?.modelStatus || 'not_downloaded');
+  const downloadProgress = useStore(state => state.localModel?.downloadProgress || 0);
+  const errorMessage = useStore(state => state.localModel?.errorMessage);
+
+  // ステータスに応じたバッジコンテンツを取得
+  const getBadgeContent = (): BadgeContent => {
+    switch (modelStatus) {
+      case 'not_downloaded':
+        return { icon: '⚪️', label: '未DL', color: colors.lightGray };
       case 'downloading':
         return {
-          label: compact ? `${Math.round(progress * 100)}%` : `ダウンロード中 ${Math.round(progress * 100)}%`,
-          icon: 'arrow-down-outline',
-          color: theme.componentStyles.badge.downloading.backgroundColor,
+          icon: '🔄',
+          label: `${Math.round(downloadProgress * 100)}%`,
+          color: colors.primary
         };
+      case 'verifying':
+        return { icon: '🔍', label: '検証中', color: colors.warning };
       case 'ready':
-        return {
-          label: compact ? '済' : 'インストール済み',
-          icon: 'checkmark-outline',
-          color: theme.componentStyles.badge.ready.backgroundColor,
-        };
+        return { icon: '🟢', label: '使用可', color: colors.success };
       case 'error':
-        return {
-          label: compact ? 'エラー' : 'インストールエラー',
-          icon: 'alert-circle-outline',
-          color: theme.componentStyles.badge.error.backgroundColor,
-        };
+        return { icon: '🔴', label: 'エラー', color: colors.error };
       default:
-        return {
-          label: compact ? '未' : '未インストール',
-          icon: 'cloud-download-outline',
-          color: theme.componentStyles.badge.notInstalled.backgroundColor,
-        };
+        return { icon: '⚪️', label: '未DL', color: colors.lightGray };
     }
   };
-  
-  const statusConfig = getStatusConfig();
-  
+
+  const badge = getBadgeContent();
+
+  // エラー詳細表示ハンドラ
+  const handlePress = () => {
+    if (modelStatus === 'error' && errorMessage) {
+      Alert.alert('エラー詳細', errorMessage);
+    }
+  };
+
+  // 進捗表示の最適化（検証中の場合は99%で固定）
+  const displayProgress = modelStatus === 'verifying' ? 99 : Math.round(downloadProgress * 100);
+
   return (
-    <View style={[
-      styles.container,
-      { backgroundColor: statusConfig.color },
-      compact && styles.compactContainer,
-    ]}>
-      <Ionicons
-        name={statusConfig.icon as any}
-        size={compact ? 12 : 14}
-        color="#FFFFFF"
-        style={styles.icon}
-      />
-      <Text style={[
-        styles.label,
-        compact && styles.compactLabel,
-      ]}>
-        {statusConfig.label}
-      </Text>
-    </View>
+    <Pressable onPress={handlePress}>
+      <View style={[styles.badge, { backgroundColor: badge.color }]}>
+        <View style={styles.badgeContent}>
+          <Text style={styles.icon}>{badge.icon}</Text>
+          <Text style={styles.label}>
+            {badge.label}
+          </Text>
+          {(modelStatus === 'downloading' || modelStatus === 'verifying') && (
+            <ActivityIndicator size="small" color="white" style={styles.spinner} />
+          )}
+        </View>
+      </View>
+      
+      {(modelStatus === 'downloading' || modelStatus === 'verifying') && (
+        <View style={styles.progressContainer}>
+          <View style={styles.progressBar}>
+            <View 
+              style={[
+                styles.progressIndicator, 
+                { 
+                  width: `${displayProgress}%`,
+                  backgroundColor: modelStatus === 'verifying' ? colors.warning : colors.primary
+                }
+              ]} 
+            />
+          </View>
+        </View>
+      )}
+    </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+  },
+  badgeContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.md,
-  },
-  compactContainer: {
-    paddingHorizontal: theme.spacing.xs,
-    paddingVertical: 2,
-    borderRadius: theme.radius.sm,
   },
   icon: {
-    marginRight: theme.spacing.xs,
+    marginRight: 4,
+    fontSize: 12,
   },
   label: {
-    color: '#FFFFFF',
-    fontSize: theme.fontSizes.sm,
-    fontWeight: '500',
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 12,
   },
-  compactLabel: {
-    fontSize: theme.fontSizes.xs,
+  spinner: {
+    marginLeft: 4,
+    width: 12,
+    height: 12,
+  },
+  progressContainer: {
+    marginTop: 2,
+    width: 60,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressIndicator: {
+    height: '100%',
+    borderRadius: 2,
   },
 });
 
