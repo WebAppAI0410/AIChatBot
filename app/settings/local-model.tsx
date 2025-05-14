@@ -8,7 +8,8 @@ import {
   ScrollView, 
   SafeAreaView, 
   Platform, 
-  StatusBar 
+  StatusBar,
+  Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
@@ -371,6 +372,23 @@ export default function LocalModelScreen() {
             • モデルのインストールには約10GBの空き容量が必要です。{'\n'}
             • バッテリー消費を抑えるため、充電中の使用を推奨します。
           </Text>
+        </View>
+        
+        <View style={styles.infoSection}>
+          <Text style={styles.infoTitle}>ライセンス情報</Text>
+          <Text style={styles.infoText}>
+            このアプリはAlibabaが開発したQwen3モデルを使用しています。
+          </Text>
+          <Text style={[styles.infoText, { fontStyle: 'italic' }]}>
+            ライセンス: Qwen3 License Agreement
+          </Text>
+          <TouchableOpacity
+            onPress={() => Linking.openURL('https://huggingface.co/Qwen/Qwen3-4B-GGUF')}
+          >
+            <Text style={[styles.infoText, { color: colors.primary, textDecorationLine: 'underline' }]}>
+              https://huggingface.co/Qwen/Qwen3-4B-GGUF
+            </Text>
+          </TouchableOpacity>
         </View>
         
         <LocalModelInstallModal

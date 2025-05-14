@@ -63,6 +63,10 @@ export default function SettingsScreen() {
       fontSize: 14,
       color: colors.gray,
     },
+    licenseButton: {
+      marginTop: 10,
+      padding: 5,
+    },
   });
 
   const settingsOptions = [
@@ -143,6 +147,16 @@ export default function SettingsScreen() {
 
         <View style={styles.versionContainer}>
           <Text style={styles.versionText}>バージョン 1.0.0</Text>
+          
+          {/* ライセンス情報 */}
+          <TouchableOpacity 
+            style={styles.licenseButton}
+            onPress={() => router.push('/settings/local-model')}
+          >
+            <Text style={[styles.versionText, { color: colors.primary, marginTop: 10 }]}>
+              ライセンス情報
+            </Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
