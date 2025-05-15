@@ -6,6 +6,7 @@ export type Message = {
   content: string;
   timestamp: number;
   isRead?: boolean;
+  imageUrl?: string;  // 画像メッセージの場合のURL
 };
 
 export type Chat = {
@@ -28,6 +29,7 @@ export interface ChatState {
   isDeleteDialogVisible: boolean;
   createChat: (modelId: string) => string;
   addMessage: (chatId: string, message: Omit<Message, 'id' | 'timestamp'>) => void;
+  addImageMessage: (chatId: string, params: { content: string; imageUrl: string; role: 'user' | 'assistant' }) => void;
   updateChatTitle: (chatId: string, title: string) => void;
   updateChatModel: (chatId: string, modelId: string) => void;
   updateChatIcon: (chatId: string, icon: { iconType: 'default' | 'custom'; iconId?: string; iconUri?: string }) => void;
@@ -100,6 +102,33 @@ export const createChatSlice: StateCreator<
       console.log(`Message added - ChatID: ${chatId}, Total messages: ${
         updatedChats.find(c => c.id === chatId)?.messages.length || 0
       }`);
+      
+      return { chats: updatedChats };
+    });
+  },
+  addImageMessage: (chatId, { content, imageUrl, role }) => {
+    set((state) => {
+      console.log(`Adding image message - ChatID: ${chatId}, Role: ${role}`);
+      
+      const newMessage: Message = {
+        id: `img_${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        role,
+        content,
+        imageUrl,
+        timestamp: Date.now(),
+      };
+      
+      const updatedChats = state.chats.map((chat) => {
+        if (chat.id === chatId) {
+          return {
+            ...chat,
+            messages: [...chat.messages, newMessage],
+            updatedAt: Date.now(),
+            unreadCount: role === 'assistant' ? chat.unreadCount + 1 : chat.unreadCount,
+          };
+        }
+        return chat;
+      });
       
       return { chats: updatedChats };
     });

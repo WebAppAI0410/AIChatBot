@@ -12,8 +12,10 @@ import {
   Pressable,
   Alert,
   SafeAreaView,
-  StatusBar
+  StatusBar,
+  Modal
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
@@ -25,6 +27,8 @@ import { Message } from '../store/chatStore';
 import ModelSelectModal from '../components/ModelSelectModal';
 import LocalModelInstallModal from '../components/LocalModelInstallModal';
 import Header from '../components/Header';
+import ChatBubble from '../components/ChatBubble';
+import { ImageGenerationPanel } from '../components/ImageGenerationPanel';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -36,10 +40,14 @@ export default function ChatScreen() {
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState('');
+  const [showImagePanel, setShowImagePanel] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [showImagePreview, setShowImagePreview] = useState(false);
   
   const colors = useColors();
   const chats = useStore(state => state.chats);
   const addMessage = useStore(state => state.addMessage);
+  const addImageMessage = useStore(state => state.addImageMessage);
   const markChatAsRead = useStore(state => state.markChatAsRead);
   const updateChatTitle = useStore(state => state.updateChatTitle);
   const updateChatModel = useStore(state => state.updateChatModel);
@@ -190,6 +198,40 @@ export default function ChatScreen() {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 300);
     }
+  };
+
+  // 画像生成パネルを表示
+  const handleShowImagePanel = () => {
+    setShowImagePanel(true);
+  };
+
+  // 画像生成完了時の処理
+  const handleImageGenerated = (imageUrl: string) => {
+    if (!chat) return;
+
+    // 画像メッセージを追加
+    addImageMessage(chat.id, {
+      content: input.trim() || '画像を生成しました',
+      imageUrl,
+      role: 'user'
+    });
+
+    // 入力欄をクリア
+    setInput('');
+    
+    // パネルを閉じる
+    setShowImagePanel(false);
+
+    // スクロール
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
+
+  // 画像プレビュー表示
+  const handleImagePress = (imageUrl: string) => {
+    setSelectedImage(imageUrl);
+    setShowImagePreview(true);
   };
   
   const handleModelSelect = () => {
@@ -342,6 +384,15 @@ export default function ChatScreen() {
       justifyContent: 'center',
       alignItems: 'center',
     },
+    imageButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 8,
+    },
     loadingButton: {
       backgroundColor: colors.primary,
       width: 44,
@@ -407,28 +458,43 @@ export default function ChatScreen() {
       padding: 16,
       paddingBottom: 32,
     },
+    imagePanelModal: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    imagePreviewModal: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.9)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    imagePreview: {
+      width: '90%',
+      height: '70%',
+      borderRadius: 8,
+    },
+    closeButton: {
+      position: 'absolute',
+      top: 40,
+      right: 20,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
   });
   
   const renderMessage = ({ item }: { item: Message }) => {
-    const isUser = item.role === 'user';
-    
     return (
-      <View style={[
-        styles.messageContainer,
-        isUser ? styles.userMessageContainer : styles.assistantMessageContainer
-      ]}>
-        <View style={[
-          styles.messageBubble,
-          isUser ? styles.userMessageBubble : styles.assistantMessageBubble
-        ]}>
-          <Text style={[
-            styles.messageText,
-            isUser ? styles.userMessageText : styles.assistantMessageText
-          ]}>
-            {item.content}
-          </Text>
-        </View>
-      </View>
+      <ChatBubble 
+        message={item} 
+        onImagePress={handleImagePress}
+        onLongPress={() => {
+          // TODO: メッセージアクションメニュー表示（修正05で実装予定）
+        }}
+      />
     );
   };
   
@@ -507,6 +573,13 @@ export default function ChatScreen() {
             />
           
             <View style={styles.inputContainer}>
+              <TouchableOpacity 
+                style={styles.imageButton}
+                onPress={handleShowImagePanel}
+              >
+                <Ionicons name="image-outline" size={24} color="#fff" />
+              </TouchableOpacity>
+
               <TextInput
                 style={styles.input}
                 placeholder="メッセージを入力"
@@ -542,6 +615,59 @@ export default function ChatScreen() {
         visible={showLocalModelInstall}
         onClose={() => setShowLocalModelInstall(false)}
       />
+
+      {/* 画像生成パネル */}
+      <Modal
+        visible={showImagePanel}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowImagePanel(false)}
+      >
+        <View style={styles.imagePanelModal}>
+          <View style={{ 
+            backgroundColor: colors.background,
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            maxHeight: '80%',
+          }}>
+            <ImageGenerationPanel
+              onImageGenerated={handleImageGenerated}
+              onClose={() => setShowImagePanel(false)}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* 画像プレビュー */}
+      <Modal
+        visible={showImagePreview}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowImagePreview(false)}
+      >
+        <Pressable 
+          style={styles.imagePreviewModal}
+          onPress={() => setShowImagePreview(false)}
+        >
+          {selectedImage && (
+            <Image
+              source={{ uri: selectedImage }}
+              style={styles.imagePreview}
+              contentFit="contain"
+            />
+          )}
+          <TouchableOpacity 
+            style={styles.closeButton}
+            onPress={() => setShowImagePreview(false)}
+          >
+            <Ionicons name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

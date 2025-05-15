@@ -1,0 +1,47 @@
+project_structure:
+  app:
+    description: "メインアプリケーションコード"
+    sub_directories:
+      tabs: "タブベースのナビゲーション画面"
+      chat: "チャット機能関連コンポーネント"
+      components: "再利用可能なUIコンポーネント"
+      config: "アプリ設定"
+      constants: "定数定義"
+      hooks: "カスタムReactフック"
+      providers: "コンテキストプロバイダー"
+      services: "APIなどの外部サービス連携"
+      settings: "設定画面関連"
+      store: "状態管理（Zustand）"
+      temp: "一時ファイル（開発用）"
+      ui: "UIユーティリティとコンポーネント"
+  
+  store:
+    description: "状態管理（Zustand）"
+    key_files:
+      - index.ts: "ストア統合"
+      - userStore.ts: "ユーザー情報・プラン管理"
+      - chatStore.ts: "チャット状態管理"
+      - localModelStore.ts: "ローカルモデル管理"
+      - settingsStore.ts: "アプリ設定管理"
+  
+  services:
+    description: "外部APIとの連携"
+    key_files:
+      - api.ts: "API呼び出し関数"
+      - supabase.ts: "Supabase連携"
+      - localInference.ts: "ローカルモデル推論"
+  
+  components:
+    description: "再利用可能なUIコンポーネント"
+    sub_directories:
+      SearchComponents: "検索関連コンポーネント"
+    key_components:
+      - ChatInput.tsx: "チャット入力"
+      - MessageBubble.tsx: "メッセージ表示"
+      - ModelSelect.tsx: "モデル選択"
+  
+  supabase:
+    description: "バックエンド機能実装（Edge Functions）"
+    key_directories:
+      - functions: "サーバーレス関数"
+      - .temp: "一時ファイル" 

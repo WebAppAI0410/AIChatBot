@@ -1,22 +1,50 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { Image } from 'expo-image';
 import theme from '../ui/theme';
 import useColors from '../constants/colors';
 import { Message } from '../store/chatStore';
+import { ImageBubble } from './ImageBubble';
 
 type ChatBubbleProps = {
   message: Message;
+  onImagePress?: (imageUrl: string) => void;
+  onLongPress?: () => void;
 };
 
-const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
+const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onImagePress, onLongPress }) => {
   const isUser = message.role === 'user';
   const colors = useColors();
+
+  // 画像URLを含むかチェック
+  const hasImage = message.imageUrl !== undefined;
   
+  // タイムスタンプをフォーマット
+  const formattedTime = new Date(message.timestamp).toLocaleTimeString();
+  
+  // 画像メッセージの場合
+  if (hasImage && message.imageUrl) {
+    return (
+      <ImageBubble
+        imageUrl={message.imageUrl}
+        prompt={message.content}
+        timestamp={formattedTime}
+        isSent={isUser}
+        onPress={() => onImagePress?.(message.imageUrl!)}
+        onLongPress={onLongPress}
+      />
+    );
+  }
+  
+  // テキストメッセージの場合
   return (
-    <View style={[
-      styles.messageContainer,
-      isUser ? styles.userMessageContainer : styles.assistantMessageContainer
-    ]}>
+    <Pressable
+      onLongPress={onLongPress}
+      style={[
+        styles.messageContainer,
+        isUser ? styles.userMessageContainer : styles.assistantMessageContainer
+      ]}
+    >
       <View style={[
         styles.messageBubble,
         isUser ? [styles.userMessageBubble, { backgroundColor: colors.primary }] : [styles.assistantMessageBubble, { backgroundColor: colors.card }]
@@ -28,7 +56,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
           {message.content}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 };
 
