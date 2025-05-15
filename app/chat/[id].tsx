@@ -28,19 +28,20 @@ import ModelSelectModal from '../components/ModelSelectModal';
 import LocalModelInstallModal from '../components/LocalModelInstallModal';
 import Header from '../components/Header';
 import ChatBubble from '../components/ChatBubble';
-import { ImageGenerationPanel } from '../components/ImageGenerationPanel';
+import { ImageGenerationPanel, ImageGenerationPanelHandle } from '../components/ImageGenerationPanel';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [showModelSelect, setShowModelSelect] = useState(false);
   const [showLocalModelInstall, setShowLocalModelInstall] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState('');
-  const [showImagePanel, setShowImagePanel] = useState(false);
+  const [showImageOptions, setShowImageOptions] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
   
@@ -56,6 +57,7 @@ export default function ChatScreen() {
   
   const chat = chats.find(c => c.id === id);
   const flatListRef = useRef<FlatList>(null);
+  const imageGenPanelRef = useRef<ImageGenerationPanelHandle>(null);
   
   useEffect(() => {
     if (chat) {
@@ -133,7 +135,29 @@ export default function ChatScreen() {
   }, [chat?.id, isLoading]);
   
   const handleSend = async () => {
-    if (!input.trim() || !chat) return;
+    if (!chat) return;
+    
+    // 画像モードがアクティブの場合
+    if (showImageOptions && imageGenPanelRef.current) {
+      if (!imageGenPanelRef.current.canGenerate()) {
+        // 画像生成条件を満たしていない場合
+        Alert.alert('エラー', 'プロンプトを入力するか、クォータが十分にあるか確認してください。');
+        return;
+      }
+      
+      // 画像生成開始
+      setIsGenerating(true);
+      
+      // 画像生成を実行（画像パネルから）
+      const success = await imageGenPanelRef.current.generateImage();
+      if (!success) {
+        setIsGenerating(false);
+      }
+      return;
+    }
+    
+    // 通常のテキストメッセージ送信（画像モードではない場合）
+    if (!input.trim()) return;
     
     const trimmedInput = input.trim();
     setInput('');
@@ -200,32 +224,36 @@ export default function ChatScreen() {
     }
   };
 
-  // 画像生成パネルを表示
-  const handleShowImagePanel = () => {
-    setShowImagePanel(true);
+  // トグルで画像オプションの表示/非表示を切り替える
+  const handleToggleImageOptions = () => {
+    setShowImageOptions(!showImageOptions);
   };
 
   // 画像生成完了時の処理
-  const handleImageGenerated = (imageUrl: string) => {
+  const handleImageGenerated = (imageUrl: string, promptText: string) => {
     if (!chat) return;
 
     // 画像メッセージを追加
     addImageMessage(chat.id, {
-      content: input.trim() || '画像を生成しました',
+      content: promptText || '画像を生成しました',
       imageUrl,
       role: 'user'
     });
 
-    // 入力欄をクリア
-    setInput('');
-    
-    // パネルを閉じる
-    setShowImagePanel(false);
+    // 画像オプションを閉じる
+    setShowImageOptions(false);
 
-    // スクロール
+    // AIの応答準備
+    setIsLoading(true);
+    setIsGenerating(false);
+    
     setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+      addMessage(chat.id, {
+        role: 'assistant',
+        content: '生成された画像について何か質問がありますか？',
+      });
+      setIsLoading(false);
+    }, 500);
   };
 
   // 画像プレビュー表示
@@ -252,7 +280,7 @@ export default function ChatScreen() {
     if (model.isPremium && plan === 'free') {
       Alert.alert(
         'プレミアムモデル',
-        `このモデルを使用するには、${model.tier === 'lite' ? 'Lite' : 'Heavy'}プランへのアップグレードが必要です。`,
+        `このモデルを使用するには、${model.tier === 1 ? 'Lite' : 'Premium'}プランへのアップグレードが必要です。`,
         [
           { text: 'キャンセル', style: 'cancel' },
           { 
@@ -572,33 +600,62 @@ export default function ChatScreen() {
               contentContainerStyle={styles.messagesContainer}
             />
           
-            <View style={styles.inputContainer}>
-              <TouchableOpacity 
-                style={styles.imageButton}
-                onPress={handleShowImagePanel}
-              >
-                <Ionicons name="image-outline" size={24} color="#fff" />
-              </TouchableOpacity>
+            <View>
+              <View style={styles.inputContainer}>
+                <TouchableOpacity 
+                  style={[
+                    styles.imageButton,
+                    showImageOptions ? { backgroundColor: colors.accentBlue } : undefined
+                  ]}
+                  onPress={handleToggleImageOptions}
+                >
+                  <Ionicons 
+                    name="image-outline" 
+                    size={24} 
+                    color="#fff" 
+                  />
+                </TouchableOpacity>
 
-              <TextInput
-                style={styles.input}
-                placeholder="メッセージを入力"
-                placeholderTextColor={colors.gray}
-                value={input}
-                onChangeText={setInput}
-                multiline
-              />
-              <TouchableOpacity 
-                style={styles.sendButton} 
-                onPress={handleSend}
-                disabled={isLoading || !input.trim()}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Ionicons name="send" size={20} color="#fff" />
-                )}
-              </TouchableOpacity>
+                <TextInput
+                  style={styles.input}
+                  placeholder={showImageOptions ? "画像の説明を入力..." : "メッセージを入力"}
+                  placeholderTextColor={colors.gray}
+                  value={input}
+                  onChangeText={setInput}
+                  multiline
+                />
+                <TouchableOpacity 
+                  style={[
+                    styles.sendButton,
+                    showImageOptions && isGenerating && { opacity: 0.5 }
+                  ]} 
+                  onPress={handleSend}
+                  disabled={
+                    (showImageOptions && isGenerating) || 
+                    (!showImageOptions && (!input.trim() || isLoading))
+                  }
+                >
+                  {isLoading || isGenerating ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Ionicons 
+                      name={showImageOptions ? "image" : "send"} 
+                      size={20} 
+                      color="#fff" 
+                    />
+                  )}
+                </TouchableOpacity>
+              </View>
+              
+              {/* 画像生成オプション - 入力欄の下に配置 */}
+              {showImageOptions && (
+                <ImageGenerationPanel
+                  ref={imageGenPanelRef}
+                  prompt={input}
+                  onImageGenerated={handleImageGenerated}
+                  onClose={() => setShowImageOptions(false)}
+                />
+              )}
             </View>
           </>
         )}
@@ -615,32 +672,6 @@ export default function ChatScreen() {
         visible={showLocalModelInstall}
         onClose={() => setShowLocalModelInstall(false)}
       />
-
-      {/* 画像生成パネル */}
-      <Modal
-        visible={showImagePanel}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowImagePanel(false)}
-      >
-        <View style={styles.imagePanelModal}>
-          <View style={{ 
-            backgroundColor: colors.background,
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            maxHeight: '80%',
-          }}>
-            <ImageGenerationPanel
-              onImageGenerated={handleImageGenerated}
-              onClose={() => setShowImagePanel(false)}
-            />
-          </View>
-        </View>
-      </Modal>
 
       {/* 画像プレビュー */}
       <Modal
