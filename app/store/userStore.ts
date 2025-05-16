@@ -11,12 +11,14 @@ export interface UserState {
   monthlyTokensLimit: number;
   dailyImageGenCount: number;
   dailyImageGenLimit: number;
+  dailyModelQuotasCount: { [modelId: string]: number };
   setAuthenticated: (value: boolean) => void;
   setUserId: (id: string | null) => void;
   setEmail: (email: string | null) => void;
   setPlan: (plan: UserPlan) => void;
   incrementTokensUsed: (amount: number) => void;
   incrementImageGenCount: () => void;
+  incrementModelUsageCount: (modelId: string) => void;
   resetImageGenCount: () => void;
 }
 
@@ -46,6 +48,7 @@ export const createUserSlice: StateCreator<
   monthlyTokensLimit: TOKEN_LIMITS.free,
   dailyImageGenCount: 0,
   dailyImageGenLimit: IMAGE_GEN_LIMITS.free,
+  dailyModelQuotasCount: {},
   setAuthenticated: (value) => set({ isAuthenticated: value }),
   setUserId: (id) => set({ userId: id }),
   setEmail: (email) => set({ email }),
@@ -60,7 +63,16 @@ export const createUserSlice: StateCreator<
   incrementImageGenCount: () => set((state) => ({
     dailyImageGenCount: state.dailyImageGenCount + 1,
   })),
-  resetImageGenCount: () => set({ dailyImageGenCount: 0 }),
+  incrementModelUsageCount: (modelId) => set((state) => ({
+    dailyModelQuotasCount: {
+      ...state.dailyModelQuotasCount,
+      [modelId]: (state.dailyModelQuotasCount[modelId] || 0) + 1
+    }
+  })),
+  resetImageGenCount: () => set({
+    dailyImageGenCount: 0,
+    dailyModelQuotasCount: {}
+  }),
 });
 
 export default createUserSlice;

@@ -17,7 +17,7 @@ export type ImageModel = 'sdxl' | 'dalle';
 
 export type ImageGenerationPanelProps = {
   prompt: string;
-  onImageGenerated: (imageUrl: string, prompt: string) => void;
+  onImageGenerated: (imageUrl: string, prompt: string, model: ImageModel) => void;
   onClose: () => void;
 };
 
@@ -104,14 +104,16 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
       generateImage: async () => {
         const imageUrl = await handleGenerate();
         if (imageUrl) {
-          onImageGenerated(imageUrl, prompt);
+          // 実際に使用されるモデルを渡す
+          const usedModel = canUseDalle && model === 'dalle' ? 'dalle' : 'sdxl';
+          onImageGenerated(imageUrl, prompt, usedModel);
           return true;
         }
         return false;
       },
       canGenerate: () => currentQuota.remaining > 0 && Boolean(prompt.trim())
     }),
-    [currentQuota.remaining, prompt, handleGenerate, onImageGenerated]
+    [currentQuota.remaining, prompt, handleGenerate, onImageGenerated, model, canUseDalle]
   );
 
   return (

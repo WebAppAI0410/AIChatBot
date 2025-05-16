@@ -75,12 +75,16 @@ export default function ImageScreen() {
   };
 
   // 画像生成完了ハンドラ
-  const handleImageGenerated = (imageUrl: string, generatedPrompt: string) => {
+  const handleImageGenerated = (
+    imageUrl: string, 
+    generatedPrompt: string,
+    model: 'sdxl' | 'dalle' = 'sdxl' // デフォルト値を設定して後方互換性を保つ
+  ) => {
     // 生成が成功した場合
     addGeneratedImage({
       url: imageUrl,
       prompt: generatedPrompt || prompt,
-      model: 'sdxl'
+      model,
     });
     
     // 入力をクリア
@@ -96,12 +100,22 @@ export default function ImageScreen() {
   const handleSend = async () => {
     if (prompt.trim() === '') return;
     
+    // オプションが非表示の場合は、まずパネルを表示する
+    if (!showOptionsPanel) {
+      setShowOptionsPanel(true);
+      // パネルの表示が完了してからrefが確実にセットされるように遅延させる
+      return;
+    }
+    
     // オプションパネル経由で画像を生成
     if (imagePanelRef.current) {
       const success = await imagePanelRef.current.generateImage();
       if (success) {
         // handleImageGeneratedが呼ばれるので、ここでは何もしない
       }
+    } else {
+      // refがないケース（コンポーネントがまだマウントされていないなど）
+      console.warn('ImageGenerationPanel reference is not available');
     }
   };
   
@@ -395,14 +409,7 @@ export default function ImageScreen() {
 
         {/* 非表示のImageGenerationPanel (参照用) */}
         {!showOptionsPanel && (
-          <View style={{ height: 0, overflow: 'hidden' }}>
-            <ImageGenerationPanel
-              ref={imagePanelRef}
-              prompt={prompt}
-              onImageGenerated={handleImageGenerated}
-              onClose={() => {}}
-            />
-          </View>
+          null
         )}
 
         {/* 画像詳細モーダル */}

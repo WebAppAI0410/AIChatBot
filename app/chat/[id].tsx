@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -61,14 +61,16 @@ export default function ChatScreen() {
   
   useEffect(() => {
     if (chat) {
-      console.log('====== CHAT STATE ======');
-      console.log('Chat ID:', chat.id);
-      console.log('Messages:', chat.messages.length);
-      if (chat.messages.length > 0) {
-        const lastMsg = chat.messages[chat.messages.length - 1];
-        console.log('Last message:', lastMsg.role, lastMsg.content.substring(0, 30));
+      if (__DEV__) {
+        console.log('====== CHAT STATE ======');
+        console.log('Chat ID:', chat.id);
+        console.log('Messages:', chat.messages.length);
+        if (chat.messages.length > 0) {
+          const lastMsg = chat.messages[chat.messages.length - 1];
+          console.log('Last message:', lastMsg.role, lastMsg.content.substring(0, 30));
+        }
+        console.log('=======================');
       }
-      console.log('=======================');
     }
   }, [chat?.messages.length]);
   
@@ -132,7 +134,7 @@ export default function ChatScreen() {
         }
       })();
     }
-  }, [chat?.id, isLoading]);
+  }, [chat?.id, chat?.messages, isLoading, addMessage]);
   
   const handleSend = async () => {
     if (!chat) return;
@@ -149,9 +151,13 @@ export default function ChatScreen() {
       setIsGenerating(true);
       
       // 画像生成を実行（画像パネルから）
-      const success = await imageGenPanelRef.current.generateImage();
-      if (!success) {
+      try {
+        const success = await imageGenPanelRef.current.generateImage();
+        if (!success) setIsGenerating(false);
+      } catch (e) {
+        console.error('Image generation failed:', e);
         setIsGenerating(false);
+        Alert.alert('エラー', '画像生成に失敗しました。もう一度お試しください。');
       }
       return;
     }
@@ -174,7 +180,7 @@ export default function ChatScreen() {
     setIsLoading(true);
     
     try {
-      console.log('Sending message to API with model:', chat.modelId);
+      if (__DEV__) console.log('Sending message to API with model:', chat.modelId);
       
       const apiMessages: ApiChatMessage[] = [
         ...chat.messages.map(msg => ({
@@ -187,14 +193,14 @@ export default function ChatScreen() {
         }
       ];
       
-      console.log('Sending API request with model:', chat.modelId);
+      if (__DEV__) console.log('Sending API request with model:', chat.modelId);
       
       const responseContent = await fetchChatCompletion(
           apiMessages,
           chat.modelId
         );
         
-        console.log('Received API response:', responseContent.substring(0, 50) + '...');
+      if (__DEV__) console.log('Received API response:', responseContent.substring(0, 50) + '...');
         
       // エラーメッセージまたは正常な応答をアシスタントメッセージとして追加
         addMessage(chat.id, {
@@ -230,8 +236,11 @@ export default function ChatScreen() {
   };
 
   // 画像生成完了時の処理
-  const handleImageGenerated = (imageUrl: string, promptText: string) => {
+  const handleImageGenerated = (imageUrl: string, promptText: string, model: 'sdxl' | 'dalle' = 'sdxl') => {
     if (!chat) return;
+
+    // モデル情報をログに出力
+    if (__DEV__) console.log(`Image generated with model: ${model}`);
 
     // 画像メッセージを追加
     addImageMessage(chat.id, {
@@ -314,7 +323,7 @@ export default function ChatScreen() {
     }
   };
 
-  const styles = StyleSheet.create({
+  const styles = useMemo(() => StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: colors.background,
@@ -512,7 +521,7 @@ export default function ChatScreen() {
       justifyContent: 'center',
       alignItems: 'center',
     },
-  });
+  }), [colors, theme.safeArea.top]);
   
   const renderMessage = ({ item }: { item: Message }) => {
     return (

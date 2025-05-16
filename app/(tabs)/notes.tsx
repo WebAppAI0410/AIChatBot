@@ -1,14 +1,15 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
-import useColors from '../constants/colors';
+import { useColors } from '../constants/colors';
 import Header from '../components/Header';
 import theme from '../ui/theme';
 
 export default function NotesScreen() {
   const colors = useColors(); // 動的カラーを取得
   
-  const styles = StyleSheet.create({
+  // colorsが変わった時だけスタイルを再計算
+  const styles = useMemo(() => StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: colors.background,
@@ -30,7 +31,7 @@ export default function NotesScreen() {
       textAlign: 'center',
       color: colors.secondaryText, // よりダークモードに適した色に変更
     },
-  });
+  }), [colors]); // colorsが変わった時だけ再計算
   
   return (
     <View style={styles.container}>

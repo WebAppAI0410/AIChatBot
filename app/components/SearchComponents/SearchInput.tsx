@@ -54,11 +54,12 @@ const SearchInputBase = forwardRef<SearchInputRef, SearchInputProps>(({
   
   const [localValue, setLocalValue] = useState(initialValue);
   const inputRef = useRef<TextInput>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSearchRef = useRef<string | null>(null);
   const lastTextRef = useRef<string>(initialValue);
   const keyboardDidHideListener = useRef<any>(null);
   const isComposingRef = useRef<boolean>(false); // IME入力状態を追跡
+  const lastTypedTimeRef = useRef<number>(0); // 前回の入力時間を追跡
   
   // キーボードイベントのリスナー設定
   useEffect(() => {
@@ -74,8 +75,21 @@ const SearchInputBase = forwardRef<SearchInputRef, SearchInputProps>(({
       
       return () => {
         keyboardDidHideListener.current?.remove();
+        // アンマウント時にタイマーをクリア
+        if (searchTimeoutRef.current) {
+          clearTimeout(searchTimeoutRef.current);
+          searchTimeoutRef.current = null;
+        }
       };
     }
+    
+    // web環境でのクリーンアップ
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+    };
   }, [onSearch]);
   
   // テキスト変更時の処理
@@ -83,13 +97,35 @@ const SearchInputBase = forwardRef<SearchInputRef, SearchInputProps>(({
     setLocalValue(text);
     lastTextRef.current = text;
 
-    // IME入力中は必ずフラグを立てる（日本語入力検出用）
+    // モバイル環境でのIME入力検出 - 様々な言語に対応
     if (text && Platform.OS !== 'web' && !isComposingRef.current) {
-      const containsJapanese = /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf\u3400-\u4dbf]/.test(text);
-      if (containsJapanese) {
+      // CJK (中国語、日本語、韓国語) および他のIME言語の文字範囲を含む拡張検出
+      // より包括的なアプローチ
+      const containsIMELanguage = 
+        // 中国語 (簡体字・繁体字)、日本語漢字
+        /[\u4E00-\u9FFF\u3400-\u4DBF]/.test(text) || 
+        // 日本語ひらがな・カタカナ
+        /[\u3040-\u309F\u30A0-\u30FF]/.test(text) || 
+        // 韓国語ハングル
+        /[\uAC00-\uD7AF\u1100-\u11FF]/.test(text) || 
+        // その他のアジア文字（タイ語、ベトナム語など）
+        /[\u0E00-\u0E7F\u1780-\u17FF\u1000-\u109F]/.test(text);
+      
+      if (containsIMELanguage) {
+        if (__DEV__) console.log('IME言語検出');
         isComposingRef.current = true;
-        return; // 日本語入力検出時は検索を実行しない
+        return; // IME入力検出時は検索を実行しない
       }
+      
+      // より確実なIME検出のために、テキスト変化の早さも考慮
+      // テキストが急速に変化する場合（IME候補選択中など）は検索を控える
+      const now = Date.now();
+      if (now - lastTypedTimeRef.current < 100) { // 100ms以内に変更が続く場合
+        isComposingRef.current = true;
+        if (__DEV__) console.log('急速なテキスト変化を検出、IMEの可能性あり');
+        return;
+      }
+      lastTypedTimeRef.current = now;
     }
 
     debouncedSearch(text);
@@ -102,7 +138,7 @@ const SearchInputBase = forwardRef<SearchInputRef, SearchInputProps>(({
     
     // IME入力中は検索を実行しない（厳格なチェック）
     if (isComposingRef.current && Platform.OS !== 'web') {
-      console.log('IME入力中のため検索を延期:', text);
+      if (__DEV__) console.log('IME入力中のため検索を延期:', text);
       return;
     }
     
@@ -115,11 +151,11 @@ const SearchInputBase = forwardRef<SearchInputRef, SearchInputProps>(({
     searchTimeoutRef.current = setTimeout(() => {
       // IME入力中でなければ検索を実行
       if (!isComposingRef.current || Platform.OS === 'web') {
-        console.log('検索実行:', text);
+        if (__DEV__) console.log('検索実行:', text);
         onSearch(text);
         pendingSearchRef.current = null;
       } else {
-        console.log('IME入力中のため検索をスキップ');
+        if (__DEV__) console.log('IME入力中のため検索をスキップ');
       }
       searchTimeoutRef.current = null;
     }, delayMs);
@@ -149,13 +185,13 @@ const SearchInputBase = forwardRef<SearchInputRef, SearchInputProps>(({
 
   // IME入力開始時のイベント処理
   const handleCompositionStart = () => {
-    console.log('IME composition started');
+    if (__DEV__) console.log('IME composition started');
     isComposingRef.current = true;
   };
   
   // IME入力終了時のイベント処理
   const handleCompositionEnd = () => {
-    console.log('IME composition ended');
+    if (__DEV__) console.log('IME composition ended');
     const currentText = localValue; // 現在の入力値を保存
     
     // IMEモードをリセット
@@ -164,7 +200,7 @@ const SearchInputBase = forwardRef<SearchInputRef, SearchInputProps>(({
     // IME入力確定時に保留中の検索を実行
     if (currentText) {
       // 即時検索を実行（遅延なし）
-      console.log('IME確定後に検索実行:', currentText);
+      if (__DEV__) console.log('IME確定後に検索実行:', currentText);
       onSearch(currentText);
       pendingSearchRef.current = null;
     }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import useColors from '../constants/colors';
+import { useColors } from '../constants/colors';
 import Header from '../components/Header';
 
 export default function NotesSettingsScreen() {
@@ -24,7 +24,8 @@ export default function NotesSettingsScreen() {
   const [categorizeNotes, setCategorizeNotes] = useState(true);
   const [showInChat, setShowInChat] = useState(true);
 
-  const styles = StyleSheet.create({
+  // colorsが変わった時だけスタイルを再計算
+  const styles = useMemo(() => StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: colors.background,
@@ -115,7 +116,7 @@ export default function NotesSettingsScreen() {
     dangerButtonText: {
       color: colors.error,
     },
-  });
+  }), [colors]);
 
   const handleClearNotes = () => {
     Alert.alert(

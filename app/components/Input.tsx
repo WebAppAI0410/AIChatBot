@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { TextInput, View, Text, StyleSheet, TextInputProps, ViewStyle } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { TextInput, View, Text, StyleSheet, TextInputProps, ViewStyle, NativeSyntheticEvent, TextInputFocusEventData, AccessibilityRole } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../ui/theme';
-import useColors from '../constants/colors';
+import { useColors } from '../constants/colors';
 
 type InputProps = TextInputProps & {
   label?: string;
@@ -25,19 +25,35 @@ const Input: React.FC<InputProps> = ({
   const colors = useColors();
   const [isFocused, setIsFocused] = useState(false);
   
-  const handleFocus = () => {
+  const handleFocus = (e: NativeSyntheticEvent<TextInputFocusEventData>) => {
     setIsFocused(true);
     if (textInputProps.onFocus) {
-      textInputProps.onFocus(null as any);
+      textInputProps.onFocus(e);
     }
   };
   
-  const handleBlur = () => {
+  const handleBlur = (e: NativeSyntheticEvent<TextInputFocusEventData>) => {
     setIsFocused(false);
     if (textInputProps.onBlur) {
-      textInputProps.onBlur(null as any);
+      textInputProps.onBlur(e);
     }
   };
+  
+  // アクセシビリティ状態の設定
+  const accessibilityState = useMemo(() => ({
+    disabled: textInputProps.editable === false,
+    error: !!error,
+  }), [textInputProps.editable, error]);
+  
+  // エラーメッセージがある場合のアクセシビリティヒント
+  const accessibilityHintWithError = useMemo(() => {
+    if (error) {
+      return textInputProps.accessibilityHint 
+        ? `${textInputProps.accessibilityHint}。エラー: ${error}` 
+        : `エラー: ${error}`;
+    }
+    return textInputProps.accessibilityHint;
+  }, [error, textInputProps.accessibilityHint]);
   
   return (
     <View style={[styles.container, containerStyle]}>
@@ -63,6 +79,8 @@ const Input: React.FC<InputProps> = ({
             size={20}
             color={colors.gray}
             style={styles.leftIcon}
+            accessibilityElementsHidden={true}
+            importantForAccessibility="no"
           />
         )}
         
@@ -76,6 +94,10 @@ const Input: React.FC<InputProps> = ({
           placeholderTextColor={colors.gray}
           onFocus={handleFocus}
           onBlur={handleBlur}
+          accessibilityLabel={textInputProps.accessibilityLabel || label}
+          accessibilityHint={accessibilityHintWithError}
+          accessibilityState={accessibilityState}
+          accessibilityRole="text"
           {...textInputProps}
         />
         
@@ -86,12 +108,15 @@ const Input: React.FC<InputProps> = ({
             color={colors.gray}
             style={styles.rightIcon}
             onPress={onRightIconPress}
+            accessibilityLabel={onRightIconPress ? `${rightIcon}ボタン` : undefined}
+            accessibilityRole={onRightIconPress ? "button" : undefined}
           />
         )}
       </View>
       
       {error && (
-        <Text style={[styles.error, { color: colors.error }]}>
+        <Text style={[styles.error, { color: colors.error }]}
+          accessibilityLiveRegion="polite">
           {error}
         </Text>
       )}

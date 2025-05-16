@@ -11,8 +11,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import useColors from '../constants/colors';
-import { MODELS, ModelType, MODEL_TIERS } from '../constants/models';
-import { PLANS } from '../constants/plans';
+import { MODELS, ModelType } from '../constants/models';
+import { PLANS, DAILY_LIMITS } from '../constants/plans';
 import { useTheme } from '../ui/ThemeProvider';
 import Badge from './Badge';
 import LocalModelStatusBadge from './LocalModelStatusBadge';
@@ -32,16 +32,46 @@ export default function ModelSelectModal({
 }: ModelSelectModalProps) {
   const localModelStatus = useStore(state => state.localModelStatus);
   const plan = useStore(state => state.plan);
+  const dailyImageGenCount = useStore(state => state.dailyImageGenCount);
+  const dailyModelQuotasCount = useStore(state => state.dailyModelQuotasCount || {});
+  const incrementModelUsageCount = useStore(state => state.incrementModelUsageCount);
   const colors = useColors();
   const { theme } = useTheme();
   
+  // モデルのクォータが残っているかチェック
+  const isModelQuotaAvailable = (model: ModelType) => {
+    // dailyLimitがないモデルは常に利用可能（プラン制限は別途チェック）
+    if (!model.dailyLimit) return true;
+    
+    // モデルIDベースの使用回数カウンターがなければ利用可能
+    if (!dailyModelQuotasCount[model.id]) return true;
+    
+    // 使用回数が制限未満かチェック
+    return dailyModelQuotasCount[model.id] < model.dailyLimit;
+  };
+  
   const handleModelSelect = (model: ModelType) => {
+    // ローカルモデルが準備できていない場合は選択不可
     if (model.isLocal && localModelStatus !== 'ready') {
-      onSelectModel(model.id);
-    } else {
-      onSelectModel(model.id);
+      return;
+    }
+
+    // プラン制限に引っかかり、かつ日次制限のないモデルは選択不可
+    if (!isModelAvailableForPlan(model) && !model.dailyLimit) {
+      return;
     }
     
+    // 日次制限があり、その制限に達したモデルは選択不可
+    if (model.dailyLimit && !isModelQuotaAvailable(model)) {
+      return;
+    }
+    
+    // モデル選択時に使用回数をインクリメント（dailyLimitがあるモデルのみ）
+    if (model.dailyLimit) {
+      incrementModelUsageCount(model.id);
+    }
+    
+    onSelectModel(model.id);
     onClose();
   };
   
@@ -60,6 +90,22 @@ export default function ModelSelectModal({
   const isModelAvailableForPlan = (model: ModelType) => {
     const availableTiers = getAvailableTiers();
     return availableTiers.includes(model.tier);
+  };
+  
+  // モデルが無効かどうかを判定する関数
+  const isModelDisabled = (model: ModelType) => {
+    // ローカルモデルの場合は準備状態をチェック
+    if (model.isLocal) {
+      return localModelStatus !== 'ready';
+    }
+    
+    // プランでの利用資格チェック
+    const planRestricted = !isModelAvailableForPlan(model) && !model.dailyLimit;
+    
+    // 日次制限のあるモデルは使用回数をチェック
+    const quotaRestricted = model.dailyLimit && !isModelQuotaAvailable(model);
+    
+    return planRestricted || quotaRestricted;
   };
   
   const getModelTierBadge = (model: ModelType) => {
@@ -84,10 +130,14 @@ export default function ModelSelectModal({
     }
     
     if (model.dailyLimit) {
+      // 使用回数を表示（残り回数ではなく使用済み/総数）
+      const usedCount = dailyModelQuotasCount[model.id] || 0;
+      const isQuotaExceeded = usedCount >= model.dailyLimit;
+      
       return (
         <Badge
-          label={`${model.dailyLimit}/日`}
-          variant="warning"
+          label={`${usedCount}/${model.dailyLimit}/日`}
+          variant={isQuotaExceeded ? "error" : "warning"}
           size="small"
           style={styles.tierBadge}
         />
@@ -267,37 +317,48 @@ export default function ModelSelectModal({
       fontSize: theme.fontSizes.xs,
       color: colors.secondaryText,
     },
+    quotaExceededText: {
+      fontSize: theme.fontSizes.xs, 
+      color: colors.error,
+      marginTop: 2,
+    },
   });
   
   const renderModelItem = ({ item }: { item: ModelType }) => {
     const isSelected = item.id === currentModelId;
-    const isDisabled = !isModelAvailableForPlan(item) && !item.dailyLimit;
+    const isDisabled = isModelDisabled(item);
+    const hasReachedQuota = item.dailyLimit && (dailyModelQuotasCount[item.id] || 0) >= (item.dailyLimit || 0);
     
     return (
       <TouchableOpacity
         style={[
           styles.modelItem,
-          isSelected && styles.selectedModelItem,
-          isDisabled && styles.disabledModelItem
+          isSelected ? styles.selectedModelItem : undefined,
+          isDisabled ? styles.disabledModelItem : undefined
         ]}
         onPress={() => handleModelSelect(item)}
-        disabled={false} // 制限はhandleModelSelectで処理
+        disabled={!!isDisabled}
       >
         <View style={styles.modelInfo}>
           <Text style={[
             styles.modelName,
-            isSelected && styles.selectedModelName,
-            isDisabled && styles.disabledModelName
+            isSelected ? styles.selectedModelName : undefined,
+            isDisabled ? styles.disabledModelName : undefined
           ]}>
             {item.name}
           </Text>
           <Text style={[
             styles.modelDescription,
-            isSelected && styles.selectedModelDescription,
-            isDisabled && styles.disabledModelDescription
+            isSelected ? styles.selectedModelDescription : undefined,
+            isDisabled ? styles.disabledModelDescription : undefined
           ]}>
             {item.description}
           </Text>
+          {hasReachedQuota && (
+            <Text style={styles.quotaExceededText}>
+              本日の利用上限に達しました
+            </Text>
+          )}
         </View>
         
         <View style={styles.modelRight}>
@@ -313,7 +374,7 @@ export default function ModelSelectModal({
             <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
           ) : (
             <View style={styles.radioOuter}>
-              {isSelected && <View style={styles.radioInner} />}
+              {isSelected ? <View style={styles.radioInner} /> : null}
             </View>
           )}
         </View>
