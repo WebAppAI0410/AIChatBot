@@ -19,17 +19,24 @@ export type ImageGenerationPanelProps = {
   prompt: string;
   onImageGenerated: (imageUrl: string, prompt: string, model: ImageModel) => void;
   onClose: () => void;
+  chatId?: string | null;
 };
 
 export type ImageGenerationPanelHandle = {
   generateImage: () => Promise<boolean>;
   canGenerate: () => boolean;
+  getSettings: () => {
+    size: ImageSize;
+    quality: ImageQuality;
+    model: ImageModel;
+  };
 };
 
 export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, ImageGenerationPanelProps>(({
   prompt,
   onImageGenerated,
   onClose,
+  chatId,
 }, ref) => {
   const {
     sdxlQuota,
@@ -115,6 +122,7 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
         quality,
         // 実際の使用時はクォータをチェック
         model: canUseDalle && model === 'dalle' ? 'dalle' : 'sdxl',
+        chatId, // chatIDを渡す
       });
       
       console.log('画像生成成功:', imageUrl.substring(0, 50) + '...');
@@ -149,7 +157,7 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
     } finally {
       setLoading(false);
     }
-  }, [prompt, size, quality, model, canUseDalle, generateImageFromStore, loading]);
+  }, [prompt, size, quality, model, canUseDalle, generateImageFromStore, loading, chatId]);
 
   // 親コンポーネントの送信ボタンが押されたときに呼び出される関数を公開
   useImperativeHandle(
@@ -166,9 +174,14 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
         }
         return false;
       },
-      canGenerate: () => currentQuota.remaining > 0 && Boolean(prompt.trim())
+      canGenerate: () => currentQuota.remaining > 0 && Boolean(prompt.trim()),
+      getSettings: () => ({
+        size,
+        quality,
+        model,
+      })
     }),
-    [handleGenerate, onImageGenerated, model, canUseDalle, currentQuota.remaining, prompt]
+    [handleGenerate, onImageGenerated, model, canUseDalle, currentQuota.remaining, prompt, size, quality]
   );
 
   // 現在選択されているサイズを表示用にフォーマット

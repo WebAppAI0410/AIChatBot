@@ -12,7 +12,7 @@ import {
   ScrollView
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import useStore from '../../app/store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,11 +44,18 @@ export default function ImageScreen() {
     incrementImageUsage,
     addGeneratedImage,
     theme: appTheme,
-    colorTheme
+    colorTheme,
+    createChat,
+    addMessage,
+    addImageMessage,
+    updateChatTitle,
+    getLastUsedModel,
+    chats
   } = useStore();
   
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showImagePanel, setShowImagePanel] = useState(false);
   const [prompt, setPrompt] = useState('');
@@ -80,13 +87,32 @@ export default function ImageScreen() {
     generatedPrompt: string,
     model: 'sdxl' | 'dalle' = 'sdxl' // デフォルト値を設定して後方互換性を保つ
   ) => {
-    // 生成が成功した場合
-    addGeneratedImage({
-      url: imageUrl,
-      prompt: generatedPrompt || prompt,
-      model,
-    });
+    // 最後に使用したモデルを取得
+    const modelToUse = getLastUsedModel();
     
+    // 新しいチャットを作成
+    const chatId = createChat(modelToUse); // 最後に使用したモデルを使用
+
+    // ユーザーのプロンプトをチャットに追加
+    addMessage(chatId, {
+      role: 'user',
+      content: generatedPrompt || prompt,
+    });
+
+    // 生成された画像をアシスタントの返信として追加
+    addImageMessage(chatId, {
+      role: 'assistant',
+      content: '生成された画像です',
+      imageUrl,
+    });
+
+    // タイトルをプロンプトベースに更新
+    const title = (generatedPrompt || prompt).slice(0, 30) + ((generatedPrompt || prompt).length > 30 ? '...' : '');
+    updateChatTitle(chatId, title);
+
+    // 注：addGeneratedImageは削除
+    // すでにimageStore内のgenerateImage関数内で自動的に呼ばれているため重複
+
     // 入力をクリア
     setPrompt('');
     
@@ -94,6 +120,12 @@ export default function ImageScreen() {
     if (showImagePanel) {
       setShowImagePanel(false);
     }
+
+    // オプションパネルを閉じる
+    setShowOptionsPanel(false);
+
+    // 作成されたチャットルームに移動
+    router.push(`/chat/${chatId}`);
   };
   
   // 送信ボタンハンドラ
@@ -107,16 +139,70 @@ export default function ImageScreen() {
       return;
     }
     
-    // オプションパネル経由で画像を生成
+    // 最後に使用したモデルを取得
+    const modelToUse = getLastUsedModel();
+    
+    // 先にチャットを作成
+    const chatId = createChat(modelToUse); // 最後に使用したモデルを使用
+    
+    // ユーザーのプロンプトをチャットに追加
+    addMessage(chatId, {
+      role: 'user',
+      content: prompt,
+    });
+    
+    // プロンプトに基づいてタイトルを設定
+    const title = prompt.slice(0, 30) + (prompt.length > 30 ? '...' : '');
+    updateChatTitle(chatId, title);
+    
+    // "生成中..."メッセージを追加
+    addMessage(chatId, {
+      role: 'assistant',
+      content: '画像を生成中...',
+    });
+    
+    // 即座にチャットルームに移行（クエリパラメータで画像モードをオンに）
+    router.push({
+      pathname: `/chat/${chatId}`,
+      params: { image_mode: 'true' }
+    });
+
+    // 画像生成処理はバックグラウンドで続行
     if (imagePanelRef.current) {
-      const success = await imagePanelRef.current.generateImage();
-      if (success) {
-        // handleImageGeneratedが呼ばれるので、ここでは何もしない
+      try {
+        // パネルの設定（サイズ/品質/モデル）を保持したまま画像生成を実行
+        generateImage({
+          prompt,
+          size: imagePanelRef.current.getSettings?.()?.size || '768x768',
+          quality: imagePanelRef.current.getSettings?.()?.quality || 'standard',
+          model: imagePanelRef.current.getSettings?.()?.model || 'sdxl',
+          chatId,
+        }).then(imageUrl => {
+          // 生成された画像をアシスタントの返信として追加（チャットルーム側で自動的に表示される）
+          addImageMessage(chatId, {
+            role: 'assistant',
+            content: '生成された画像です',
+            imageUrl,
+          });
+        }).catch(err => {
+          console.error('Image generation error:', err);
+          // エラーメッセージをチャットに追加
+          addMessage(chatId, {
+            role: 'assistant',
+            content: `画像生成に失敗しました: ${err.message || 'エラーが発生しました'}`,
+          });
+        });
+      } catch (err) {
+        console.error('Image generation error:', err);
       }
     } else {
-      // refがないケース（コンポーネントがまだマウントされていないなど）
       console.warn('ImageGenerationPanel reference is not available');
     }
+    
+    // 入力をクリア
+    setPrompt('');
+    // オプションパネルを閉じる
+    setShowOptionsPanel(false);
   };
   
   // チップをタップしたときの処理

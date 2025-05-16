@@ -31,7 +31,7 @@ import ChatBubble from '../components/ChatBubble';
 import { ImageGenerationPanel, ImageGenerationPanelHandle } from '../components/ImageGenerationPanel';
 
 export default function ChatScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, image_mode } = useLocalSearchParams<{ id: string; image_mode?: string }>();
   const router = useRouter();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -119,9 +119,7 @@ export default function ChatScreen() {
             content: responseContent,
           });
           
-          setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-          }, 100);
+          // 反転FlatListでは自動的に最新メッセージが表示されるのでスクロール不要
         } catch (error) {
           console.error('Error in auto API request:', error);
           
@@ -136,6 +134,13 @@ export default function ChatScreen() {
     }
   }, [chat?.id, chat?.messages, isLoading, addMessage]);
   
+  // ギャラリーから移行した場合、画像生成モードを自動的に有効化
+  useEffect(() => {
+    if (id && image_mode === 'true') {
+      setShowImageOptions(true);
+    }
+  }, [id, image_mode]);
+  
   const handleSend = async () => {
     if (!chat) return;
     
@@ -147,17 +152,48 @@ export default function ChatScreen() {
         return;
       }
       
+      // プロンプトをローカル変数に保存
+      const imagePrompt = input.trim();
+      
+      // プロンプトをユーザーメッセージとして即時追加
+      addMessage(chat.id, {
+        content: imagePrompt || '画像を生成してください',
+        role: 'user'
+      });
+
+      // 入力欄をクリア
+      setInput('');
+      
+      // 「生成中...」メッセージをアシスタントから一時的に表示
+      addMessage(chat.id, {
+        content: '画像を生成中...',
+        role: 'assistant'
+      });
+      
       // 画像生成開始
       setIsGenerating(true);
+      
+      // 反転FlatListでは自動的に最新メッセージが表示されるのでスクロール不要
       
       // 画像生成を実行（画像パネルから）
       try {
         const success = await imageGenPanelRef.current.generateImage();
-        if (!success) setIsGenerating(false);
+        if (!success) {
+          setIsGenerating(false);
+          // 生成に失敗した場合、新しいエラーメッセージを追加
+          addMessage(chat.id, {
+            content: '画像生成に失敗しました。もう一度お試しください。',
+            role: 'assistant'
+          });
+        }
       } catch (e) {
         console.error('Image generation failed:', e);
         setIsGenerating(false);
-        Alert.alert('エラー', '画像生成に失敗しました。もう一度お試しください。');
+        // 例外発生時も新しいエラーメッセージを追加
+        addMessage(chat.id, {
+          content: '画像生成中にエラーが発生しました。もう一度お試しください。',
+          role: 'assistant'
+        });
       }
       return;
     }
@@ -173,9 +209,7 @@ export default function ChatScreen() {
       content: trimmedInput,
     });
     
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    // 反転FlatListでは自動的に最新メッセージが表示されるのでスクロール不要
     
     setIsLoading(true);
     
@@ -224,9 +258,7 @@ export default function ChatScreen() {
     } finally {
       setIsLoading(false);
       
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 300);
+      // 反転FlatListでは自動的に最新メッセージが表示されるのでスクロール不要
     }
   };
 
@@ -242,27 +274,17 @@ export default function ChatScreen() {
     // モデル情報をログに出力
     if (__DEV__) console.log(`Image generated with model: ${model}`);
 
-    // 画像メッセージを追加
+    // 画像をアシスタントからの返信として追加
     addImageMessage(chat.id, {
-      content: promptText || '画像を生成しました',
+      content: '生成された画像です',
       imageUrl,
-      role: 'user'
+      role: 'assistant'
     });
 
-    // 画像オプションを閉じる
-    setShowImageOptions(false);
-
-    // AIの応答準備
-    setIsLoading(true);
+    // 生成完了ステータスを更新
     setIsGenerating(false);
     
-    setTimeout(() => {
-      addMessage(chat.id, {
-        role: 'assistant',
-        content: '生成された画像について何か質問がありますか？',
-      });
-      setIsLoading(false);
-    }, 500);
+    // 反転FlatListでは自動的に最新メッセージが表示されるのでスクロール不要
   };
 
   // 画像プレビュー表示
@@ -494,6 +516,8 @@ export default function ChatScreen() {
     messagesContainer: {
       padding: 16,
       paddingBottom: 32,
+      flexGrow: 1,
+      justifyContent: 'flex-end',
     },
     imagePanelModal: {
       flex: 1,
@@ -535,6 +559,16 @@ export default function ChatScreen() {
     );
   };
   
+  // スクロールの高さがコンテンツ高さより小さい場合は、自動スクロールを行わない
+  const handleContentSizeChange = () => {
+    if (!chat || chat.messages.length === 0) return;
+    
+    // 新規チャットや最初のメッセージが追加されたときは強制的にスクロール
+    if (chat.messages.length <= 3) {
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }
+  };
+
   if (!chat) {
     return (
       <View style={styles.container}>
@@ -601,12 +635,15 @@ export default function ChatScreen() {
               </View>
             )}
 
+            {/* チャットメッセージリスト */}
             <FlatList
               ref={flatListRef}
-              data={chat.messages}
+              data={[...chat.messages].reverse()} // メッセージの順序を逆にする
               keyExtractor={(item, index) => `${item.role}-${index}`}
               renderItem={renderMessage}
               contentContainerStyle={styles.messagesContainer}
+              inverted={true} // FlatListを反転
+              onContentSizeChange={handleContentSizeChange}
             />
           
             <View>

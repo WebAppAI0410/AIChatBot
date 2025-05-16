@@ -30,7 +30,7 @@ export interface GeneratedImage {
   prompt: string;
   model: 'sdxl' | 'dalle';
   createdAt: string;
-  chatId?: string;
+  chatId?: string | null;
 }
 
 export interface ImageState {
@@ -51,7 +51,7 @@ export interface ImageState {
     size: string;
     quality: string;
     model: 'sdxl' | 'dalle';
-    chatId?: string;
+    chatId?: string | null;
   }) => Promise<string>;
 
   incrementImageUsage: (model: 'sdxl' | 'dalle') => void;
@@ -60,7 +60,7 @@ export interface ImageState {
     url: string;
     prompt: string;
     model: 'sdxl' | 'dalle';
-    chatId?: string;
+    chatId?: string | null;
   }) => string;
   
   // 画像生成のモック版（開発用）

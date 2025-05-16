@@ -48,6 +48,7 @@ export interface ChatState {
   cancelDeleteChat: () => void;
   setCurrentChat: (chatId: string | null) => void;
   markChatAsRead: (chatId: string) => void;
+  getLastUsedModel: () => string;
 }
 
 // メッセージ追加の共通ロジック
@@ -178,6 +179,25 @@ export const createChatSlice: StateCreator<
         chat.id === chatId ? { ...chat, unreadCount: 0, messages: chat.messages.map(m => ({ ...m, isRead: true })) } : chat
       ),
     }));
+  },
+  getLastUsedModel: () => {
+    // 現在のチャットIDからモデルを取得
+    const currentChatId = get().currentChatId;
+    if (currentChatId) {
+      const currentChatModel = get().chats.find(chat => chat.id === currentChatId)?.modelId;
+      if (currentChatModel) return currentChatModel;
+    }
+    
+    // 現在のチャットがない場合は、最も最近更新されたチャットからモデルを取得
+    const chats = get().chats;
+    if (chats.length > 0) {
+      // 更新日時の降順でソート
+      const sortedChats = [...chats].sort((a, b) => b.updatedAt - a.updatedAt);
+      return sortedChats[0].modelId;
+    }
+    
+    // デフォルトモデル
+    return 'gpt-3.5-turbo';
   },
 });
 
