@@ -1,4 +1,6 @@
 import React, { useState, forwardRef, useImperativeHandle } from 'react';
+import { View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { 
   YStack, 
   Text, 
@@ -48,8 +50,13 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
 
   // モデル切り替え - SDXLとDALL-Eのトグル
   const toggleModel = () => {
-    if (canUseDalle) {
-      setModel(model === 'sdxl' ? 'dalle' : 'sdxl');
+    // 常に切り替え可能にする。ただし実際に使用する時はクォータをチェック
+    setModel(model === 'sdxl' ? 'dalle' : 'sdxl');
+    
+    // DALL-Eが使えない場合は警告を表示
+    if (model === 'sdxl' && !canUseDalle) {
+      console.warn('DALL-E 3はプレミアムプランでのみ利用可能です');
+      // ここで警告表示を出すこともできます
     }
   };
 
@@ -76,6 +83,7 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
         prompt,
         size,
         quality,
+        // 実際の使用時はクォータをチェック
         model: canUseDalle && model === 'dalle' ? 'dalle' : 'sdxl',
       });
 
@@ -106,46 +114,87 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
 
   return (
     <Container>
-      <XStack alignItems="center" justifyContent="space-between">
-        {/* トグルボタン群 */}
-        <XStack space="$2">
-          {/* モデル選択トグル */}
-          <ToggleButton 
-            backgroundColor={model === 'sdxl' ? '$blue9' : '$purple9'}
-            onPress={toggleModel}
-            disabled={!canUseDalle}
-          >
-            {model === 'sdxl' ? 'SDXL' : 'DALL-E'}
-          </ToggleButton>
+      {/* トグルボタン群と残り枚数を同じ行に配置 */}
+      <OptionsContainer>
+        {/* モデル選択トグル */}
+        <ToggleButton 
+          backgroundColor={model === 'sdxl' ? '$blue9' : '$purple9'}
+          borderColor={!canUseDalle && model === 'dalle' ? '$red10' : undefined}
+          borderWidth={!canUseDalle && model === 'dalle' ? 1 : 0}
+          onPress={toggleModel}
+          flex={1}
+        >
+          <ToggleButtonContent>
+            <Ionicons 
+              name={model === 'sdxl' ? 'color-palette' : 'flask'} 
+              size={20} 
+              color="white" 
+              style={{ marginRight: 4 }}
+            />
+            <ToggleButtonText>
+              {model === 'sdxl' ? 'SDXL' : 'DALL-E'}
+            </ToggleButtonText>
+            <Ionicons name="chevron-forward" size={16} color="white" style={{ marginLeft: 2 }} />
+          </ToggleButtonContent>
+        </ToggleButton>
 
-          {/* サイズ選択トグル */}
-          <ToggleButton
-            backgroundColor="$green9"
-            onPress={toggleSize}
-          >
-            {size.split('x')[0]}
-          </ToggleButton>
+        {/* サイズ選択トグル */}
+        <ToggleButton
+          backgroundColor="$green9"
+          onPress={toggleSize}
+          flex={1}
+        >
+          <ToggleButtonContent>
+            <Ionicons name="resize-outline" size={20} color="white" style={{ marginRight: 4 }} />
+            <ToggleButtonText>
+              {size.split('x')[0]}
+            </ToggleButtonText>
+            <Ionicons name="chevron-forward" size={16} color="white" style={{ marginLeft: 2 }} />
+          </ToggleButtonContent>
+        </ToggleButton>
 
-          {/* 品質選択トグル */}
-          <ToggleButton
-            backgroundColor={quality === 'standard' ? '$amber9' : '$orange9'}
-            onPress={toggleQuality}
-          >
-            {quality === 'standard' ? '標準' : '高'}
-          </ToggleButton>
-        </XStack>
+        {/* 品質選択トグル */}
+        <ToggleButton
+          backgroundColor={quality === 'standard' ? '$amber9' : '$orange9'}
+          onPress={toggleQuality}
+          flex={1}
+        >
+          <ToggleButtonContent>
+            <Ionicons 
+              name={quality === 'standard' ? 'speedometer-outline' : 'diamond-outline'} 
+              size={20} 
+              color="white" 
+              style={{ marginRight: 4 }}
+            />
+            <ToggleButtonText>
+              {quality === 'standard' ? '標準' : '高品質'}
+            </ToggleButtonText>
+            <Ionicons name="swap-horizontal" size={16} color="white" style={{ marginLeft: 2 }} />
+          </ToggleButtonContent>
+        </ToggleButton>
 
         {/* 残り回数表示 */}
-        <Text color="$gray11" fontSize="$2">
-          残り: {currentQuota.remaining}/{currentQuota.total}
-        </Text>
-      </XStack>
+        <QuotaDisplay>
+          <Text color="$gray11" fontSize="$2" fontWeight="500">
+            残り: {currentQuota.remaining}/{currentQuota.total}
+          </Text>
+        </QuotaDisplay>
+      </OptionsContainer>
 
       {/* エラー表示 */}
       {generationError && (
-        <Text color="$red10" fontSize="$2" mt="$1">
+        <ErrorText>
+          <Ionicons name="alert-circle" size={14} color="#e53935" style={{marginRight: 4}} />
           {generationError}
-        </Text>
+        </ErrorText>
+      )}
+
+      {/* DALL-E利用不可の警告 */}
+      {model === 'dalle' && !canUseDalle && (
+        <WarningText>
+          <Ionicons name="warning" size={14} color="#f57c00" style={{marginRight: 4}} />
+          DALL-E 3はプレミアムプランでのみ利用可能です
+        </WarningText>
       )}
     </Container>
   );
@@ -153,15 +202,76 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
 
 const Container = styled(YStack, {
   padding: '$2',
-  paddingVertical: '$1',
+  paddingVertical: '$2',
   borderTopWidth: 1,
   borderTopColor: '$borderColor',
+  backgroundColor: '$background',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: -2 },
+  shadowOpacity: 0.05,
+  shadowRadius: 3,
+  elevation: 2,
+});
+
+const OptionsContainer = styled(XStack, {
+  space: "$2",
+  alignItems: "center",
+  justifyContent: "space-between",
+  borderRadius: '$4',
+  backgroundColor: '$backgroundHover',
+});
+
+const QuotaDisplay = styled(View, {
+  paddingHorizontal: '$2',
+  backgroundColor: '$backgroundHover',
+  borderRadius: '$2',
+  paddingVertical: '$1',
 });
 
 const ToggleButton = styled(Button, {
   paddingHorizontal: '$3',
-  paddingVertical: '$1',
+  paddingVertical: '$3',
+  height: 50,
+  minHeight: 50,
   borderRadius: '$4',
-  fontSize: '$2',
+  fontSize: '$3',
   color: 'white',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 2,
+  elevation: 3,
+  pressStyle: {
+    opacity: 0.8,
+    scale: 0.98,
+  },
+});
+
+const ToggleButtonContent = styled(XStack, {
+  alignItems: 'center',
+  justifyContent: 'center',
+  space: '$2',
+});
+
+const ToggleButtonText = styled(Text, {
+  color: 'white',
+  fontSize: '$3',
+  fontWeight: 'bold',
+}); 
+
+const ErrorText = styled(Text, {
+  color: '$red10',
+  fontSize: '$2',
+  mt: '$2',
+  flexDirection: 'row',
+  alignItems: 'center',
+  display: 'flex',
+});
+
+const WarningText = styled(Text, {
+  color: '$orange10',
+  fontSize: '$2',
+  mt: '$2',
+  flexDirection: 'row',
+  alignItems: 'center',
+  display: 'flex',
 }); 
