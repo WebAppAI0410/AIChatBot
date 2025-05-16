@@ -9,6 +9,7 @@ import {
   styled,
 } from 'tamagui';
 import useStore from '../store';
+import useColors from '../constants/colors';
 
 export type ImageSize = '512x512' | '768x768' | '1024x1024';
 export type ImageQuality = 'standard' | 'hd';
@@ -38,6 +39,7 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
     generationError
   } = useStore();
 
+  const colors = useColors();
   const [size, setSize] = useState<ImageSize>('768x768');
   const [quality, setQuality] = useState<ImageQuality>('standard');
   const [model, setModel] = useState<ImageModel>('sdxl');
@@ -113,9 +115,9 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
   );
 
   return (
-    <Container>
+    <Container style={{ backgroundColor: colors.background, borderTopColor: colors.border }}>
       {/* トグルボタン群と残り枚数を同じ行に配置 */}
-      <OptionsContainer>
+      <OptionsContainer style={{ backgroundColor: colors.lightGray }}>
         {/* モデル選択トグル */}
         <ToggleButton 
           backgroundColor={model === 'sdxl' ? '$blue9' : '$purple9'}
@@ -177,13 +179,13 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
         </ToggleButton>
 
         {/* 残り回数表示 */}
-        <QuotaDisplay>
+        <QuotaDisplay style={{ backgroundColor: colors.lightGray }}>
           {storeIsGenerating ? (
             <Text color="$blue10" fontSize="$2" fontWeight="500">
               生成中...
             </Text>
           ) : (
-            <Text color="$gray11" fontSize="$2" fontWeight="500">
+            <Text color={colors.text} fontSize="$2" fontWeight="500">
               残り: {currentQuota.remaining}/{currentQuota.total}
             </Text>
           )}

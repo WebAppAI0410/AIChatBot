@@ -15,7 +15,7 @@ import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import useStore from '../../app/store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { styled } from 'tamagui';
+import { styled, YStack, XStack } from 'tamagui';
 import { ImageGenerationPanel, ImageGenerationPanelHandle } from '../../app/components/ImageGenerationPanel';
 import useColors from '../constants/colors';
 import theme from '../ui/theme';
@@ -37,7 +37,9 @@ export default function ImageScreen() {
     generateImage,
     isGenerating,
     incrementImageUsage,
-    addGeneratedImage
+    addGeneratedImage,
+    theme: appTheme,
+    colorTheme
   } = useStore();
   
   const colors = useColors();
@@ -46,6 +48,7 @@ export default function ImageScreen() {
   const [showImagePanel, setShowImagePanel] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [fullScreenMode, setFullScreenMode] = useState(false);
+  const [showOptionsPanel, setShowOptionsPanel] = useState(false);
   
   // ImageGenerationPanelへの参照
   const imagePanelRef = useRef<ImageGenerationPanelHandle>(null);
@@ -93,12 +96,21 @@ export default function ImageScreen() {
     setPrompt(suggestion);
   };
 
+  // オプションパネルの表示を切り替え
+  const toggleOptionsPanel = () => {
+    setShowOptionsPanel(!showOptionsPanel);
+  };
+
   return (
     <KeyboardAvoidingView 
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={{ flex: 1, paddingTop: insets.top }}>
+      <View style={{ 
+        flex: 1, 
+        paddingTop: insets.top,
+        backgroundColor: colors.background
+      }}>
         <Stack.Screen
           options={{
             headerShown: false,
@@ -112,9 +124,14 @@ export default function ImageScreen() {
           alignItems: 'center',
           padding: 16,
           borderBottomWidth: 1,
-          borderBottomColor: '#e0e0e0'
+          borderBottomColor: colors.border,
+          backgroundColor: colors.background
         }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold' }}>画像ギャラリー</Text>
+          <Text style={{ 
+            fontSize: 20, 
+            fontWeight: 'bold',
+            color: colors.text 
+          }}>画像ギャラリー</Text>
 
           <TouchableOpacity
             style={{
@@ -128,7 +145,7 @@ export default function ImageScreen() {
               setShowImagePanel(true);
             }}
           >
-            <Text style={{ color: 'white' }}>詳細設定</Text>
+            <Text style={{ color: colors.textOnPrimary }}>詳細設定</Text>
           </TouchableOpacity>
         </View>
 
@@ -137,27 +154,27 @@ export default function ImageScreen() {
           flexDirection: 'row', 
           justifyContent: 'space-between', 
           padding: 16,
-          backgroundColor: '#f5f5f5'
+          backgroundColor: colors.card
         }}>
-          <Text>
+          <Text style={{ color: colors.text }}>
             SDXL: 残り {sdxlQuota.remaining}/{sdxlQuota.total}
           </Text>
           {dalleQuota.total > 0 && (
-            <Text>
+            <Text style={{ color: colors.text }}>
               DALL·E: 残り {dalleQuota.remaining}/{dalleQuota.total}
             </Text>
           )}
         </View>
 
         {/* サジェスチョンチップ */}
-        <View style={styles.chipContainer}>
+        <View style={[styles.chipContainer, { backgroundColor: colors.background }]}>
           {SUGGESTIONS.map((suggestion, index) => (
             <TouchableOpacity
               key={index}
-              style={styles.chip}
+              style={[styles.chip, { backgroundColor: colors.lightGray }]}
               onPress={() => handleChipPress(suggestion)}
             >
-              <Text style={styles.chipText}>{suggestion}</Text>
+              <Text style={[styles.chipText, { color: colors.text }]}>{suggestion}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -175,8 +192,8 @@ export default function ImageScreen() {
                 <View style={{ 
                   borderRadius: 12, 
                   overflow: 'hidden',
-                  backgroundColor: '#ffffff',
-                  shadowColor: "#000",
+                  backgroundColor: colors.card,
+                  shadowColor: colors.text,
                   shadowOffset: {
                     width: 0,
                     height: 2,
@@ -214,49 +231,92 @@ export default function ImageScreen() {
             )}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ padding: 4 }}
+            style={{ backgroundColor: colors.background }}
           />
         ) : (
-          <View style={styles.emptyContainer}>
-            <Text style={{ textAlign: 'center' }}>
+          <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
+            <Text style={{ textAlign: 'center', color: colors.text }}>
               まだ画像がありません。下のチャット入力から生成してみましょう。
             </Text>
           </View>
         )}
 
         {/* 画像生成チャット入力 (非モーダル) */}
-        <View style={styles.inputContainer}>
+        <View style={[
+          styles.inputContainer, 
+          { 
+            borderTopColor: colors.border,
+            backgroundColor: colors.background 
+          }
+        ]}>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              { 
+                backgroundColor: colors.lightGray,
+                color: colors.text
+              }
+            ]}
             value={prompt}
             onChangeText={setPrompt}
             placeholder="画像の説明を入力..."
+            placeholderTextColor={colors.gray}
             multiline
           />
           <TouchableOpacity
+            style={styles.optionsButton}
+            onPress={toggleOptionsPanel}
+          >
+            <Ionicons name={showOptionsPanel ? "chevron-down" : "options-outline"} size={24} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[
               styles.sendButton,
-              !prompt.trim() ? styles.sendButtonDisabled : null
+              !prompt.trim() ? styles.sendButtonDisabled : { backgroundColor: colors.primary },
             ]}
             onPress={handleSend}
             disabled={!prompt.trim() || isGenerating}
           >
             {isGenerating ? (
-              <Ionicons name="sync" size={24} color="white" />
+              <Ionicons name="sync" size={24} color={colors.textOnPrimary} />
             ) : (
-              <Ionicons name="sparkles-outline" size={24} color="white" />
+              <Ionicons name="sparkles-outline" size={24} color={colors.textOnPrimary} />
             )}
           </TouchableOpacity>
         </View>
 
+        {/* オプション選択パネル - チャットルームと同じUIを実装 */}
+        {showOptionsPanel && (
+          <View style={{ 
+            backgroundColor: colors.background, 
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+            shadowColor: colors.text,
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 3,
+            elevation: 2,
+          }}>
+            <ImageGenerationPanel
+              ref={imagePanelRef}
+              prompt={prompt}
+              onImageGenerated={handleImageGenerated}
+              onClose={() => {}}
+            />
+          </View>
+        )}
+
         {/* 非表示のImageGenerationPanel (参照用) */}
-        <View style={{ height: 0, overflow: 'hidden' }}>
-          <ImageGenerationPanel
-            ref={imagePanelRef}
-            prompt={prompt}
-            onImageGenerated={handleImageGenerated}
-            onClose={() => {}}
-          />
-        </View>
+        {!showOptionsPanel && (
+          <View style={{ height: 0, overflow: 'hidden' }}>
+            <ImageGenerationPanel
+              ref={imagePanelRef}
+              prompt={prompt}
+              onImageGenerated={handleImageGenerated}
+              onClose={() => {}}
+            />
+          </View>
+        )}
 
         {/* 画像詳細モーダル */}
         <Modal
@@ -308,14 +368,20 @@ export default function ImageScreen() {
             backgroundColor: 'rgba(0,0,0,0.4)'
           }}>
             <View style={{
-              backgroundColor: 'white',
+              backgroundColor: colors.background,
               borderTopLeftRadius: 16,
               borderTopRightRadius: 16,
               maxHeight: '80%'
             }}>
               {/* ヘッダーとクローズボタン */}
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>詳細設定</Text>
+              <View style={[
+                styles.modalHeader, 
+                { 
+                  borderBottomColor: colors.border,
+                  backgroundColor: colors.background
+                }
+              ]}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>詳細設定</Text>
                 <TouchableOpacity onPress={() => setShowImagePanel(false)}>
                   <Ionicons name="close" size={24} color={colors.text} />
                 </TouchableOpacity>
@@ -372,6 +438,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     maxHeight: 120,
     fontSize: 16,
+  },
+  optionsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
   sendButton: {
     backgroundColor: '#6366f1',
