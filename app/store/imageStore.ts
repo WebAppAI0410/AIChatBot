@@ -1,5 +1,6 @@
 import { StateCreator } from 'zustand';
 import { StoreState } from './index';
+import { generateImage as apiGenerateImage } from '../services/api';
 
 // モック用の画像URL（実装初期段階で使用）
 const MOCK_IMAGES = [
@@ -105,11 +106,12 @@ export const createImageSlice: StateCreator<
     try {
       set({ isGenerating: true, generationError: null });
 
-      // 開発初期段階ではモック実装を使用
-      const imageUrl = await get().generateImageMock({
+      // 実際のAPIを呼び出し
+      const imageUrl = await apiGenerateImage({
         prompt,
-        model,
-        chatId
+        size,
+        quality,
+        model
       });
 
       // 生成履歴に追加

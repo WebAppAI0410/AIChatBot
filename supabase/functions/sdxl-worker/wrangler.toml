@@ -1,0 +1,6 @@
+name = "sdxl-worker"
+main = "index.ts"
+compatibility_date = "2023-09-04"
+
+[ai]
+binding = "AI" 

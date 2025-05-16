@@ -123,6 +123,7 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
           borderWidth={!canUseDalle && model === 'dalle' ? 1 : 0}
           onPress={toggleModel}
           flex={1}
+          disabled={storeIsGenerating}
         >
           <ToggleButtonContent>
             <Ionicons 
@@ -143,6 +144,7 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
           backgroundColor="$green9"
           onPress={toggleSize}
           flex={1}
+          disabled={storeIsGenerating}
         >
           <ToggleButtonContent>
             <Ionicons name="resize-outline" size={20} color="white" style={{ marginRight: 4 }} />
@@ -158,6 +160,7 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
           backgroundColor={quality === 'standard' ? '$amber9' : '$orange9'}
           onPress={toggleQuality}
           flex={1}
+          disabled={storeIsGenerating}
         >
           <ToggleButtonContent>
             <Ionicons 
@@ -175,9 +178,15 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
 
         {/* 残り回数表示 */}
         <QuotaDisplay>
-          <Text color="$gray11" fontSize="$2" fontWeight="500">
-            残り: {currentQuota.remaining}/{currentQuota.total}
-          </Text>
+          {storeIsGenerating ? (
+            <Text color="$blue10" fontSize="$2" fontWeight="500">
+              生成中...
+            </Text>
+          ) : (
+            <Text color="$gray11" fontSize="$2" fontWeight="500">
+              残り: {currentQuota.remaining}/{currentQuota.total}
+            </Text>
+          )}
         </QuotaDisplay>
       </OptionsContainer>
 
