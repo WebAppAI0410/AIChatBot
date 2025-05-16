@@ -6,7 +6,7 @@ const CLOUDFLARE_WORKERS_API_URL = 'https://sdxl-worker.webapptest0410.workers.d
 // OpenAI API URL
 const OPENAI_API_URL = 'https://api.openai.com/v1';
 
-// APIキー（環境変数またはSecrets経由で設定）
+// APIキー（環境変数から取得）
 const CLOUDFLARE_API_KEY = Deno.env.get('CLOUDFLARE_API_KEY') || '';
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') || '';
 
