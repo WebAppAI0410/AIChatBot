@@ -6,15 +6,24 @@ const CLOUDFLARE_WORKERS_API_URL = 'https://sdxl-worker.webapptest0410.workers.d
 // OpenAI API URL
 const OPENAI_API_URL = 'https://api.openai.com/v1';
 
-// APIキー（環境変数から取得）
+// APIキー（環境変数またはSecrets経由で設定）
 const CLOUDFLARE_API_KEY = Deno.env.get('CLOUDFLARE_API_KEY') || '';
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') || '';
+
+// ストレージ設定
+const STORAGE_BUCKET = 'user-content';
+const IMAGE_EXPIRY_DAYS = 7; // 画像の有効期限（日数）
 
 // Supabaseクライアント
 const supabaseAdmin = createClient(
   Deno.env.get('SUPABASE_URL') || '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 );
+
+// デバッグログ追加
+console.log('Edge Function starting...');
+console.log('OPENAI_API_KEY present:', OPENAI_API_KEY ? 'Yes' : 'No');
+console.log('CLOUDFLARE_API_KEY present:', CLOUDFLARE_API_KEY ? 'Yes' : 'No');
 
 Deno.serve(async (req) => {
   // CORSヘッダー
@@ -41,7 +50,13 @@ Deno.serve(async (req) => {
 
   try {
     // リクエストボディを解析
-    const { prompt, size = '768x768', quality = 'standard', model = 'sdxl' } = await req.json();
+    const { 
+      prompt, 
+      size = '768x768', 
+      quality = 'standard', 
+      model = 'sdxl',
+      returnType = 'url' // 'url'または'base64'
+    } = await req.json();
 
     // 必須パラメータの検証
     if (!prompt || typeof prompt !== 'string') {
@@ -54,9 +69,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`画像生成リクエスト - モデル: ${model}, サイズ: ${size}, 品質: ${quality}`);
+    console.log(`画像生成リクエスト - モデル: ${model}, サイズ: ${size}, 品質: ${quality}, 返却形式: ${returnType}`);
 
-    let imageUrl;
+    let imageResult;
+    let forceBase64 = returnType === 'base64';
 
     if (model === 'dalle') {
       // DALL-E 3経由で画像を生成
@@ -75,7 +91,7 @@ Deno.serve(async (req) => {
             n: 1,
             size,
             quality,
-            response_format: 'url',
+            response_format: forceBase64 ? 'b64_json' : 'url',
           }),
         });
 
@@ -88,8 +104,19 @@ Deno.serve(async (req) => {
         const data = await response.json();
         console.log('DALL-E画像生成成功');
         
-        // DALL-Eの場合は直接URLを返す
-        imageUrl = data.data[0].url;
+        if (forceBase64) {
+          // Base64形式で返す
+          imageResult = {
+            dataUrl: `data:image/png;base64,${data.data[0].b64_json}`,
+            contentType: 'image/png'
+          };
+        } else {
+          // URLで返す
+          imageResult = {
+            url: data.data[0].url,
+            contentType: 'image/png'
+          };
+        }
       } catch (error) {
         console.error('DALL-E API Error:', error);
         return new Response(JSON.stringify({ error: `DALL-E画像生成に失敗しました: ${error.message}` }), {
@@ -129,34 +156,87 @@ Deno.serve(async (req) => {
           throw new Error('SDXL画像生成に失敗しました: ' + errorText);
         }
 
-        console.log('SDXL画像生成成功、Supabaseストレージに保存中');
+        console.log('SDXL画像生成成功');
         
         // バイナリデータを取得
         const imageArrayBuffer = await sdxlResponse.arrayBuffer();
+        const contentType = sdxlResponse.headers.get('content-type') || 'image/png';
         
-        // ファイル名を生成
-        const fileName = `images/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.png`;
+        // 常にBase64データを準備（ストレージ保存に失敗した場合のフォールバック用）
+        const base64 = btoa(
+          new Uint8Array(imageArrayBuffer).reduce(
+            (data, byte) => data + String.fromCharCode(byte),
+            ''
+          )
+        );
         
-        // Supabaseストレージに画像を保存
-        const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-          .from('user-content')
-          .upload(fileName, imageArrayBuffer, {
-            contentType: 'image/png',
-            cacheControl: '3600',
-          });
+        if (forceBase64) {
+          // Base64形式で返す
+          imageResult = {
+            dataUrl: `data:${contentType};base64,${base64}`,
+            contentType
+          };
+          
+          console.log('画像をBase64データURLとして返します');
+        } else {
+          try {
+            // 有効期限を計算
+            const expiry = new Date();
+            expiry.setDate(expiry.getDate() + IMAGE_EXPIRY_DAYS);
+            const expiryTimestamp = expiry.getTime();
+            
+            // 有効期限を含むファイル名を生成
+            const fileName = `images/${Date.now()}_exp${expiryTimestamp}_${Math.random().toString(36).substring(2, 9)}.png`;
+            
+            console.log(`Supabaseストレージに画像を保存中: ${fileName}`);
+            
+            // Supabaseストレージに画像を保存
+            const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+              .from(STORAGE_BUCKET)
+              .upload(fileName, imageArrayBuffer, {
+                contentType,
+                cacheControl: '3600',
+                upsert: true,
+                metadata: {
+                  expiry: String(expiryTimestamp)
+                }
+              });
 
-        if (uploadError) {
-          console.error('Storage upload error:', uploadError);
-          throw new Error(`ストレージアップロードに失敗しました: ${uploadError.message}`);
+            if (uploadError) {
+              console.error('Storage upload error:', uploadError);
+              // ストレージ保存に失敗した場合、Base64データにフォールバック
+              console.log('ストレージ保存に失敗したため、Base64データにフォールバック');
+              imageResult = {
+                dataUrl: `data:${contentType};base64,${base64}`,
+                contentType,
+                fallback: true,
+                error: uploadError.message
+              };
+            } else {
+              // 公開URLを取得
+              const { data: urlData } = supabaseAdmin.storage
+                .from(STORAGE_BUCKET)
+                .getPublicUrl(fileName);
+
+              imageResult = {
+                url: urlData.publicUrl,
+                contentType,
+                expiry: expiryTimestamp,
+                expiryDate: expiry.toISOString()
+              };
+              console.log('画像をURLとして返します');
+            }
+          } catch (storageError) {
+            console.error('Storage operation error:', storageError);
+            // ストレージ操作に失敗した場合、Base64データにフォールバック
+            imageResult = {
+              dataUrl: `data:${contentType};base64,${base64}`,
+              contentType,
+              fallback: true,
+              error: storageError.message
+            };
+          }
         }
-
-        // 公開URLを取得
-        const { data: urlData } = supabaseAdmin.storage
-          .from('user-content')
-          .getPublicUrl(fileName);
-
-        imageUrl = urlData.publicUrl;
-        console.log('画像保存成功:', imageUrl);
       } catch (error) {
         console.error('SDXL or Storage Error:', error);
         return new Response(JSON.stringify({ error: `画像生成または保存に失敗しました: ${error.message}` }), {
@@ -169,8 +249,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 生成された画像URLを返す
-    return new Response(JSON.stringify({ url: imageUrl }), {
+    // 生成された画像の結果を返す
+    return new Response(JSON.stringify(imageResult), {
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'

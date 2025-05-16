@@ -15,7 +15,7 @@ type ChatBubbleProps = {
 const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onImagePress, onLongPress }) => {
   const isUser = message.role === 'user';
   const colors = useColors();
-
+  
   // 画像URLを含むかチェック
   const hasImage = message.imageUrl !== undefined;
   
@@ -41,8 +41,8 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onImagePress, onLongPr
     <Pressable
       onLongPress={onLongPress}
       style={[
-        styles.messageContainer,
-        isUser ? styles.userMessageContainer : styles.assistantMessageContainer
+      styles.messageContainer,
+      isUser ? styles.userMessageContainer : styles.assistantMessageContainer
       ]}
     >
       <View style={[
