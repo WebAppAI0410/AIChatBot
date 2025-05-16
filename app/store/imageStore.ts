@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand';
 import { StoreState } from './index';
 import { generateImage as apiGenerateImage } from '../services/api';
+import { UserPlan } from './userStore';
 
 // モック用の画像URL（実装初期段階で使用）
 const MOCK_IMAGES = [
@@ -8,6 +9,13 @@ const MOCK_IMAGES = [
   'https://images.unsplash.com/photo-1682685797769-481b48222608',
   'https://images.unsplash.com/photo-1686937871119-a9f2f2ecd610'
 ];
+
+// プラン別クォータ設定
+const QUOTA_LIMITS = {
+  free: { sdxl: 5, dalle: 0 },
+  lite: { sdxl: 15, dalle: 1 },
+  premium: { sdxl: 50, dalle: 5 },
+};
 
 export interface ImageQuota {
   total: number;
@@ -124,6 +132,9 @@ export const createImageSlice: StateCreator<
 
       // 使用カウント増加
       get().incrementImageUsage(model);
+      
+      // ユーザーストアの画像生成カウントも増加
+      get().incrementImageGenCount();
 
       return imageUrl;
     } catch (error: any) {
@@ -169,34 +180,31 @@ export const createImageSlice: StateCreator<
 
   // クォータリセット（日次）
   resetDailyQuotas: () => {
-    // プランに基づいてクォータを設定
-    // 現段階ではユーザーストアが未実装のため、プランの参照は簡易実装
-    const userPlan = 'free'; // ここは後でuserStore.getState().planから取得する
+    // ユーザーストアからプランを取得
+    const userPlan = get().plan || 'free';
     
-    // プラン別クォータ設定
-    const quotas = {
-      free: { sdxl: 5, dalle: 0 },
-      lite: { sdxl: 15, dalle: 1 },
-      premium: { sdxl: 50, dalle: 5 },
-    };
+    // プラン別クォータ設定から制限を取得
+    const quotas = QUOTA_LIMITS;
 
-    const plan = userPlan || 'free';
     const resetDate = new Date(new Date().setHours(0, 0, 0, 0) + 24 * 60 * 60 * 1000).toISOString();
 
     set({
       sdxlQuota: {
-        total: quotas[plan].sdxl,
+        total: quotas[userPlan].sdxl,
         used: 0,
-        remaining: quotas[plan].sdxl,
+        remaining: quotas[userPlan].sdxl,
         resetDate,
       },
       dalleQuota: {
-        total: quotas[plan].dalle,
+        total: quotas[userPlan].dalle,
         used: 0,
-        remaining: quotas[plan].dalle,
+        remaining: quotas[userPlan].dalle,
         resetDate,
       },
     });
+    
+    // ユーザーストアの画像生成カウントもリセット
+    get().resetImageGenCount();
   },
 
   // 生成履歴に追加

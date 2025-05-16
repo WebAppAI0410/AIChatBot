@@ -120,6 +120,15 @@ export function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="image"
+        options={{
+          title: '画像',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="image-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="notes"
         options={{
           title: 'ノート',

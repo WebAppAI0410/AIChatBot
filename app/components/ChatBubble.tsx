@@ -17,7 +17,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onImagePress, onLongPr
   const colors = useColors();
   
   // 画像URLを含むかチェック
-  const hasImage = message.imageUrl !== undefined;
+  const hasImage = message.imageUrl !== undefined && message.imageUrl !== null;
   
   // タイムスタンプをフォーマット
   const formattedTime = new Date(message.timestamp).toLocaleTimeString();
@@ -30,7 +30,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onImagePress, onLongPr
         prompt={message.content}
         timestamp={formattedTime}
         isSent={isUser}
-        onPress={() => onImagePress?.(message.imageUrl!)}
+        onPress={() => onImagePress && message.imageUrl ? onImagePress(message.imageUrl) : undefined}
         onLongPress={onLongPress}
       />
     );
