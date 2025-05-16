@@ -3,10 +3,10 @@ import { MODELS } from '../constants/models';
 import Constants from 'expo-constants';
 
 // Supabase Edge FunctionのURL
-const SUPABASE_URL = Constants.expoConfig?.extra?.SUPABASE_URL!;
+const SUPABASE_URL = Constants.expoConfig?.extra?.supabaseUrl!;
 const SUPABASE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/openrouter-proxy`;
 const SUPABASE_IMAGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/image-generator`;
-const SUPABASE_ANON_KEY = Constants.expoConfig?.extra?.SUPABASE_ANON_KEY!;
+const SUPABASE_ANON_KEY = Constants.expoConfig?.extra?.supabaseAnonKey!;
 
 // 画像生成API用のエンドポイント
 // ⚠️注: すべてのAPIキーはSupabase Edge Functionで管理するため
@@ -99,6 +99,57 @@ const normalizeModelId = (modelId: string): string => {
   }
   
   return `openai/${modelId}`;
+};
+
+/**
+ * ネットワークエラー時の再試行ロジック
+ * リトライ間隔を指数バックオフで増加させる
+ * @param fn 実行する関数
+ * @param maxRetries 最大再試行回数
+ */
+const withNetworkRetry = async <T>(
+  fn: () => Promise<T>, 
+  maxRetries = 3
+): Promise<T> => {
+  let lastError: any;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      // 最初の試行または再試行
+      if (attempt > 0) {
+        // 指数バックオフ（最初は500ms、次は1000ms、2000ms...）
+        const delay = Math.min(500 * Math.pow(2, attempt - 1), 10000);
+        console.log(`リトライ ${attempt}/${maxRetries}... ${delay}ms後`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      
+      return await fn();
+    } catch (error: any) {
+      console.error(`試行 ${attempt + 1}/${maxRetries + 1} 失敗:`, error.message || error);
+      lastError = error;
+      
+      // Network request failedエラーを明示的に検知してログ出力
+      if (error.message && error.message.includes('Network request failed')) {
+        console.error('Network request failed検出: Supabase Edge Functionへの接続が一時的に失敗しました');
+        // ネットワークエラーは再試行対象なので続行
+      }
+      // 永続的なエラーの場合は即時終了（再試行しない）
+      else if (
+        // 401/403はJWT認証の問題、402は支払い問題など、再試行しても解決しない
+        error.status === 401 || 
+        error.status === 402 ||
+        error.status === 403 ||
+        // 400はリクエスト形式の問題
+        error.status === 400
+      ) {
+        console.error('永続的なエラー、再試行をスキップします:', error);
+        break;
+      }
+    }
+  }
+  
+  // すべての再試行が失敗した場合、最後のエラーをスロー
+  throw lastError;
 };
 
 /**
@@ -224,92 +275,100 @@ export const fetchChatCompletion = async (
       max_tokens: 1000,
       temperature: 0.7,
     };
-
-    // タイムアウト処理を追加
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒タイムアウト
     
-    try {
-      console.log('Sending request to Supabase Edge Function...');
+    // ネットワークリトライロジックを適用
+    return await withNetworkRetry(async () => {
+      // タイムアウト処理を追加
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒タイムアウト
       
-      // Edge Functionを使った方法を試す（JWT認証なし）
-      const response = await fetch(SUPABASE_FUNCTION_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      console.log('API Response status:', response.status);
-      
-      // Edge Functionからのエラーレスポンスを処理
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`API error (${response.status}):`, errorText);
+      try {
+        console.log('Sending request to Supabase Edge Function...');
         
-        let errorMessage = `API error: ${response.status}`;
+        // Edge Functionを使った方法（JWT認証用Authorization付き）
+        const response = await fetch(SUPABASE_FUNCTION_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            // キャッシュ制御ヘッダーの追加
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal
+        });
         
-        try {
-          const errorJson = JSON.parse(errorText);
-          console.error('Parsed error:', errorJson);
-          
-          if (errorJson.error) {
-            errorMessage = `エラー: ${errorJson.error}`;
-          } else if (response.status === 401) {
-            errorMessage = `認証エラー: APIキーが無効または期限切れです。`;
-          } else if (response.status === 400) {
-            errorMessage = `リクエストエラー: ${errorJson.error?.message || errorText}`;
-          } else if (response.status === 429) {
-            errorMessage = 'レート制限に達しました。しばらく待ってから再試行してください。';
-          } else if (response.status === 500) {
-            errorMessage = 'サーバーエラーが発生しました。しばらくしてからもう一度お試しください。';
+        clearTimeout(timeoutId);
+        console.log('API Response status:', response.status);
+        
+        // レスポンスが正常でない場合
+        if (!response.ok) {
+          let errorText = '';
+          try {
+            errorText = await response.text();
+          } catch (e) {
+            errorText = 'レスポンステキスト取得エラー';
           }
-        } catch (e) {
-          console.error('Error parsing error response:', e);
+          
+          console.error(`API error (${response.status}):`, errorText);
+          
+          // エラーオブジェクトを作成
+          const error: any = new Error(`API error: ${response.status}`);
+          error.status = response.status;
+          error.body = errorText;
+          
+          try {
+            const errorJson = JSON.parse(errorText);
+            if (errorJson.error) {
+              error.message = `エラー: ${errorJson.error}`;
+            }
+          } catch (e) {
+            // JSON解析エラー - テキストをそのまま使用
+          }
+          
+          throw error;
+        }
+
+        // レスポンスデータを取得
+        const data = await response.json();
+        
+        if (!data || !data.choices || data.choices.length === 0) {
+          console.error('Invalid API response format:', data);
+          return 'APIからの応答が無効です。';
         }
         
-        return errorMessage;
+        const content = data.choices[0]?.message?.content || '';
+        
+        if (!content) {
+          console.error('Empty content in API response:', data);
+          return 'APIからの応答が空です。';
+        }
+        
+        console.log(`API Response received - Length: ${content.length}`);
+        
+        if (__DEV__) {
+          console.log(`Response preview: ${content.substring(0, 50)}...`);
+        }
+        
+        if (onChunk && content) {
+          onChunk(content);
+        }
+        
+        return content;
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+          const error: any = new Error('APIリクエストがタイムアウトしました。');
+          error.status = 408; // Request Timeout
+          throw error;
+        }
+        
+        console.error('Error when calling Edge Function:', fetchError);
+        throw fetchError;
       }
-
-      const data = await response.json();
-      
-      if (!data || !data.choices || data.choices.length === 0) {
-        console.error('Invalid API response format:', data);
-        return 'APIからの応答が無効です。';
-      }
-      
-      const content = data.choices[0]?.message?.content || '';
-      
-      if (!content) {
-        console.error('Empty content in API response:', data);
-        return 'APIからの応答が空です。';
-      }
-      
-      console.log(`API Response received - Length: ${content.length}`);
-      
-      if (__DEV__) {
-        console.log(`Response preview: ${content.substring(0, 50)}...`);
-      }
-      
-      if (onChunk && content) {
-        onChunk(content);
-      }
-      
-      return content;
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId);
-      
-      if (fetchError.name === 'AbortError') {
-        return 'APIリクエストがタイムアウトしました。ネットワーク接続を確認してください。';
-      }
-      
-      console.error('Error when calling Edge Function:', fetchError);
-      return 'サーバーとの通信に問題が発生しました。しばらくしてからもう一度お試しください。';
-    }
+    }, 3);
   } catch (error) {
     console.error('Error in fetchChatCompletion:', error);
     
@@ -344,58 +403,71 @@ export const generateImage = async ({
   try {
     console.log(`画像生成リクエスト - モデル: ${model}, サイズ: ${size}, 品質: ${quality}, 返却形式: ${returnType}`);
 
-    // Edge Function経由で画像生成を行う
-    const response = await fetch(SUPABASE_IMAGE_FUNCTION_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({
-        prompt,
-        size,
-        quality,
-        model,
-        returnType
-      }),
-    });
+    // ネットワークリトライロジックを適用
+    return await withNetworkRetry(async () => {
+      // Edge Function経由で画像生成を行う
+      const response = await fetch(SUPABASE_IMAGE_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          // キャッシュ制御ヘッダーの追加
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        body: JSON.stringify({
+          prompt,
+          size,
+          quality,
+          model,
+          returnType
+        }),
+      });
 
-    // レスポンスステータスを確認
-    console.log(`画像生成APIレスポンスステータス: ${response.status}`);
-    
-    if (!response.ok) {
-      let errorMessage = `画像生成に失敗しました (${response.status})`;
-      try {
-        const errorText = await response.text();
+      // レスポンスステータスを確認
+      console.log(`画像生成APIレスポンスステータス: ${response.status}`);
+      
+      if (!response.ok) {
+        let errorText = '';
+        try {
+          errorText = await response.text();
+        } catch (e) {
+          errorText = 'レスポンステキスト取得エラー';
+        }
+        
         console.error('画像生成API Error:', errorText);
+        
+        // エラーオブジェクトを作成
+        const error: any = new Error(`画像生成に失敗しました (${response.status})`);
+        error.status = response.status;
+        error.body = errorText;
+        
         try {
           const errorJson = JSON.parse(errorText);
           if (errorJson.error) {
-            errorMessage = errorJson.error;
+            error.message = errorJson.error;
           }
         } catch (jsonError) {
-          // テキストのまま使用
-          errorMessage = `画像生成エラー: ${errorText}`;
+          // JSON解析エラー - テキストをそのまま使用
         }
-      } catch (e) {
-        console.error('Error reading error response:', e);
+        
+        throw error;
       }
-      throw new Error(errorMessage);
-    }
 
-    const data = await response.json() as ImageGenerationResponse;
-    
-    if (!data || (!data.url && !data.dataUrl)) {
-      console.error('Invalid API response format:', data);
-      throw new Error('APIからの応答が無効です');
-    }
-    
-    // URLまたはデータURLを返す
-    const result = data.url || data.dataUrl || '';
-    if (__DEV__) {
-      console.log('画像生成成功:', (result.length > 80 ? result.slice(0, 80) + '...' : result));
-    }
-    return result;
+      const data = await response.json() as ImageGenerationResponse;
+      
+      if (!data || (!data.url && !data.dataUrl)) {
+        console.error('Invalid API response format:', data);
+        throw new Error('APIからの応答が無効です');
+      }
+      
+      // URLまたはデータURLを返す
+      const result = data.url || data.dataUrl || '';
+      if (__DEV__) {
+        console.log('画像生成成功:', (result.length > 80 ? result.slice(0, 80) + '...' : result));
+      }
+      return result;
+    }, 3);
   } catch (error: unknown) {
     console.error('Image generation final error:', error);
     if (error instanceof Error) {

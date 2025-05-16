@@ -43,6 +43,9 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
   const [size, setSize] = useState<ImageSize>('768x768');
   const [quality, setQuality] = useState<ImageQuality>('standard');
   const [model, setModel] = useState<ImageModel>('sdxl');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
 
   // ユーザープランからDALL-E使用可能か判定（仮実装）
   const canUseDalle = dalleQuota.total > 0;
@@ -77,10 +80,13 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
 
   // 画像生成ハンドラ - 親コンポーネントから呼び出されるように変更
   const handleGenerate = useCallback(async () => {
-    if (!prompt.trim()) return null;
+    if (!prompt || loading) return null;
     
-    try {      
-      // 画像生成
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log(`画像生成リクエスト開始: ${prompt.substring(0, 30)}...`);
       const imageUrl = await generateImageFromStore({
         prompt,
         size,
@@ -88,14 +94,40 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
         // 実際の使用時はクォータをチェック
         model: canUseDalle && model === 'dalle' ? 'dalle' : 'sdxl',
       });
-
+      
+      console.log('画像生成成功:', imageUrl.substring(0, 50) + '...');
+      setGeneratedImage(imageUrl);
+      
+      // 画像を保存
+      await onImageGenerated(imageUrl, prompt, model);
+      
       return imageUrl;
-    } catch (err) {
-      // エラーはstore内でハンドリング済み
+    } catch (err: any) {
       console.error('Image generation error:', err);
+      
+      // エラーメッセージの改善
+      let errorMessage = '画像の生成に失敗しました。';
+      
+      if (err.message) {
+        if (err.message.includes('Network request failed')) {
+          errorMessage = 'ネットワークエラー: サーバーに接続できませんでした。インターネット接続を確認して再試行してください。';
+        } else if (err.message.includes('timeout') || err.message.includes('timed out')) {
+          errorMessage = 'タイムアウト: サーバーからの応答が遅すぎます。後でもう一度お試しください。';
+        } else if (err.message.includes('quota') || err.message.includes('limit')) {
+          errorMessage = '利用制限: 画像生成の利用上限に達しました。プレミアムプランへのアップグレードをご検討ください。';
+        } else if (err.message.includes('content policy') || err.message.includes('safety')) {
+          errorMessage = 'コンテンツポリシー違反: プロンプトが安全ポリシーに違反している可能性があります。別の表現を試してください。';
+        } else {
+          errorMessage = `エラー: ${err.message}`;
+        }
+      }
+      
+      setError(errorMessage);
       return null;
+    } finally {
+      setLoading(false);
     }
-  }, [prompt, size, quality, model, canUseDalle, generateImageFromStore]);
+  }, [prompt, size, quality, model, canUseDalle, generateImageFromStore, onImageGenerated, loading]);
 
   // 親コンポーネントの送信ボタンが押されたときに呼び出される関数を公開
   useImperativeHandle(
@@ -195,10 +227,10 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
       </OptionsContainer>
 
       {/* エラー表示 */}
-      {generationError && (
+      {error && (
         <ErrorText>
           <Ionicons name="alert-circle" size={14} color="#e53935" style={{marginRight: 4}} />
-          {generationError}
+          {error}
         </ErrorText>
       )}
 

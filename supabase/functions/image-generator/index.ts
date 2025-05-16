@@ -22,17 +22,24 @@ const supabaseAdmin = createClient(
 
 // デバッグログ追加
 console.log('Edge Function starting...');
-console.log('OPENAI_API_KEY present:', OPENAI_API_KEY ? 'Yes' : 'No');
-console.log('CLOUDFLARE_API_KEY present:', CLOUDFLARE_API_KEY ? 'Yes' : 'No');
+console.log('OPENAI_API_KEY present:', OPENAI_API_KEY ? 'Yes (length: ' + OPENAI_API_KEY.length + ')' : 'No');
+console.log('CLOUDFLARE_API_KEY present:', CLOUDFLARE_API_KEY ? 'Yes (length: ' + CLOUDFLARE_API_KEY.length + ')' : 'No');
+console.log('SUPABASE_URL present:', Deno.env.get('SUPABASE_URL') ? 'Yes' : 'No');
+console.log('SUPABASE_SERVICE_ROLE_KEY present:', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? 'Yes (length: ' + (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.length || 0) + ')' : 'No');
 
 Deno.serve(async (req) => {
+  // リクエスト情報をログに出力
+  console.log(`${new Date().toISOString()} - Request received: ${req.method}, URL: ${req.url}`);
+  console.log('Authorization header present:', req.headers.has('Authorization') ? 'Yes' : 'No');
+  
   // CORSヘッダー
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cache-Control, Pragma',
+        'Access-Control-Max-Age': '86400', // 24時間キャッシュを許可
       }
     });
   }
@@ -49,17 +56,39 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('リクエストを受信しました');
+    
+    // Authorization ヘッダーの確認
+    const auth = req.headers.get('Authorization');
+    console.log('Authorization header:', auth ? 'Present' : 'Missing');
+    
     // リクエストボディを解析
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log('リクエストボディを解析しました:', JSON.stringify(requestBody).substring(0, 100) + '...');
+    } catch (e) {
+      console.error('リクエストボディの解析に失敗しました:', e);
+      return new Response(JSON.stringify({ error: 'Invalid request body' }), {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    }
+    
     const { 
       prompt, 
       size = '768x768', 
       quality = 'standard', 
       model = 'sdxl',
       returnType = 'url' // 'url'または'base64'
-    } = await req.json();
+    } = requestBody;
 
     // 必須パラメータの検証
     if (!prompt || typeof prompt !== 'string') {
+      console.error('プロンプトが無効です');
       return new Response(JSON.stringify({ error: 'Valid prompt is required' }), {
         status: 400,
         headers: {
@@ -74,34 +103,67 @@ Deno.serve(async (req) => {
     let imageResult;
     let forceBase64 = returnType === 'base64';
 
+    // APIキーチェック
+    if (model === 'dalle' && !OPENAI_API_KEY) {
+      console.error('OPENAI_API_KEY が設定されていません');
+      return new Response(JSON.stringify({ error: 'OpenAI API key is not configured' }), {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    }
+    
+    if (model === 'sdxl' && !CLOUDFLARE_API_KEY) {
+      console.error('CLOUDFLARE_API_KEY が設定されていません');
+      return new Response(JSON.stringify({ error: 'Cloudflare API key is not configured' }), {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+    }
+
     if (model === 'dalle') {
       // DALL-E 3経由で画像を生成
       try {
         console.log('DALL-E 3で画像生成を実行');
         
-        const response = await fetch(`${OPENAI_API_URL}/images/generations`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: 'dall-e-3',
-            prompt,
-            n: 1,
-            size,
-            quality,
-            response_format: forceBase64 ? 'b64_json' : 'url',
-          }),
-        });
+        let openaiResponse;
+        try {
+          openaiResponse = await fetch(`${OPENAI_API_URL}/images/generations`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: 'dall-e-3',
+              prompt,
+              n: 1,
+              size,
+              quality,
+              response_format: forceBase64 ? 'b64_json' : 'url',
+            }),
+          });
+        } catch (networkError) {
+          console.error('DALL-E APIとの通信エラー:', networkError);
+          throw new Error(
+            networkError.message?.includes('Network request failed')
+              ? 'OpenAI APIとの接続に失敗しました (Network request failed)'
+              : `OpenAI APIエラー: ${networkError.message || 'Unknown error'}`
+          );
+        }
 
-        if (!response.ok) {
-          const error = await response.json();
+        if (!openaiResponse.ok) {
+          const error = await openaiResponse.json();
           console.error('DALL-E API Error:', error);
           throw new Error(error.error?.message || 'DALL-E画像生成に失敗しました');
         }
 
-        const data = await response.json();
+        const data = await openaiResponse.json();
         console.log('DALL-E画像生成成功');
         
         if (forceBase64) {
@@ -119,7 +181,11 @@ Deno.serve(async (req) => {
         }
       } catch (error) {
         console.error('DALL-E API Error:', error);
-        return new Response(JSON.stringify({ error: `DALL-E画像生成に失敗しました: ${error.message}` }), {
+        return new Response(JSON.stringify({ 
+          error: `DALL-E画像生成に失敗しました: ${error.message}`,
+          errorType: error.message?.includes('Network request failed') ? 'network_error' : 'api_error',
+          timestamp: new Date().toISOString(),
+        }), {
           status: 500,
           headers: {
             'Content-Type': 'application/json',
@@ -131,28 +197,48 @@ Deno.serve(async (req) => {
       // SDXL経由で画像を生成
       try {
         console.log('SDXLで画像生成を実行');
+        console.log('SDXL API URL:', CLOUDFLARE_WORKERS_API_URL);
         
         const [width, height] = size.split('x').map(Number);
 
-        const sdxlResponse = await fetch(`${CLOUDFLARE_WORKERS_API_URL}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${CLOUDFLARE_API_KEY}`,
-          },
-          body: JSON.stringify({
-            prompt,
-            negative_prompt: 'blurry, bad quality, distorted, deformed',
-            width,
-            height,
-            num_steps: quality === 'hd' ? 40 : 25,
-            guidance: 7.5,
-          }),
-        });
+        let sdxlResponse;
+        try {
+          sdxlResponse = await fetch(`${CLOUDFLARE_WORKERS_API_URL}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${CLOUDFLARE_API_KEY}`,
+              // キャッシュ制御を追加
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache',
+            },
+            body: JSON.stringify({
+              prompt,
+              negative_prompt: 'blurry, bad quality, distorted, deformed',
+              width,
+              height,
+              num_steps: quality === 'hd' ? 40 : 25,
+              guidance: 7.5,
+            }),
+          });
+        } catch (networkError) {
+          console.error('SDXL APIとの通信エラー:', networkError);
+          throw new Error(
+            networkError.message?.includes('Network request failed')
+              ? 'Cloudflare Workerとの接続に失敗しました (Network request failed)'
+              : `SDXL APIエラー: ${networkError.message || 'Unknown error'}`
+          );
+        }
 
         if (!sdxlResponse.ok) {
-          const errorText = await sdxlResponse.text();
-          console.error('SDXL API Error:', errorText);
+          let errorText = '';
+          try {
+            errorText = await sdxlResponse.text();
+          } catch (e) {
+            errorText = 'レスポンステキストの取得に失敗しました';
+          }
+          console.error('SDXL API Error Status:', sdxlResponse.status);
+          console.error('SDXL API Error Body:', errorText);
           throw new Error('SDXL画像生成に失敗しました: ' + errorText);
         }
 
@@ -239,7 +325,11 @@ Deno.serve(async (req) => {
         }
       } catch (error) {
         console.error('SDXL or Storage Error:', error);
-        return new Response(JSON.stringify({ error: `画像生成または保存に失敗しました: ${error.message}` }), {
+        return new Response(JSON.stringify({ 
+          error: `画像生成または保存に失敗しました: ${error.message}`,
+          errorType: error.message?.includes('Network request failed') ? 'network_error' : 'api_error',
+          timestamp: new Date().toISOString(),
+        }), {
           status: 500,
           headers: {
             'Content-Type': 'application/json',
@@ -250,6 +340,7 @@ Deno.serve(async (req) => {
     }
 
     // 生成された画像の結果を返す
+    console.log('画像生成処理が完了しました');
     return new Response(JSON.stringify(imageResult), {
       headers: {
         'Content-Type': 'application/json',
@@ -257,8 +348,20 @@ Deno.serve(async (req) => {
       }
     });
   } catch (error) {
-    console.error('Server error:', error);
-    return new Response(JSON.stringify({ error: `サーバーエラー: ${error.message}` }), {
+    // エラーの詳細情報を追加
+    const errorDetails = {
+      error: `サーバーエラー: ${error.message}`,
+      errorType: error.message?.includes('Network request failed') ? 'network_error' : 'server_error',
+      timestamp: new Date().toISOString(),
+      requestInfo: {
+        method: req.method,
+        url: req.url,
+        hasAuthHeader: req.headers.has('Authorization'),
+      }
+    };
+    
+    console.error('Server error:', error, errorDetails);
+    return new Response(JSON.stringify(errorDetails), {
       status: 500,
       headers: {
         'Content-Type': 'application/json',

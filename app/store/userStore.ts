@@ -1,4 +1,5 @@
 import { StateCreator } from 'zustand';
+import { StoreState } from './index';
 
 export type UserPlan = 'free' | 'lite' | 'premium';
 
@@ -35,7 +36,7 @@ const IMAGE_GEN_LIMITS = {
 };
 
 export const createUserSlice: StateCreator<
-  UserState,
+  StoreState,
   [],
   [],
   UserState
@@ -59,11 +60,11 @@ export const createUserSlice: StateCreator<
       dailyImageGenLimit: IMAGE_GEN_LIMITS[plan],
     });
     
-    // プラン変更時に画像クォータをリセットする
+    // プラン変更時に画像クォータを即時リセットする
     // 型アサーションを使用して他のストアスライスの関数にアクセス
-    const resetDailyQuotas = (get() as any).resetDailyQuotas;
-    if (typeof resetDailyQuotas === 'function') {
-      resetDailyQuotas();
+    const state = get() as any;
+    if (typeof state.resetDailyQuotas === 'function') {
+      state.resetDailyQuotas();
     }
   },
   incrementTokensUsed: (amount) => set((state) => ({

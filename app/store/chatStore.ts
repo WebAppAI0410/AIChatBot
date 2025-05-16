@@ -1,5 +1,14 @@
 import { StateCreator } from 'zustand';
-import { v4 as uuidv4 } from 'uuid';
+// import { v4 as uuidv4 } from 'uuid';
+
+// Hermesエンジン対応のUUID生成関数
+const generateUuid = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
 
 export type Message = {
   id: string;
@@ -44,7 +53,7 @@ export interface ChatState {
 // メッセージ追加の共通ロジック
 const appendMessageToChat = (state: ChatState, chatId: string, messageContent: Omit<Message, 'id' | 'timestamp' | 'isRead'>, idPrefix: string = ''): ChatState => {
   const newMessage: Message = {
-    id: `${idPrefix}${uuidv4()}`,
+    id: `${idPrefix}${generateUuid()}`,
     ...messageContent,
     timestamp: Date.now(),
     isRead: false, // デフォルトで未読に設定
@@ -88,7 +97,7 @@ export const createChatSlice: StateCreator<
   chatToDelete: null,
   isDeleteDialogVisible: false,
   createChat: (modelId) => {
-    const id = uuidv4(); // チャットIDもuuidに変更
+    const id = generateUuid(); // チャットIDもuuidに変更
     const newChat: Chat = {
       id,
       title: 'New Chat',
