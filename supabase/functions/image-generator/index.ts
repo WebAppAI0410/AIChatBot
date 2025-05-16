@@ -131,6 +131,18 @@ Deno.serve(async (req) => {
       try {
         console.log('DALL-E 3で画像生成を実行');
         
+        // DALL-E 3がサポートするサイズに変換
+        let dalleSize: string;
+        // 入力サイズから最適なDALL-E 3サイズを決定
+        if (size === '1024x1024' || size === '1792x1024' || size === '1024x1792') {
+          // すでにサポートされているサイズはそのまま使用
+          dalleSize = size;
+        } else {
+          // デフォルトでは正方形のサイズを使用
+          dalleSize = '1024x1024';
+          console.log(`警告: サイズ "${size}" はDALL-E 3でサポートされていません。代わりに "${dalleSize}" を使用します。`);
+        }
+        
         let openaiResponse;
         try {
           openaiResponse = await fetch(`${OPENAI_API_URL}/images/generations`, {
@@ -143,7 +155,7 @@ Deno.serve(async (req) => {
               model: 'dall-e-3',
               prompt,
               n: 1,
-              size,
+              size: dalleSize,
               quality,
               response_format: forceBase64 ? 'b64_json' : 'url',
             }),

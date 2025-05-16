@@ -1,4 +1,4 @@
-import React, { useState, forwardRef, useImperativeHandle, useCallback } from 'react';
+import React, { useState, forwardRef, useImperativeHandle, useCallback, useEffect } from 'react';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { 
@@ -11,7 +11,7 @@ import {
 import useStore from '../store';
 import useColors from '../constants/colors';
 
-export type ImageSize = '512x512' | '768x768' | '1024x1024';
+export type ImageSize = '512x512' | '768x768' | '1024x1024' | '1024x1792' | '1792x1024';
 export type ImageQuality = 'standard' | 'hd';
 export type ImageModel = 'sdxl' | 'dalle';
 
@@ -53,6 +53,17 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
   // 選択中のモデルのクォータを取得
   const currentQuota = model === 'dalle' ? dalleQuota : sdxlQuota;
 
+  // モデルが変更されたときにサイズを適切な値に調整する
+  useEffect(() => {
+    // DALL-E 3が選択された場合、サポートされているサイズに変更
+    if (model === 'dalle') {
+      // 現在のサイズがDALL-E 3でサポートされていない場合は1024x1024に変更
+      if (size !== '1024x1024' && size !== '1024x1792' && size !== '1792x1024') {
+        setSize('1024x1024');
+      }
+    }
+  }, [model]);
+
   // モデル切り替え - SDXLとDALL-Eのトグル
   const toggleModel = () => {
     // 常に切り替え可能にする。ただし実際に使用する時はクォータをチェック
@@ -65,12 +76,23 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
     }
   };
 
-  // サイズ切り替え - 512 → 768 → 1024 → 512...
+  // サイズ切り替え - モデルに応じて異なるサイズを切り替え
   const toggleSize = () => {
-    const sizes: ImageSize[] = ['512x512', '768x768', '1024x1024'];
-    const currentIndex = sizes.indexOf(size);
-    const nextIndex = (currentIndex + 1) % sizes.length;
-    setSize(sizes[nextIndex]);
+    if (model === 'dalle') {
+      // DALL-E 3用のサイズ：1024x1024 → 1024x1792 → 1792x1024 → 1024x1024
+      const dalleSizes: ImageSize[] = ['1024x1024', '1024x1792', '1792x1024'];
+      const currentIndex = dalleSizes.indexOf(size as any);
+      // 現在のサイズがリストにない場合は最初の要素から開始
+      const nextIndex = (currentIndex === -1) ? 0 : (currentIndex + 1) % dalleSizes.length;
+      setSize(dalleSizes[nextIndex]);
+    } else {
+      // SDXL用のサイズ：512x512 → 768x768 → 1024x1024 → 512x512
+      const sdxlSizes: ImageSize[] = ['512x512', '768x768', '1024x1024'];
+      const currentIndex = sdxlSizes.indexOf(size as any);
+      // 現在のサイズがリストにない場合は最初の要素から開始
+      const nextIndex = (currentIndex === -1) ? 0 : (currentIndex + 1) % sdxlSizes.length;
+      setSize(sdxlSizes[nextIndex]);
+    }
   };
 
   // 品質切り替え - 標準 ↔ 高品質
@@ -98,8 +120,8 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
       console.log('画像生成成功:', imageUrl.substring(0, 50) + '...');
       setGeneratedImage(imageUrl);
       
-      // 画像を保存
-      await onImageGenerated(imageUrl, prompt, model);
+      // ここでは画像生成のみ行い、親コンポーネントへの通知は行わない
+      // onImageGenerated呼び出しを削除
       
       return imageUrl;
     } catch (err: any) {
@@ -127,7 +149,7 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
     } finally {
       setLoading(false);
     }
-  }, [prompt, size, quality, model, canUseDalle, generateImageFromStore, onImageGenerated, loading]);
+  }, [prompt, size, quality, model, canUseDalle, generateImageFromStore, loading]);
 
   // 親コンポーネントの送信ボタンが押されたときに呼び出される関数を公開
   useImperativeHandle(
@@ -138,6 +160,7 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
         if (imageUrl) {
           // 実際に使用されるモデルを渡す
           const usedModel = canUseDalle && model === 'dalle' ? 'dalle' : 'sdxl';
+          // ここで一度だけonImageGeneratedを呼び出す
           onImageGenerated(imageUrl, prompt, usedModel);
           return true;
         }
@@ -147,6 +170,17 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
     }),
     [handleGenerate, onImageGenerated, model, canUseDalle, currentQuota.remaining, prompt]
   );
+
+  // 現在選択されているサイズを表示用にフォーマット
+  const displaySize = () => {
+    const [width, height] = size.split('x');
+    // 大きすぎる値やダブルのxを避けるため簡略表示
+    if (width === height) {
+      return width; // 正方形の場合は一辺の長さだけ表示
+    } else {
+      return `${width}x${height.slice(-3)}`; // 長い方のサイズは省略表示
+    }
+  };
 
   return (
     <Container style={{ backgroundColor: colors.background, borderTopColor: colors.border }}>
@@ -185,7 +219,7 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
           <ToggleButtonContent>
             <Ionicons name="resize-outline" size={20} color="white" style={{ marginRight: 4 }} />
             <ToggleButtonText>
-              {size.split('x')[0]}
+              {displaySize()}
             </ToggleButtonText>
             <Ionicons name="chevron-forward" size={16} color="white" style={{ marginLeft: 2 }} />
           </ToggleButtonContent>
@@ -240,6 +274,14 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
           <Ionicons name="warning" size={14} color="#f57c00" style={{marginRight: 4}} />
           DALL-E 3はプレミアムプランでのみ利用可能です
         </WarningText>
+      )}
+
+      {/* DALL-Eサイズ情報 */}
+      {model === 'dalle' && (
+        <InfoText>
+          <Ionicons name="information-circle" size={14} color="#2196f3" style={{marginRight: 4}} />
+          DALL-E 3は特定のサイズ比率のみサポートしています
+        </InfoText>
       )}
     </Container>
   );
@@ -305,6 +347,15 @@ const ToggleButtonText = styled(Text, {
 
 const ErrorText = styled(Text, {
   color: '$red10',
+  fontSize: '$2',
+  mt: '$2',
+  flexDirection: 'row',
+  alignItems: 'center',
+  display: 'flex',
+});
+
+const InfoText = styled(Text, {
+  color: '$blue10',
   fontSize: '$2',
   mt: '$2',
   flexDirection: 'row',

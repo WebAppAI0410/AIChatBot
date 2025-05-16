@@ -403,6 +403,17 @@ export const generateImage = async ({
   try {
     console.log(`画像生成リクエスト - モデル: ${model}, サイズ: ${size}, 品質: ${quality}, 返却形式: ${returnType}`);
 
+    // DALL-E 3の場合はサイズをサポートされている値に変換
+    let adjustedSize = size;
+    if (model === 'dalle') {
+      const supportedDalleSizes = ['1024x1024', '1024x1792', '1792x1024'];
+      if (!supportedDalleSizes.includes(size)) {
+        // デフォルトで正方形サイズを使用
+        adjustedSize = '1024x1024';
+        console.log(`DALL-E 3はサイズ "${size}" をサポートしていません。代わりに "${adjustedSize}" を使用します。`);
+      }
+    }
+
     // ネットワークリトライロジックを適用
     return await withNetworkRetry(async () => {
       // Edge Function経由で画像生成を行う
@@ -417,7 +428,7 @@ export const generateImage = async ({
         },
         body: JSON.stringify({
           prompt,
-          size,
+          size: adjustedSize,
           quality,
           model,
           returnType
