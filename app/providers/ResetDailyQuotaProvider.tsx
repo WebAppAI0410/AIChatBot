@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useStore } from '../store';
 
 // 前日のリセット日を確認し、日付が変わっていたらクォータをリセットする
-const checkAndResetDailyQuotas = async (resetImageGenCount: () => void) => {
+const checkAndResetDailyQuotas = async (resetImageGenCount: () => void, resetDailyQuotas: () => void) => {
   try {
     // 現在の日付（YYYY-MM-DD形式）
     const today = new Date().toISOString().split('T')[0];
@@ -15,6 +15,7 @@ const checkAndResetDailyQuotas = async (resetImageGenCount: () => void) => {
     if (!lastResetDate || lastResetDate !== today) {
       // 日付が変わっていたらリセット
       resetImageGenCount();
+      resetDailyQuotas(); // 画像生成クォータもリセット
       
       // 最終リセット日を更新
       await AsyncStorage.setItem('lastQuotaResetDate', today);
@@ -31,17 +32,18 @@ interface ResetDailyQuotaProviderProps {
 
 export const ResetDailyQuotaProvider = ({ children }: ResetDailyQuotaProviderProps) => {
   const resetImageGenCount = useStore((state) => state.resetImageGenCount);
+  const resetDailyQuotas = useStore((state) => state.resetDailyQuotas);
 
   // アプリ起動時に確認
   useEffect(() => {
-    checkAndResetDailyQuotas(resetImageGenCount);
-  }, [resetImageGenCount]);
+    checkAndResetDailyQuotas(resetImageGenCount, resetDailyQuotas);
+  }, [resetImageGenCount, resetDailyQuotas]);
 
   // アプリがバックグラウンドから復帰したときに確認
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
-        checkAndResetDailyQuotas(resetImageGenCount);
+        checkAndResetDailyQuotas(resetImageGenCount, resetDailyQuotas);
       }
     };
 
@@ -50,7 +52,7 @@ export const ResetDailyQuotaProvider = ({ children }: ResetDailyQuotaProviderPro
     return () => {
       subscription.remove();
     };
-  }, [resetImageGenCount]);
+  }, [resetImageGenCount, resetDailyQuotas]);
 
   return <>{children}</>;
 };

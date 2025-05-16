@@ -39,7 +39,7 @@ export const createUserSlice: StateCreator<
   [],
   [],
   UserState
-> = (set) => ({
+> = (set, get) => ({
   isAuthenticated: false,
   userId: null,
   email: null,
@@ -52,11 +52,20 @@ export const createUserSlice: StateCreator<
   setAuthenticated: (value) => set({ isAuthenticated: value }),
   setUserId: (id) => set({ userId: id }),
   setEmail: (email) => set({ email }),
-  setPlan: (plan) => set({
-    plan,
-    monthlyTokensLimit: TOKEN_LIMITS[plan],
-    dailyImageGenLimit: IMAGE_GEN_LIMITS[plan],
-  }),
+  setPlan: (plan) => {
+    set({
+      plan,
+      monthlyTokensLimit: TOKEN_LIMITS[plan],
+      dailyImageGenLimit: IMAGE_GEN_LIMITS[plan],
+    });
+    
+    // プラン変更時に画像クォータをリセットする
+    // 型アサーションを使用して他のストアスライスの関数にアクセス
+    const resetDailyQuotas = (get() as any).resetDailyQuotas;
+    if (typeof resetDailyQuotas === 'function') {
+      resetDailyQuotas();
+    }
+  },
   incrementTokensUsed: (amount) => set((state) => ({
     monthlyTokensUsed: state.monthlyTokensUsed + amount,
   })),
