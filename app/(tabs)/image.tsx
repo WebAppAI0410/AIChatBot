@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -8,7 +8,8 @@ import {
   TextInput, 
   KeyboardAvoidingView,
   Platform,
-  StyleSheet
+  StyleSheet,
+  ScrollView
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Stack } from 'expo-router';
@@ -19,6 +20,7 @@ import { styled, YStack, XStack } from 'tamagui';
 import { ImageGenerationPanel, ImageGenerationPanelHandle } from '../../app/components/ImageGenerationPanel';
 import useColors from '../constants/colors';
 import theme from '../ui/theme';
+import { GeneratedImage } from '../../app/store/imageStore';
 
 const SUGGESTIONS = [
   'リアルなキツネの写真',
@@ -27,6 +29,9 @@ const SUGGESTIONS = [
   'サイバーパンクの都市',
   'ファンタジーの森',
 ];
+
+// フィルタータイプの定義
+type FilterType = 'all' | 'sdxl' | 'dalle';
 
 export default function ImageScreen() {
   // ストアから必要な状態を取得
@@ -47,11 +52,22 @@ export default function ImageScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showImagePanel, setShowImagePanel] = useState(false);
   const [prompt, setPrompt] = useState('');
-  const [fullScreenMode, setFullScreenMode] = useState(false);
   const [showOptionsPanel, setShowOptionsPanel] = useState(false);
+  const [isGridView, setIsGridView] = useState(true);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [currentFilter, setCurrentFilter] = useState<FilterType>('all');
   
   // ImageGenerationPanelへの参照
   const imagePanelRef = useRef<ImageGenerationPanelHandle>(null);
+
+  // フィルタリングされた画像リスト
+  const filteredImages = useMemo(() => {
+    if (!generatedImages || generatedImages.length === 0) return [];
+    
+    if (currentFilter === 'all') return generatedImages;
+    
+    return generatedImages.filter(img => img.model === currentFilter);
+  }, [generatedImages, currentFilter]);
 
   // 画像詳細表示
   const handleImagePress = (imageUrl: string) => {
@@ -80,10 +96,8 @@ export default function ImageScreen() {
   const handleSend = async () => {
     if (prompt.trim() === '') return;
     
-    // 選択した手法で画像を生成
-    if (fullScreenMode) {
-      setShowImagePanel(true);
-    } else if (imagePanelRef.current) {
+    // オプションパネル経由で画像を生成
+    if (imagePanelRef.current) {
       const success = await imagePanelRef.current.generateImage();
       if (success) {
         // handleImageGeneratedが呼ばれるので、ここでは何もしない
@@ -100,6 +114,106 @@ export default function ImageScreen() {
   const toggleOptionsPanel = () => {
     setShowOptionsPanel(!showOptionsPanel);
   };
+
+  // 表示モードの切り替え
+  const toggleViewMode = () => {
+    setIsGridView(!isGridView);
+  };
+
+  // フィルターの適用
+  const applyFilter = (filter: FilterType) => {
+    setCurrentFilter(filter);
+    setShowFilterModal(false);
+  };
+
+  // リスト表示用のレンダリング関数
+  const renderListItem = ({ item }: { item: GeneratedImage }) => (
+    <TouchableOpacity
+      style={[
+        styles.listItem,
+        { backgroundColor: colors.card, borderBottomColor: colors.border }
+      ]}
+      onPress={() => handleImagePress(item.url)}
+    >
+      <View style={styles.listItemContent}>
+        <Image
+          source={{ uri: item.url }}
+          style={styles.listItemImage}
+          contentFit="cover"
+          transition={300}
+        />
+        <View style={styles.listItemDetails}>
+          <Text style={[styles.listItemPrompt, { color: colors.text }]} numberOfLines={2}>
+            {item.prompt}
+          </Text>
+          <View style={styles.listItemMeta}>
+            <View style={[
+              styles.modelBadge, 
+              { 
+                backgroundColor: item.model === 'dalle' ? '#a78bfa' : '#38bdf8'
+              }
+            ]}>
+              <Text style={styles.modelBadgeText}>
+                {item.model === 'dalle' ? 'DALL-E' : 'SDXL'}
+              </Text>
+            </View>
+            {item.createdAt && (
+              <Text style={[styles.dateText, { color: colors.secondaryText }]}>
+                {new Date(item.createdAt).toLocaleDateString()}
+              </Text>
+            )}
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  // グリッド表示用のレンダリング関数
+  const renderGridItem = ({ item }: { item: GeneratedImage }) => (
+    <TouchableOpacity
+      style={{ flex: 1, padding: 4 }}
+      onPress={() => handleImagePress(item.url)}
+    >
+      <View style={{ 
+        borderRadius: 12, 
+        overflow: 'hidden',
+        backgroundColor: colors.card,
+        shadowColor: colors.text,
+        shadowOffset: {
+          width: 0,
+          height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
+      }}>
+        <Image
+          source={{ uri: item.url }}
+          style={{ aspectRatio: 1 }}
+          contentFit="cover"
+          transition={300}
+        />
+        <View style={{ 
+          padding: 8,
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0
+        }}>
+          <Text
+            style={{ 
+              color: 'white',
+              fontSize: 12 
+            }}
+            numberOfLines={1}
+          >
+            {item.prompt}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <KeyboardAvoidingView 
@@ -133,20 +247,34 @@ export default function ImageScreen() {
             color: colors.text 
           }}>画像ギャラリー</Text>
 
-          <TouchableOpacity
-            style={{
-              backgroundColor: colors.primary,
-              paddingVertical: 8,
-              paddingHorizontal: 16,
-              borderRadius: 8
-            }}
-            onPress={() => {
-              setFullScreenMode(true);
-              setShowImagePanel(true);
-            }}
-          >
-            <Text style={{ color: colors.textOnPrimary }}>詳細設定</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row' }}>
+            {/* 表示切替ボタン */}
+            <TouchableOpacity
+              style={[styles.headerButton, { backgroundColor: colors.card }]}
+              onPress={toggleViewMode}
+            >
+              <Ionicons 
+                name={isGridView ? "list-outline" : "grid-outline"} 
+                size={20} 
+                color={colors.primary} 
+              />
+            </TouchableOpacity>
+
+            {/* フィルターボタン */}
+            <TouchableOpacity
+              style={[styles.headerButton, { backgroundColor: colors.card, marginLeft: 8 }]}
+              onPress={() => setShowFilterModal(true)}
+            >
+              <Ionicons 
+                name="filter-outline" 
+                size={20} 
+                color={currentFilter !== 'all' ? colors.primary : colors.text} 
+              />
+              {currentFilter !== 'all' && (
+                <View style={styles.filterActiveDot} />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* クォータ表示 */}
@@ -180,55 +308,12 @@ export default function ImageScreen() {
         </View>
 
         {/* 画像ギャラリー */}
-        {generatedImages && generatedImages.length > 0 ? (
+        {filteredImages && filteredImages.length > 0 ? (
           <FlatList
-            data={generatedImages}
-            numColumns={2}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={{ flex: 1, padding: 4 }}
-                onPress={() => handleImagePress(item.url)}
-              >
-                <View style={{ 
-                  borderRadius: 12, 
-                  overflow: 'hidden',
-                  backgroundColor: colors.card,
-                  shadowColor: colors.text,
-                  shadowOffset: {
-                    width: 0,
-                    height: 2,
-                  },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 3,
-                  elevation: 2,
-                }}>
-                  <Image
-                    source={{ uri: item.url }}
-                    style={{ aspectRatio: 1 }}
-                    contentFit="cover"
-                    transition={300}
-                  />
-                  <View style={{ 
-                    padding: 8,
-                    backgroundColor: 'rgba(0,0,0,0.6)',
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0
-                  }}>
-                    <Text
-                      style={{ 
-                        color: 'white',
-                        fontSize: 12 
-                      }}
-                      numberOfLines={1}
-                    >
-                      {item.prompt}
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            )}
+            data={filteredImages}
+            numColumns={isGridView ? 2 : 1}
+            key={isGridView ? 'grid' : 'list'} // キーを変更して再レンダリングを強制
+            renderItem={isGridView ? renderGridItem : renderListItem}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ padding: 4 }}
             style={{ backgroundColor: colors.background }}
@@ -236,7 +321,9 @@ export default function ImageScreen() {
         ) : (
           <View style={[styles.emptyContainer, { backgroundColor: colors.background }]}>
             <Text style={{ textAlign: 'center', color: colors.text }}>
-              まだ画像がありません。下のチャット入力から生成してみましょう。
+              {currentFilter !== 'all' 
+                ? `${currentFilter === 'dalle' ? 'DALL-E' : 'SDXL'}で生成された画像はありません。` 
+                : 'まだ画像がありません。下のチャット入力から生成してみましょう。'}
             </Text>
           </View>
         )}
@@ -395,6 +482,97 @@ export default function ImageScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* フィルターモーダル */}
+        <Modal
+          visible={showFilterModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowFilterModal(false)}
+        >
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.4)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+            activeOpacity={1}
+            onPress={() => setShowFilterModal(false)}
+          >
+            <View 
+              style={{
+                width: '80%',
+                backgroundColor: colors.background,
+                borderRadius: 12,
+                padding: 16,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 4,
+                elevation: 5,
+              }}
+            >
+              <Text style={{ 
+                fontSize: 18, 
+                fontWeight: 'bold', 
+                marginBottom: 16, 
+                color: colors.text 
+              }}>
+                フィルター
+              </Text>
+              
+              <TouchableOpacity
+                style={[
+                  styles.filterOption,
+                  currentFilter === 'all' && { backgroundColor: colors.lightGray }
+                ]}
+                onPress={() => applyFilter('all')}
+              >
+                <Text style={{ color: colors.text }}>すべて表示</Text>
+                {currentFilter === 'all' && (
+                  <Ionicons name="checkmark" size={20} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.filterOption,
+                  currentFilter === 'sdxl' && { backgroundColor: colors.lightGray }
+                ]}
+                onPress={() => applyFilter('sdxl')}
+              >
+                <Text style={{ color: colors.text }}>SDXLのみ</Text>
+                {currentFilter === 'sdxl' && (
+                  <Ionicons name="checkmark" size={20} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.filterOption,
+                  currentFilter === 'dalle' && { backgroundColor: colors.lightGray }
+                ]}
+                onPress={() => applyFilter('dalle')}
+              >
+                <Text style={{ color: colors.text }}>DALL-Eのみ</Text>
+                {currentFilter === 'dalle' && (
+                  <Ionicons name="checkmark" size={20} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.closeFilterButton,
+                  { backgroundColor: colors.primary }
+                ]}
+                onPress={() => setShowFilterModal(false)}
+              >
+                <Text style={{ color: colors.textOnPrimary }}>閉じる</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -470,5 +648,77 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  headerButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterActiveDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#e53935',
+  },
+  filterOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  closeFilterButton: {
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  listItem: {
+    borderBottomWidth: 1,
+    marginBottom: 2,
+    padding: 12,
+  },
+  listItemContent: {
+    flexDirection: 'row',
+  },
+  listItemImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  listItemDetails: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'space-between',
+  },
+  listItemPrompt: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  listItemMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modelBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  modelBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  dateText: {
+    fontSize: 12,
   },
 }); 

@@ -324,7 +324,7 @@ export default function ModelSelectModal({
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={true}
       animationType="slide"
       onRequestClose={onClose}
     >

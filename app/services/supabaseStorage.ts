@@ -1,9 +1,14 @@
 import { StorageClient } from '@supabase/storage-js';
+import Constants from 'expo-constants';
 
-// Supabaseプロジェクト情報
-const SUPABASE_URL = 'https://alperyqhdtpnivxfnqdi.supabase.co';
-// 匿名キーを使用（サービスキーはクライアントサイドでは使わない）
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFscGVyeXFoZHRwbml2eGZucWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY4MDc5OTcsImV4cCI6MjA2MjM4Mzk5N30.0gTXgFtD2uIhGdSB4twConRJPF_0Ccz5zePqa0hD8B0';
+// app.config.js から環境変数を取得
+const SUPABASE_URL = Constants.expoConfig?.extra?.supabaseUrl;
+const SUPABASE_ANON_KEY = Constants.expoConfig?.extra?.supabaseAnonKey;
+
+// 環境変数の値を検証
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('Supabase環境変数が設定されていません。app.config.jsを確認してください。');
+}
 
 // StorageClientの初期化
 export const storageClient = new StorageClient(`${SUPABASE_URL}/storage/v1`, {
