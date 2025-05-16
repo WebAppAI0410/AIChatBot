@@ -55,6 +55,12 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onImagePress, onLongPr
         ]}>
           {message.content}
         </Text>
+        <Text style={[
+          styles.timestampText,
+          isUser ? { color: colors.textOnPrimary + '99' } : { color: colors.secondaryText }
+        ]}>
+          {formattedTime}
+        </Text>
       </View>
     </Pressable>
   );
@@ -93,6 +99,11 @@ const styles = StyleSheet.create({
   },
   assistantMessageText: {
     color: theme.colors.text.light,
+  },
+  timestampText: {
+    fontSize: theme.fontSizes.xs,
+    marginTop: theme.spacing.xs,
+    alignSelf: 'flex-end',
   },
 });
 

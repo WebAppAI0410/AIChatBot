@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { Pressable, Text, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../ui/theme';
 import useColors from '../constants/colors';
@@ -106,13 +106,23 @@ const AccessibleButton: React.FC<AccessibleButtonProps> = ({
   const buttonStyles = getButtonStyles();
   const textStyles = getTextStyles();
   
+  // Get a safe icon color
+  const getIconColor = () => {
+    if (typeof textStyles.color === 'string') {
+      return textStyles.color;
+    }
+    return colors.textOnPrimary;
+  };
+  
+  const iconColor = getIconColor();
+  
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
       accessibilityLabel={label}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      hitSlop={{ top: theme.spacing.sm, bottom: theme.spacing.sm, left: theme.spacing.sm, right: theme.spacing.sm }}
       style={({ pressed }) => [
         buttonStyles,
         pressed && styles.buttonPressed,
@@ -120,12 +130,12 @@ const AccessibleButton: React.FC<AccessibleButtonProps> = ({
       ]}
       disabled={disabled}
     >
-      <Text style={[styles.contentContainer]}>
+      <View style={[styles.contentContainer]}>
         {icon && iconPosition === 'left' && (
           <Ionicons
             name={icon}
             size={20}
-            color={textStyles.color as string}
+            color={iconColor}
             style={styles.leftIcon}
           />
         )}
@@ -138,11 +148,11 @@ const AccessibleButton: React.FC<AccessibleButtonProps> = ({
           <Ionicons
             name={icon}
             size={20}
-            color={textStyles.color as string}
+            color={iconColor}
             style={styles.rightIcon}
           />
         )}
-      </Text>
+      </View>
     </Pressable>
   );
 };

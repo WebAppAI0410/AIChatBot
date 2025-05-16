@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
@@ -58,7 +58,7 @@ const UsageCounter: React.FC<UsageCounterProps> = ({ label, current, limit, isPr
         )}
       </View>
       <Text style={[styles.usageCounterValue, { color: colors.text }]}>
-        {isUnlimited ? `${current}/${limit}` : `${current}/${limit}`}
+        {isUnlimited ? `${current}/∞` : `${current}/${limit}`}
       </Text>
     </View>
   );
@@ -92,7 +92,9 @@ export default function UsageScreen() {
     dailyImageGenLimit
   } = useStore(state => state);
 
-  const tokenPercentage = Math.min(100, Math.round((monthlyTokensUsed / monthlyTokensLimit) * 100));
+  const tokenPercentage = monthlyTokensLimit
+    ? Math.min(100, Math.round((monthlyTokensUsed / monthlyTokensLimit) * 100))
+    : 0;
   const tokenWarning = tokenPercentage >= 80;
 
   const imageUsage = {
@@ -107,6 +109,8 @@ export default function UsageScreen() {
 
   const aiAssistUsage = 15;
   const aiAssistLimit = plan === 'free' ? 30 : plan === 'lite' ? 100 : 300;
+
+  const nextPlan = plan === 'free' ? 'lite' : 'premium';
 
   const handleUpgrade = () => {
     router.push('/settings/subscription');
@@ -189,10 +193,10 @@ export default function UsageScreen() {
             label={`${aiAssistUsage}/${aiAssistLimit}`}
           />
 
-          {plan !== 'heavy' && (
+          {plan !== 'premium' && (
             <UpgradeButton
               style={styles.marginTop}
-              label={`${plan === 'free' ? 'Lite' : 'Heavy'}にアップグレード`}
+              label={`${nextPlan.charAt(0).toUpperCase() + nextPlan.slice(1)}にアップグレード`}
               onPress={handleUpgrade}
             />
           )}

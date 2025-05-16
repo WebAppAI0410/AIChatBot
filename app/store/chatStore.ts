@@ -1,4 +1,5 @@
 import { StateCreator } from 'zustand';
+import { v4 as uuidv4 } from 'uuid';
 
 export type Message = {
   id: string;
@@ -28,7 +29,7 @@ export interface ChatState {
   chatToDelete: string | null;
   isDeleteDialogVisible: boolean;
   createChat: (modelId: string) => string;
-  addMessage: (chatId: string, message: Omit<Message, 'id' | 'timestamp'>) => void;
+  addMessage: (chatId: string, message: Omit<Message, 'id' | 'timestamp' | 'isRead'>) => void;
   addImageMessage: (chatId: string, params: { content: string; imageUrl: string; role: 'user' | 'assistant' }) => void;
   updateChatTitle: (chatId: string, title: string) => void;
   updateChatModel: (chatId: string, modelId: string) => void;
@@ -39,6 +40,42 @@ export interface ChatState {
   setCurrentChat: (chatId: string | null) => void;
   markChatAsRead: (chatId: string) => void;
 }
+
+// メッセージ追加の共通ロジック
+const appendMessageToChat = (state: ChatState, chatId: string, messageContent: Omit<Message, 'id' | 'timestamp' | 'isRead'>, idPrefix: string = ''): ChatState => {
+  const newMessage: Message = {
+    id: `${idPrefix}${uuidv4()}`,
+    ...messageContent,
+    timestamp: Date.now(),
+    isRead: false, // デフォルトで未読に設定
+  };
+
+  const updatedChats = state.chats.map((chat) => {
+    if (chat.id === chatId) {
+      const updatedChat: Chat = {
+        ...chat,
+        messages: [...chat.messages, newMessage],
+        updatedAt: Date.now(),
+        unreadCount: newMessage.role === 'assistant' ? chat.unreadCount + 1 : chat.unreadCount,
+      };
+
+      // ユーザーの最初のメッセージでタイトルを自動生成
+      if (newMessage.role === 'user' && chat.messages.filter(m => m.role === 'user').length === 0) {
+        const cleanContent = newMessage.content.trim().replace(/\s+/g, ' ');
+        updatedChat.title = cleanContent.length > 30 ? `${cleanContent.slice(0, 30)}…` : cleanContent;
+      }
+      return updatedChat;
+    }
+    return chat;
+  });
+
+  if (__DEV__) {
+    console.log(`Message added - ChatID: ${chatId}, Role: ${newMessage.role}, MessageID: ${newMessage.id}`);
+    console.log(`Total messages: ${updatedChats.find(c => c.id === chatId)?.messages.length || 0}`);
+  }
+
+  return { ...state, chats: updatedChats };
+};
 
 export const createChatSlice: StateCreator<
   ChatState,
@@ -51,7 +88,7 @@ export const createChatSlice: StateCreator<
   chatToDelete: null,
   isDeleteDialogVisible: false,
   createChat: (modelId) => {
-    const id = Date.now().toString();
+    const id = uuidv4(); // チャットIDもuuidに変更
     const newChat: Chat = {
       id,
       title: 'New Chat',
@@ -72,66 +109,10 @@ export const createChatSlice: StateCreator<
     return id;
   },
   addMessage: (chatId, message) => {
-    set((state) => {
-      console.log(`Adding message - ChatID: ${chatId}, Role: ${message.role}`);
-      
-      const newMessage: Message = {
-        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        ...message,
-        timestamp: Date.now(),
-      };
-      
-      const updatedChats = state.chats.map((chat) => {
-        if (chat.id === chatId) {
-          const updatedChat: Chat = {
-            ...chat,
-            messages: [...chat.messages, newMessage],
-            updatedAt: Date.now(),
-            unreadCount: message.role === 'assistant' ? chat.unreadCount + 1 : chat.unreadCount,
-          };
-          
-          if (message.role === 'user' && chat.messages.filter(m => m.role === 'user').length === 0) {
-            updatedChat.title = message.content.slice(0, 30) + (message.content.length > 30 ? '...' : '');
-          }
-          
-          return updatedChat;
-        }
-        return chat;
-      });
-      
-      console.log(`Message added - ChatID: ${chatId}, Total messages: ${
-        updatedChats.find(c => c.id === chatId)?.messages.length || 0
-      }`);
-      
-      return { chats: updatedChats };
-    });
+    set((state) => appendMessageToChat(state, chatId, message));
   },
   addImageMessage: (chatId, { content, imageUrl, role }) => {
-    set((state) => {
-      console.log(`Adding image message - ChatID: ${chatId}, Role: ${role}`);
-      
-      const newMessage: Message = {
-        id: `img_${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        role,
-        content,
-        imageUrl,
-        timestamp: Date.now(),
-      };
-      
-      const updatedChats = state.chats.map((chat) => {
-        if (chat.id === chatId) {
-          return {
-            ...chat,
-            messages: [...chat.messages, newMessage],
-            updatedAt: Date.now(),
-            unreadCount: role === 'assistant' ? chat.unreadCount + 1 : chat.unreadCount,
-          };
-        }
-        return chat;
-      });
-      
-      return { chats: updatedChats };
-    });
+    set((state) => appendMessageToChat(state, chatId, { content, imageUrl, role }, 'img_'));
   },
   updateChatTitle: (chatId, title) => {
     set((state) => ({
@@ -167,7 +148,9 @@ export const createChatSlice: StateCreator<
         ? filteredChats.length > 0 ? filteredChats[0].id : null
         : state.currentChatId;
       
-      console.log(`Chat deleted - ChatID: ${chatId}`);
+      if (__DEV__) {
+        console.log(`Chat deleted - ChatID: ${chatId}`);
+      }
       
       return {
         chats: filteredChats,

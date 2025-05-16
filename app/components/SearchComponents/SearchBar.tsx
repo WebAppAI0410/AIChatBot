@@ -11,15 +11,16 @@ import { Ionicons } from '@expo/vector-icons';
 import theme from '../../ui/theme';
 import useColors from '../../constants/colors';
 import SearchInput, { SearchInputRef } from './SearchInput';
+import { t } from '../../localization';
 
-export type SearchBarRef = {
+export interface SearchBarRef {
   focus: () => void;
   blur: () => void;
   clear: () => void;
   getValue: () => string;
-};
+}
 
-type SearchBarProps = {
+interface SearchBarProps {
   placeholder?: string;
   onSearch: (text: string) => void;
   onCancel?: () => void;
@@ -29,7 +30,16 @@ type SearchBarProps = {
   showCancelButton?: boolean;
   containerStyle?: ViewStyle;
   delayMs?: number;
-};
+}
+
+// インラインスタイルを抽出
+const getSearchInputStyle = (isFocused: boolean, colors: ReturnType<typeof useColors>): ViewStyle => ({
+  flex: 1,
+  borderRadius: theme.radius.md,
+  borderWidth: 1,
+  borderColor: isFocused ? colors.primary : 'transparent',
+  backgroundColor: colors.card,
+});
 
 const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(({
   placeholder = '検索...',
@@ -47,21 +57,21 @@ const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(({
   const [isFocused, setIsFocused] = useState(false);
   const [inputValue, setInputValue] = useState(initialValue);
 
-  // キーボードの表示/非表示を監視
+  // キーボードの表示/非表示を監視（改善版）
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
-      setIsFocused(true);
-    });
-
-    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
-      if (!inputValue) {
-        setIsFocused(false);
-      }
-    });
+    const subscriptions = [
+      Keyboard.addListener('keyboardDidShow', () => {
+        setIsFocused(true);
+      }),
+      Keyboard.addListener('keyboardDidHide', () => {
+        if (!inputValue) {
+          setIsFocused(false);
+        }
+      })
+    ];
 
     return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
+      subscriptions.forEach(subscription => subscription.remove());
     };
   }, [inputValue]);
   
@@ -89,7 +99,6 @@ const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(({
   
   // 検索処理
   const handleSearch = (text: string) => {
-    console.log('検索処理実行:', text);
     // テキスト入力を維持する
     setInputValue(text);
     // 親コンポーネントに通知（入力テキストは消さない）
@@ -104,11 +113,8 @@ const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(({
   
   // ブラーイベントハンドラ
   const handleInputBlur = () => {
-    // 入力値がある場合はフォーカス状態を維持（バツボタン表示のため）
-    if (inputValue) {
-      // フォーカス状態は変更しない（バツボタンを表示し続ける）
-    } else {
-      // 入力値がなければフォーカス状態を解除
+    // 入力値がなければフォーカス状態を解除、あればフォーカス状態を維持
+    if (!inputValue) {
       setTimeout(() => {
         setIsFocused(false);
         onCustomBlur?.();
@@ -128,7 +134,7 @@ const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(({
     }, 50);
   };
 
-  // バツボタン処理
+  // バツボタン処理（最適化版）
   const handleClose = () => {
     // 現在の入力値を保持
     const currentInputValue = inputValue;
@@ -136,6 +142,9 @@ const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(({
     // 入力をクリア
     searchInputRef.current?.clear();
     setInputValue('');
+
+    // 空文字で検索を実行して初期状態に戻す
+    onSearch('');
     
     // 元々入力値がなかった場合はフォーカスを解除し、キーボードを閉じる
     if (!currentInputValue) {
@@ -150,9 +159,6 @@ const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(({
         searchInputRef.current?.focus();
       }, 50);
     }
-    
-    // 空文字で検索を実行して初期状態に戻す
-    onSearch('');
   };
   
   return (
@@ -172,13 +178,7 @@ const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(({
           delayMs={delayMs}
           onCustomFocus={handleInputFocus}
           onCustomBlur={handleInputBlur}
-          containerStyle={{
-            flex: 1,
-            borderRadius: theme.radius.md,
-            borderWidth: 1,
-            borderColor: isFocused ? colors.primary : 'transparent',
-            backgroundColor: colors.card,
-          }}
+          containerStyle={getSearchInputStyle(isFocused, colors)}
           showSearchIcon={true}
         />
       </View>
@@ -190,6 +190,8 @@ const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(({
           onPress={handleClose}
           activeOpacity={0.7}
           hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+          accessibilityLabel={t('search.clearInput', '検索をクリア')}
+          accessibilityRole="button"
         >
           <Ionicons name="close-circle" size={22} color={colors.gray} />
         </TouchableOpacity>
@@ -201,9 +203,11 @@ const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(({
           style={styles.cancelButton}
           onPress={handleCancel}
           activeOpacity={0.7}
+          accessibilityLabel={t('search.cancelSearch', '検索をキャンセル')}
+          accessibilityRole="button"
         >
           <Text style={[styles.cancelText, {color: colors.primary}]}>
-            キャンセル
+            {t('search.cancel', 'キャンセル')}
           </Text>
         </TouchableOpacity>
       )}
@@ -217,7 +221,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: theme.spacing.sm,
     paddingVertical: theme.spacing.xs,
-    minHeight: 48,
+    minHeight: theme.sizes.input.height.md,
     backgroundColor: 'transparent',
   },
   searchContainer: {

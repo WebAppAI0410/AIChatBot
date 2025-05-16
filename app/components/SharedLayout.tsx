@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, ViewStyle } from 'react-native';
 import useResponsive from '../hooks/useResponsive';
 import useColors from '../constants/colors';
 
@@ -8,6 +8,19 @@ type SharedLayoutProps = {
   mainContent: React.ReactNode;
   showSidebar?: boolean;
 };
+
+/**
+ * サイドバースタイルを計算するヘルパー関数
+ */
+const getSidebarStyles = (
+  sidebarWidth: number | string,
+  colors: ReturnType<typeof useColors>
+): ViewStyle => ({
+  width: typeof sidebarWidth === 'number' ? sidebarWidth : undefined,
+  flex: typeof sidebarWidth !== 'number' ? 1 : undefined,
+  backgroundColor: colors.background,
+  borderRightColor: colors.lightGray
+});
 
 /**
  * 共通レイアウトコンポーネント
@@ -23,22 +36,22 @@ const SharedLayout: React.FC<SharedLayoutProps> = ({
   const useTwoColumnLayout = layout.twoColumn && showSidebar;
   
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View 
+      style={[styles.container, { backgroundColor: colors.background }]}
+      accessibilityLabel="メインレイアウトコンテナ"
+    >
       {useTwoColumnLayout ? (
         // タブレット/デスクトップ/横向きのレイアウト
         <View style={styles.twoColumnContainer}>
-          <View style={[
-            styles.sidebar, 
-            { 
-              width: typeof layout.sidebarWidth === 'number' ? layout.sidebarWidth : undefined,
-              flex: typeof layout.sidebarWidth !== 'number' ? 1 : undefined,
-              backgroundColor: colors.background,
-              borderRightColor: colors.lightGray
-            }
-          ]}>
+          <View 
+            style={[styles.sidebar, getSidebarStyles(layout.sidebarWidth, colors)]}
+            accessibilityLabel="サイドバーナビゲーション"
+          >
             {sidebarContent}
           </View>
-          <View style={[styles.mainContent, { backgroundColor: colors.background }]}>
+          <View 
+            style={[styles.mainContent, { backgroundColor: colors.background }]}
+          >
             {mainContent}
           </View>
         </View>

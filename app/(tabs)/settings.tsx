@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { Link, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +13,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const colors = useColors();  // 動的カラーを取得
 
-  const styles = StyleSheet.create({
+  const styles = useMemo(() => StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: colors.background,
@@ -63,7 +63,7 @@ export default function SettingsScreen() {
       fontSize: 14,
       color: colors.gray,
     },
-  });
+  }), [colors]); // colorsが変わった時だけ再計算
 
   const settingsOptions = [
     {
@@ -74,7 +74,7 @@ export default function SettingsScreen() {
     },
     {
       title: '使用量',
-      icon: 'analytics-outline',
+      icon: 'analytics-outline' as IconName,
       route: 'settings/usage',
       description: 'トークンと機能の使用状況',
     },

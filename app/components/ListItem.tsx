@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../ui/theme';
 import useColors from '../constants/colors';
@@ -11,7 +11,7 @@ type ListItemProps = {
   rightIcon?: keyof typeof Ionicons.glyphMap | 'chevron';
   onPress?: () => void;
   selected?: boolean;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   badge?: React.ReactNode;
 };
 
@@ -29,6 +29,15 @@ const ListItem: React.FC<ListItemProps> = ({
   
   const Container = onPress ? TouchableOpacity : View;
   
+  // アクセシビリティとタッチ関連のプロパティを条件付きで適用
+  const accessibilityProps = onPress ? {
+    accessibilityRole: "button" as const,
+    accessibilityLabel: title,
+    accessibilityHint: subtitle,
+    accessibilityState: { selected },
+    activeOpacity: 0.7
+  } : {};
+  
   return (
     <Container
       style={[
@@ -38,7 +47,7 @@ const ListItem: React.FC<ListItemProps> = ({
         style,
       ]}
       onPress={onPress}
-      activeOpacity={0.7}
+      {...accessibilityProps}
     >
       {leftIcon && (
         <View style={styles.leftIconContainer}>

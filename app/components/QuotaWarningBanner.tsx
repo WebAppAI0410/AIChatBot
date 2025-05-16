@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import theme from '../ui/theme';
 import useColors from '../constants/colors';
 import Button from './Button';
+import { t } from '../localization';
 
 type QuotaWarningBannerProps = {
   quotaType: 'tokens' | 'images' | 'aiAssist';
@@ -21,24 +22,21 @@ const QuotaWarningBanner: React.FC<QuotaWarningBannerProps> = ({
   const colors = useColors();
   
   const getQuotaTypeLabel = () => {
-    switch (quotaType) {
-      case 'tokens':
-        return 'トークン';
-      case 'images':
-        return '画像生成';
-      case 'aiAssist':
-        return 'AIアシスト';
-      default:
-        return 'クォータ';
-    }
+    return t(`quota.types.${quotaType}`, t('quota.types.default'));
   };
   
   const getMessage = () => {
     const quotaLabel = getQuotaTypeLabel();
-    if (percentRemaining <= 0) {
-      return `${quotaLabel}の月間クォータを使い切りました。プランをアップグレードするか、来月まで待ってください。`;
+    // パーセント値のバリデーション（0～100の範囲内にクランプ）
+    const validPercent = Math.max(0, Math.min(100, percentRemaining));
+    
+    if (validPercent <= 0) {
+      return t('quota.message.empty', undefined, { quota: quotaLabel });
     } else {
-      return `${quotaLabel}の月間クォータが残り${percentRemaining}%です。プランをアップグレードして制限を増やしましょう。`;
+      return t('quota.message.remaining', undefined, { 
+        quota: quotaLabel, 
+        percent: validPercent 
+      });
     }
   };
   
@@ -65,7 +63,7 @@ const QuotaWarningBanner: React.FC<QuotaWarningBannerProps> = ({
         
         {onUpgrade && (
           <Button
-            title="プランをアップグレード"
+            title={t('quota.action.upgrade')}
             variant="primary"
             size="small"
             iconName="arrow-up-circle-outline"

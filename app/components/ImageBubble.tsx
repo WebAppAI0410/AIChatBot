@@ -1,5 +1,4 @@
 import React from 'react';
-import { View, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { styled, Text, YStack } from 'tamagui';
 
@@ -26,12 +25,18 @@ export const ImageBubble: React.FC<ImageBubbleProps> = ({
       onPress={onPress}
       alignSelf={isSent ? 'flex-end' : 'flex-start'}
       backgroundColor={isSent ? '$primary' : '$backgroundHover'}
+      accessibilityRole="button"
+      accessibilityLabel={`Generated image from prompt: ${prompt}`}
+      accessibilityHint={onPress ? "Tap to view image in full screen" : undefined}
     >
       <Image
         source={{ uri: imageUrl }}
         style={{ width: '100%', aspectRatio: 1 }}
         contentFit="cover"
         transition={300}
+        accessible={true}
+        accessibilityLabel={`Image generated from prompt: ${prompt}`}
+        onError={(error) => console.error('Image loading error:', error)}
       />
 
       <ContentContainer>
@@ -59,6 +64,9 @@ const Container = styled(YStack, {
   maxWidth: '80%',
   borderRadius: '$4',
   overflow: 'hidden',
+  pressStyle: {
+    opacity: 0.8,
+  },
 });
 
 const ContentContainer = styled(YStack, {

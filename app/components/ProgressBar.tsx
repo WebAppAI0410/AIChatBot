@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import theme from '../ui/theme';
 import useColors from '../constants/colors';
 
@@ -9,7 +9,7 @@ type ProgressBarProps = {
   label?: string;
   height?: number;
   showLabel?: boolean;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 };
 
 const ProgressBar: React.FC<ProgressBarProps> = ({
@@ -25,7 +25,11 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
   const progressColor = color || colors.primary;
   
   return (
-    <View style={[styles.container, style]}>
+    <View 
+      style={[styles.container, style]}
+      accessibilityRole="progressbar"
+      accessibilityValue={{ now: clampedPercentage, min: 0, max: 100 }}
+    >
       <View style={[styles.track, { height, backgroundColor: colors.lightGray }]}>
         <View
           style={[
@@ -55,11 +59,11 @@ const styles = StyleSheet.create({
   },
   track: {
     width: '100%',
-    borderRadius: theme.radius.round,
+    borderRadius: theme.radius.xxl,
     overflow: 'hidden',
   },
   progress: {
-    borderRadius: theme.radius.round,
+    borderRadius: theme.radius.xxl,
   },
   label: {
     fontSize: theme.fontSizes.sm,

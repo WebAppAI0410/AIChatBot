@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle, StyleProp } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../ui/theme';
 import useColors from '../constants/colors';
@@ -14,8 +14,8 @@ type ButtonProps = {
   disabled?: boolean;
   loading?: boolean;
   fullWidth?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
 };
 
 const Button: React.FC<ButtonProps> = ({
@@ -154,6 +154,8 @@ const Button: React.FC<ButtonProps> = ({
         disabled && styles.disabled,
         style,
       ]}
+      accessibilityRole="button"
+      accessibilityState={{ disabled, busy: loading }}
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.7}

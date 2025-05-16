@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -52,39 +52,10 @@ export default function AppearanceScreen() {
     { id: 'purple', label: 'パープル', color: '#7C3AED' },
   ];
 
-  const styles = StyleSheet.create({
+  const styles = useMemo(() => StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: colors.background,
-    },
-    headerContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      backgroundColor: colors.primary,
-      paddingTop: Platform.OS === 'ios' ? 12 : StatusBar.currentHeight || 0,
-      paddingBottom: 12,
-      paddingHorizontal: 16,
-      height: Platform.OS === 'ios' ? 100 : (StatusBar.currentHeight || 0) + 60,
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: 'rgba(255, 255, 255, 0.2)',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    headerTitle: {
-      color: colors.textOnPrimary,
-      fontSize: 18,
-      fontWeight: '600',
-      flex: 1,
-      textAlign: 'center',
-      marginHorizontal: 10,
-    },
-    headerRight: {
-      width: 40,
     },
     scrollContainer: {
       flex: 1,
@@ -161,7 +132,7 @@ export default function AppearanceScreen() {
       color: colors.textOnPrimary,
       fontWeight: '500',
     },
-  });
+  }), [colors]);
 
   return (
     <View style={styles.container}>
@@ -212,17 +183,17 @@ export default function AppearanceScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>カラーテーマ</Text>
           <View style={styles.colorThemeContainer}>
-            {colorThemes.map((theme) => (
+            {colorThemes.map((colorOpt) => (
               <TouchableOpacity
-                key={theme.id}
+                key={colorOpt.id}
                 style={[
                   styles.colorOption,
-                  { backgroundColor: theme.color },
-                  theme.id === colorTheme && styles.selectedColorOption,
+                  { backgroundColor: colorOpt.color },
+                  colorOpt.id === colorTheme && styles.selectedColorOption,
                 ]}
-                onPress={() => setColorTheme(theme.id as 'green' | 'blue' | 'orange' | 'purple')}
+                onPress={() => setColorTheme(colorOpt.id as 'green' | 'blue' | 'orange' | 'purple')}
               >
-                {theme.id === colorTheme && (
+                {colorOpt.id === colorTheme && (
                   <Ionicons name="checkmark" size={20} color="#FFFFFF" />
                 )}
               </TouchableOpacity>

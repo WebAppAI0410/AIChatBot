@@ -14,7 +14,7 @@ export type PlanType = {
   };
 };
 
-export const PLANS = {
+export const PLANS: Record<string, PlanType> = {
   FREE: {
     id: 'free',
     name: 'Free',
@@ -71,5 +71,3 @@ export const QUOTA_WARNING_THRESHOLDS = {
   WARNING: 0.8, // 80%使用で警告
   EXCEEDED: 1.0, // 100%使用でクォータ超過
 };
-
-export default PLANS;

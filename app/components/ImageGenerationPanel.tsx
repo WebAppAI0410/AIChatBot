@@ -1,4 +1,4 @@
-import React, { useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { 
@@ -34,7 +34,7 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
   const {
     sdxlQuota,
     dalleQuota,
-    generateImage,
+    generateImage: generateImageFromStore,
     isGenerating: storeIsGenerating,
     generationError
   } = useStore();
@@ -76,12 +76,12 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
   };
 
   // 画像生成ハンドラ - 親コンポーネントから呼び出されるように変更
-  const handleGenerate = async () => {
+  const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return null;
     
     try {      
       // 画像生成
-      const imageUrl = await generateImage({
+      const imageUrl = await generateImageFromStore({
         prompt,
         size,
         quality,
@@ -95,7 +95,7 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
       console.error('Image generation error:', err);
       return null;
     }
-  };
+  }, [prompt, size, quality, model, canUseDalle, generateImageFromStore]);
 
   // 親コンポーネントの送信ボタンが押されたときに呼び出される関数を公開
   useImperativeHandle(
@@ -113,7 +113,7 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
       },
       canGenerate: () => currentQuota.remaining > 0 && Boolean(prompt.trim())
     }),
-    [currentQuota.remaining, prompt, handleGenerate, onImageGenerated, model, canUseDalle]
+    [handleGenerate, onImageGenerated, model, canUseDalle, currentQuota.remaining, prompt]
   );
 
   return (

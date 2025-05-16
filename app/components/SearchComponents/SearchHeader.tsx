@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import theme from '../../ui/theme';
 import useColors from '../../constants/colors';
 import SearchBar, { SearchBarRef } from './SearchBar';
+import { t } from '../../localization';
 
 export type SearchHeaderRef = {
   focus: () => void;
@@ -46,7 +47,7 @@ const SearchHeader = forwardRef<SearchHeaderRef, SearchHeaderProps>(({
   const router = useRouter();
   const searchBarRef = useRef<SearchBarRef>(null);
   
-  // 外部からアクセスできるメソッドを定義
+  // Define methods that can be accessed externally
   useImperativeHandle(ref, () => ({
     focus: () => {
       searchBarRef.current?.focus();
@@ -62,7 +63,7 @@ const SearchHeader = forwardRef<SearchHeaderRef, SearchHeaderProps>(({
     }
   }));
   
-  // 戻るボタン処理
+  // Back button handling
   const handleBackPress = () => {
     if (onBackPress) {
       onBackPress();
@@ -83,7 +84,9 @@ const SearchHeader = forwardRef<SearchHeaderRef, SearchHeaderProps>(({
         <TouchableOpacity
           style={styles.backButton}
           onPress={handleBackPress}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          hitSlop={{ top: theme.spacing.sm, bottom: theme.spacing.sm, left: theme.spacing.sm, right: theme.spacing.sm }}
+          accessibilityLabel={t('header.backButton', '戻る')}
+          accessibilityRole="button"
         >
           <Ionicons name="chevron-back" size={24} color={colors.textOnPrimary} />
         </TouchableOpacity>
@@ -111,12 +114,12 @@ const styles = StyleSheet.create({
     paddingTop: theme.safeArea.top,
     paddingBottom: 0,
     paddingHorizontal: theme.spacing.sm,
-    height: 44 + theme.safeArea.top,
+    height: theme.sizes.header.height + theme.safeArea.top,
   },
   backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: theme.radius.round,
+    width: theme.sizes.header.backButton,
+    height: theme.sizes.header.backButton,
+    borderRadius: theme.radius.xxl,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',

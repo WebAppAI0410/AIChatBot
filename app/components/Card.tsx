@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
+import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import theme from '../ui/theme';
 import useColors from '../constants/colors';
 
@@ -7,7 +7,7 @@ type CardProps = {
   children: React.ReactNode;
   variant?: 'default' | 'elevated' | 'outlined';
   padding?: 'none' | 'small' | 'medium' | 'large';
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 };
 
 const Card: React.FC<CardProps> = ({
@@ -43,7 +43,11 @@ const Card: React.FC<CardProps> = ({
   };
   
   return (
-    <View style={[getCardStyle(), style]}>
+    <View 
+      style={[getCardStyle(), style]}
+      accessibilityRole="none"
+      accessible={false}
+    >
       {children}
     </View>
   );

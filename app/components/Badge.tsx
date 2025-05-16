@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle, TextStyle, StyleProp } from 'react-native';
 import theme from '../ui/theme';
 import useColors from '../constants/colors';
 
@@ -8,8 +8,8 @@ type BadgeProps = {
   variant?: 'primary' | 'success' | 'warning' | 'error' | 'info';
   size?: 'small' | 'medium' | 'large';
   showDot?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
 };
 
 const Badge: React.FC<BadgeProps> = ({
@@ -89,7 +89,11 @@ const Badge: React.FC<BadgeProps> = ({
           paddingHorizontal: sizeStyle.paddingHorizontal,
           borderRadius: sizeStyle.borderRadius,
         },
-        !label && { width: sizeStyle.dotSize * 2, height: sizeStyle.dotSize * 2 },
+        !label && {
+          width: sizeStyle.dotSize * 2,
+          height: sizeStyle.dotSize * 2,
+          borderRadius: sizeStyle.dotSize,
+        },
         style,
       ]}
     >

@@ -15,10 +15,18 @@
 ### 方法1: Supabase CLIを使用する方法（推奨）
 
 ```bash
-# 必要なAPIキーを設定
-supabase secrets set OPENROUTER_API_KEY=sk-or-v1-your-key-here --project-ref alperyqhdtpnivxfnqdi
-supabase secrets set OPENAI_API_KEY=sk-your-openai-key-here --project-ref alperyqhdtpnivxfnqdi
-supabase secrets set CLOUDFLARE_API_KEY=your-cloudflare-key-here --project-ref alperyqhdtpnivxfnqdi
+# ⚠️ 警告: 以下のように直接APIキーをコマンドラインに入力すると、シェル履歴やCIログに残り漏洩リスクがあります
+# supabase secrets set OPENROUTER_API_KEY=sk-or-v1-your-key-here --project-ref alperyqhdtpnivxfnqdi
+
+# 安全な方法1: 環境変数から読み込む（シェル履歴にはキー値が残りません）
+supabase secrets set OPENROUTER_API_KEY="$OPENROUTER_API_KEY" --project-ref alperyqhdtpnivxfnqdi
+supabase secrets set OPENAI_API_KEY="$OPENAI_API_KEY" --project-ref alperyqhdtpnivxfnqdi
+supabase secrets set CLOUDFLARE_API_KEY="$CLOUDFLARE_API_KEY" --project-ref alperyqhdtpnivxfnqdi
+
+# 安全な方法2: 標準入力から読み込む（コマンドラインにキー値が一切現れません）
+printf %s "$OPENROUTER_API_KEY" | supabase secrets set OPENROUTER_API_KEY - --project-ref alperyqhdtpnivxfnqdi
+printf %s "$OPENAI_API_KEY" | supabase secrets set OPENAI_API_KEY - --project-ref alperyqhdtpnivxfnqdi
+printf %s "$CLOUDFLARE_API_KEY" | supabase secrets set CLOUDFLARE_API_KEY - --project-ref alperyqhdtpnivxfnqdi
 ```
 
 ### 方法2: Supabaseダッシュボードを使用する方法
@@ -122,6 +130,8 @@ supabase functions deploy image-generator --no-verify-jwt
 ## 重要な注意事項
 
 - APIキーは機密情報です。Gitリポジトリにコミットしないでください
+- シェル履歴やCIログにAPIキーが残らないよう、上記の安全な方法で設定してください
+- スクリプト内でAPIキーを扱う場合は、必ず環境変数経由で渡し、スクリプト内にハードコーディングしないでください
 - 各APIキーには利用制限があります。使用状況を定期的に確認してください
 - 不審なアクティビティに気付いた場合は、すぐにAPIキーを再生成してください
 - Edge Functionの最大実行時間は10秒です。長時間実行されるリクエストの場合はタイムアウト処理を実装してください 

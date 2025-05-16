@@ -73,14 +73,19 @@ const SwipeableRow: React.FC<SwipeableRowProps> = ({ children, onDelete, onLongP
   };
 
   return (
-    <Swipeable
-      ref={swipeableRef}
-      friction={2}
-      rightThreshold={40}
-      renderRightActions={renderRightActions}
+    <View 
+      accessibilityLabel="チャット項目"
+      accessibilityHint="左にスワイプすると削除オプションが表示されます"
     >
-      {childrenWithLongPress}
-    </Swipeable>
+      <Swipeable
+        ref={swipeableRef}
+        friction={2}
+        rightThreshold={40}
+        renderRightActions={renderRightActions}
+      >
+        {childrenWithLongPress}
+      </Swipeable>
+    </View>
   );
 };
 

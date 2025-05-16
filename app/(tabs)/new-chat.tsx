@@ -9,8 +9,6 @@ import {
   KeyboardAvoidingView, 
   Platform,
   Keyboard,
-  Dimensions,
-  SafeAreaView
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,9 +28,105 @@ const SUGGESTIONS = [
   '英語の勉強のコツは？',
 ];
 
+// Define styles outside component scope with factory function
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+    paddingTop: 0,
+  },
+  suggestionsContainer: {
+    flex: 1,
+    padding: 16,
+  },
+  suggestionsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: colors.text,
+  },
+  chipContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 24,
+  },
+  chip: {
+    backgroundColor: colors.lightGray,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    margin: 4,
+  },
+  chipText: {
+    fontSize: 14,
+    color: colors.text,
+  },
+  localModelBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${colors.accentBlue}20`,
+    padding: 12,
+    borderRadius: 8,
+    margin: 16,
+    marginTop: 0,
+  },
+  localModelText: {
+    fontSize: 14,
+    color: colors.accentBlue,
+    marginLeft: 8,
+    flex: 1,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.lightGray,
+    backgroundColor: colors.background,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: colors.lightGray,
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    maxHeight: 120,
+    fontSize: 16,
+    color: colors.text,
+  },
+  sendButton: {
+    backgroundColor: colors.primary,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  sendButtonDisabled: {
+    backgroundColor: colors.lightGray,
+  },
+  modelSelectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.lg,
+  },
+  modelSelectButtonText: {
+    marginRight: theme.spacing.xs,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: '500',
+    color: colors.textOnPrimary,
+  },
+});
+
 export default function NewChatScreen() {
   const router = useRouter();
   const colors = useColors(); // 動的カラーを取得
+  
+  // Cache styles with useMemo
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   
   const [input, setInput] = useState('');
   const createChat = useStore(state => state.createChat);
@@ -115,98 +209,6 @@ export default function NewChatScreen() {
       <Ionicons name="chevron-down" size={16} color={colors.textOnPrimary} />
     </TouchableOpacity>
   );
-
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-      paddingTop: 0,
-    },
-    suggestionsContainer: {
-      flex: 1,
-      padding: 16,
-    },
-    suggestionsTitle: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      marginBottom: 12,
-      color: colors.text,
-    },
-    chipContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginBottom: 24,
-    },
-    chip: {
-      backgroundColor: colors.lightGray,
-      borderRadius: 16,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      margin: 4,
-    },
-    chipText: {
-      fontSize: 14,
-      color: colors.text,
-    },
-    localModelBanner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: `${colors.accentBlue}20`,
-      padding: 12,
-      borderRadius: 8,
-      margin: 16,
-      marginTop: 0,
-    },
-    localModelText: {
-      fontSize: 14,
-      color: colors.accentBlue,
-      marginLeft: 8,
-      flex: 1,
-    },
-    inputContainer: {
-      flexDirection: 'row',
-      padding: 12,
-      borderTopWidth: 1,
-      borderTopColor: colors.lightGray,
-      backgroundColor: colors.background,
-    },
-    input: {
-      flex: 1,
-      backgroundColor: colors.lightGray,
-      borderRadius: 20,
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      maxHeight: 120,
-      fontSize: 16,
-      color: colors.text,
-    },
-    sendButton: {
-      backgroundColor: colors.primary,
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginLeft: 8,
-    },
-    sendButtonDisabled: {
-      backgroundColor: colors.lightGray,
-    },
-    modelSelectButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: 'rgba(255, 255, 255, 0.2)',
-      paddingHorizontal: theme.spacing.md,
-      paddingVertical: theme.spacing.xs,
-      borderRadius: theme.radius.lg,
-    },
-    modelSelectButtonText: {
-      marginRight: theme.spacing.xs,
-      fontSize: theme.fontSizes.sm,
-      fontWeight: '500',
-      color: colors.textOnPrimary,
-    },
-  });
 
   return (
     <View style={styles.container}>

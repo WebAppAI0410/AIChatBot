@@ -1,5 +1,15 @@
 import { Platform, StatusBar } from 'react-native';
 
+// フォントサイズの一元管理のための定義
+const baseFontSizes = {
+  xs: 12,
+  sm: 14,
+  md: 16,
+  lg: 18,
+  xl: 20,
+  xxl: 24,
+};
+
 export const theme = {
   colors: {
     primary: '#005E36',
@@ -54,7 +64,7 @@ export const theme = {
   },
   
   safeArea: {
-    top: Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 0,
+    top: Platform.OS === 'ios' ? (StatusBar.currentHeight || 44) : (StatusBar.currentHeight || 0),
     bottom: Platform.OS === 'ios' ? 34 : 0,
     left: 0,
     right: 0,
@@ -62,32 +72,32 @@ export const theme = {
   
   typography: {
     heading1: {
-      fontSize: 24,
+      fontSize: baseFontSizes.xxl,
       fontWeight: 'bold',
       lineHeight: 32,
     },
     heading2: {
-      fontSize: 20,
+      fontSize: baseFontSizes.xl,
       fontWeight: 'bold',
       lineHeight: 28,
     },
     heading3: {
-      fontSize: 18,
+      fontSize: baseFontSizes.lg,
       fontWeight: 'bold',
       lineHeight: 24,
     },
     body: {
-      fontSize: 16,
+      fontSize: baseFontSizes.md,
       fontWeight: 'normal',
       lineHeight: 22,
     },
     caption: {
-      fontSize: 14,
+      fontSize: baseFontSizes.sm,
       fontWeight: 'normal',
       lineHeight: 18,
     },
     small: {
-      fontSize: 12,
+      fontSize: baseFontSizes.xs,
       fontWeight: 'normal',
       lineHeight: 16,
     },
@@ -99,7 +109,7 @@ export const theme = {
     md: 8,
     lg: 12,
     xl: 16,
-    round: 9999,
+    xxl: 9999, // 以前の'round'から命名規則を一致させるように変更
   },
   
   shadows: {
@@ -132,19 +142,34 @@ export const theme = {
     slow: 500,
   },
   
-  fontSizes: {
-    xs: 12,
-    sm: 14,
-    md: 16,
-    lg: 18,
-    xl: 20,
-    xxl: 24,
-  },
+  // 共通のフォントサイズ定義を使用
+  fontSizes: baseFontSizes,
   
   borderWidth: {
     thin: 1,
     normal: 2,
     thick: 3,
+  },
+  
+  // 共通のコンポーネントサイズを定義
+  sizes: {
+    input: {
+      height: {
+        sm: 36,
+        md: 48,
+        lg: 56,
+      },
+    },
+    icon: {
+      sm: 16,
+      md: 24,
+      lg: 32,
+    },
+    header: {
+      height: 44, // ヘッダーの標準高さ
+      backButton: 32, // 戻るボタンサイズ
+      verticalAdjust: -4, // 垂直位置調整用
+    },
   },
   
   componentStyles: {

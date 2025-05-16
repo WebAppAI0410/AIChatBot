@@ -1,5 +1,9 @@
 import { useStore } from '../store';
 import { useColorScheme } from 'react-native';
+import { useMemo } from 'react';
+
+// カラーテーマの型定義
+export type ColorTheme = 'green' | 'blue' | 'orange' | 'purple';
 
 // カラーテーマの色定義
 const themeColors = {
@@ -70,7 +74,7 @@ const baseDarkColors = {
 };
 
 // ライトモード用のテーマごとのカラー生成
-export const createLightColors = (theme: 'green' | 'blue' | 'orange' | 'purple') => {
+export const createLightColors = (theme: ColorTheme) => {
   return {
     ...baseLightColors,
     primary: themeColors[theme].lightPrimary,
@@ -80,7 +84,7 @@ export const createLightColors = (theme: 'green' | 'blue' | 'orange' | 'purple')
 };
 
 // ダークモード用のテーマごとのカラー生成
-export const createDarkColors = (theme: 'green' | 'blue' | 'orange' | 'purple') => {
+export const createDarkColors = (theme: ColorTheme) => {
   return {
     ...baseDarkColors,
     primary: themeColors[theme].darkPrimary,
@@ -103,11 +107,13 @@ export function useColors() {
   
   const isDark = theme === 'dark' || (theme === 'system' && systemScheme === 'dark');
   
-  if (isDark) {
-    return createDarkColors(colorTheme as 'green' | 'blue' | 'orange' | 'purple');
-  } else {
-    return createLightColors(colorTheme as 'green' | 'blue' | 'orange' | 'purple');
-  }
+  return useMemo(
+    () => 
+      isDark
+        ? createDarkColors(colorTheme as ColorTheme)
+        : createLightColors(colorTheme as ColorTheme),
+    [isDark, colorTheme]
+  );
 }
 
 export default useColors;

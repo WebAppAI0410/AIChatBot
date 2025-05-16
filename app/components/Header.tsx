@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import theme from '../ui/theme';
 import useColors from '../constants/colors';
+import { t } from '../localization';
 
 type HeaderProps = {
   title: string;
@@ -68,16 +69,18 @@ const Header: React.FC<HeaderProps> = ({
     ]}>
       {showBack && (
         <TouchableOpacity
-          style={styles.backButton}
+          style={[styles.backButton, styles.verticalCenterAdjust]}
           onPress={handleBackPress}
           hitSlop={{ top: theme.spacing.sm, bottom: theme.spacing.sm, left: theme.spacing.sm, right: theme.spacing.sm }}
+          accessibilityLabel={t('header.backButton', '戻る')}
+          accessibilityRole="button"
         >
           <Ionicons name="chevron-back" size={24} color={colors.textOnPrimary} />
         </TouchableOpacity>
       )}
 
       {isEditingTitle ? (
-        <View style={styles.editTitleContainer}>
+        <View style={[styles.editTitleContainer, styles.verticalCenterAdjust]}>
           <TextInput
             style={[styles.editTitleInput, { color: colors.textOnPrimary }]}
             value={editTitle}
@@ -88,25 +91,32 @@ const Header: React.FC<HeaderProps> = ({
             onSubmitEditing={saveTitleEdit}
             blurOnSubmit={true}
             returnKeyType="done"
+            accessibilityLabel={t('header.editTitleInput', 'タイトルを編集')}
           />
           <TouchableOpacity
             style={styles.titleEditIcon}
             onPress={saveTitleEdit}
+            accessibilityLabel={t('header.saveTitle', '保存')}
+            accessibilityRole="button"
           >
             <Ionicons name="checkmark" size={22} color={colors.textOnPrimary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.titleEditIcon}
             onPress={cancelTitleEdit}
+            accessibilityLabel={t('header.cancelEdit', 'キャンセル')}
+            accessibilityRole="button"
           >
             <Ionicons name="close" size={22} color={colors.textOnPrimary} />
           </TouchableOpacity>
         </View>
       ) : (
         <TouchableOpacity
-          style={styles.titleContainer}
+          style={[styles.titleContainer, styles.verticalCenterAdjust]}
           onPress={onTitleEdit ? startTitleEdit : undefined}
           activeOpacity={onTitleEdit ? 0.7 : 1}
+          accessibilityLabel={onTitleEdit ? t('header.tapToEditTitle', 'タップしてタイトルを編集') : undefined}
+          accessibilityRole={onTitleEdit ? "button" : undefined}
         >
           <Text
             style={[styles.title, { color: colors.textOnPrimary }]}
@@ -131,9 +141,11 @@ const Header: React.FC<HeaderProps> = ({
           style={styles.modelButton}
           onPress={onModelSelect}
           hitSlop={{ top: theme.spacing.sm, bottom: theme.spacing.sm, left: theme.spacing.sm, right: theme.spacing.sm }}
+          accessibilityLabel={t('header.selectModel', 'モデルを選択')}
+          accessibilityRole="button"
         >
           <Text style={[styles.modelButtonText, { color: colors.textOnPrimary }]}>
-            {currentModelName || 'モデル選択'}
+            {currentModelName || t('header.modelSelection')}
           </Text>
           <Ionicons name="chevron-down" size={16} color={colors.textOnPrimary} />
         </TouchableOpacity>
@@ -149,6 +161,9 @@ const Header: React.FC<HeaderProps> = ({
 };
 
 const styles = StyleSheet.create({
+  verticalCenterAdjust: {
+    marginTop: theme.sizes.header.verticalAdjust, // Adjust vertical position to center in blue area
+  },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -156,16 +171,15 @@ const styles = StyleSheet.create({
     paddingTop: theme.safeArea.top,
     paddingBottom: 0,
     paddingHorizontal: theme.spacing.md,
-    height: 44 + theme.safeArea.top, // Increased height to match blue area
+    height: theme.sizes.header.height + theme.safeArea.top, // Increased height to match blue area
   },
   backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: theme.radius.round,
+    width: theme.sizes.header.backButton,
+    height: theme.sizes.header.backButton,
+    borderRadius: theme.radius.xxl,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: -4, // Adjust vertical position to center in blue area
   },
   titleContainer: {
     flex: 1,
@@ -173,14 +187,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 28,
-    marginTop: -4, // Adjust vertical position to center in blue area
   },
   title: {
     fontSize: theme.fontSizes.md,
     fontWeight: '600',
     textAlign: 'center',
     marginHorizontal: theme.spacing.sm,
-    maxWidth: '80%', // タイトルの最大幅を制限
+    maxWidth: '80%', // Limit the maximum width of the title
   },
   titleEditIcon: {
     marginLeft: theme.spacing.xs,
@@ -192,7 +205,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 28,
-    marginTop: -4, // Adjust vertical position to center in blue area
   },
   editTitleInput: {
     flex: 1,

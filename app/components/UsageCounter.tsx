@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import theme from '../ui/theme';
 import useColors from '../constants/colors';
 import Badge from './Badge';
@@ -10,7 +10,7 @@ type UsageCounterProps = {
   limit: number | string;
   isPremium?: boolean;
   isUnlimited?: boolean;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 };
 
 const UsageCounter: React.FC<UsageCounterProps> = ({
@@ -23,7 +23,9 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
 }) => {
   const colors = useColors();
   
-  const percentage = isUnlimited ? 0 : typeof limit === 'number' ? (current / limit) * 100 : 0;
+  const percentage = isUnlimited || typeof limit !== 'number' || limit === 0 
+    ? 0 
+    : (current / limit) * 100;
   const isWarning = percentage >= 80 && percentage < 100;
   const isExceeded = percentage >= 100;
   
@@ -34,7 +36,12 @@ const UsageCounter: React.FC<UsageCounterProps> = ({
   };
   
   return (
-    <View style={[styles.container, style]}>
+    <View 
+      style={[styles.container, style]}
+      accessible={true}
+      accessibilityRole="text"
+      accessibilityLabel={`${label} usage: ${current} out of ${isUnlimited ? 'unlimited' : limit}`}
+    >
       <View style={styles.labelContainer}>
         <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
         {isPremium && (

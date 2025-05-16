@@ -1,4 +1,4 @@
-import React, { useEffect, createContext } from 'react';
+import React, { createContext } from 'react';
 import { Slot, Stack, Tabs } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
@@ -7,7 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from './store';
-import { useColors } from './constants/colors';
+import { useColors, lightColors } from './constants/colors';
 import config from '../tamagui.config';
 import { useColorScheme } from 'react-native';
 import { ThemeProvider, useTheme } from './ui/ThemeProvider';
@@ -15,11 +15,10 @@ import { OrientationProvider } from './providers/OrientationProvider';
 import { ResetDailyQuotaProvider } from './providers/ResetDailyQuotaProvider';
 
 // ColorsType型を定義
-import type { lightColors } from './constants/colors';
 type ColorsType = typeof lightColors;
 
-// 初期値をnullに変更し、型を明示
-export const ColorsContext = createContext<ColorsType | null>(null);
+// 初期値をlightColorsに設定し、型安全性を向上
+export const ColorsContext = createContext<ColorsType>(lightColors);
 
 export default function RootLayout() {
   const [loaded] = useFonts({

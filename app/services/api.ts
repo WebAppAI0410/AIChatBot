@@ -1,11 +1,12 @@
 import { MODELS } from '../constants/models';
-import { storageClient } from './supabaseStorage';
+// import { storageClient } from './supabaseStorage'; // remove until actually needed
+import Constants from 'expo-constants';
 
 // Supabase Edge FunctionのURL
-const SUPABASE_URL = 'https://alperyqhdtpnivxfnqdi.supabase.co';
+const SUPABASE_URL = Constants.expoConfig?.extra?.SUPABASE_URL!;
 const SUPABASE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/openrouter-proxy`;
 const SUPABASE_IMAGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/image-generator`;
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFscGVyeXFoZHRwbml2eGZucWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY4MDc5OTcsImV4cCI6MjA2MjM4Mzk5N30.0gTXgFtD2uIhGdSB4twConRJPF_0Ccz5zePqa0hD8B0';
+const SUPABASE_ANON_KEY = Constants.expoConfig?.extra?.SUPABASE_ANON_KEY!;
 
 // 画像生成API用のエンドポイント
 // ⚠️注: すべてのAPIキーはSupabase Edge Functionで管理するため
@@ -210,9 +211,11 @@ export const fetchChatCompletion = async (
       }
     }
     
-    console.log('First message role:', processedMessages[0].role);
-    console.log('Last message role:', processedMessages[processedMessages.length - 1].role);
-    console.log('Last message content:', processedMessages[processedMessages.length - 1].content.substring(0, 30));
+    if (__DEV__) {
+      console.log('First message role:', processedMessages[0].role);
+      console.log('Last message role:', processedMessages[processedMessages.length - 1].role);
+      console.log('Last message content:', processedMessages[processedMessages.length - 1].content.substring(0, 30));
+    }
     
     const body = {
       messages: processedMessages,
@@ -235,7 +238,6 @@ export const fetchChatCompletion = async (
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'apikey': SUPABASE_ANON_KEY
         },
         body: JSON.stringify(body),
         signal: controller.signal
@@ -288,7 +290,10 @@ export const fetchChatCompletion = async (
       }
       
       console.log(`API Response received - Length: ${content.length}`);
-      console.log(`Response preview: ${content.substring(0, 50)}...`);
+      
+      if (__DEV__) {
+        console.log(`Response preview: ${content.substring(0, 50)}...`);
+      }
       
       if (onChunk && content) {
         onChunk(content);
@@ -345,7 +350,6 @@ export const generateImage = async ({
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'apikey': SUPABASE_ANON_KEY
       },
       body: JSON.stringify({
         prompt,
@@ -388,7 +392,9 @@ export const generateImage = async ({
     
     // URLまたはデータURLを返す
     const result = data.url || data.dataUrl || '';
-    console.log('画像生成成功:', result.substring(0, 50) + '...');
+    if (__DEV__) {
+      console.log('画像生成成功:', (result.length > 80 ? result.slice(0, 80) + '...' : result));
+    }
     return result;
   } catch (error: unknown) {
     console.error('Image generation final error:', error);

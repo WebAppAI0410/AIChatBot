@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode, useMemo } from 'react';
 import theme from './theme';
 import useColors from '../constants/colors';
 
@@ -16,8 +16,13 @@ type ThemeProviderProps = {
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const colors = useColors();
   
+  const contextValue = useMemo(() => ({
+    theme,
+    colors,
+  }), [colors]);
+  
   return (
-    <ThemeContext.Provider value={{ theme, colors }}>
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );

@@ -4,7 +4,7 @@ import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
 import useColors from '../constants/colors';
-import { theme } from '../ui/theme';
+import theme from '../ui/theme';
 import SwipeableRow from '../components/SwipeableRow';
 import DeleteConfirmDialog from '../components/DeleteConfirmDialog';
 import { Chat } from '../store/chatStore';
@@ -12,22 +12,12 @@ import IconSelectModal from '../components/IconSelectModal';
 import Header from '../components/Header';
 import SharedLayout from '../components/SharedLayout';
 import useResponsive from '../hooks/useResponsive';
-import { useTheme } from '../ui/ThemeProvider';
 import { SearchBar, SearchBarRef } from '../components/SearchComponents';
-
-// Ioniconsのデフォルトアイコン名リスト（20種）
-const DEFAULT_ICON_NAMES = [
-  'chatbubble', 'person', 'bulb', 'book', 'rocket',
-  'flame', 'star', 'heart', 'leaf', 'cloud',
-  'planet', 'paw', 'cafe', 'musical-notes', 'camera',
-  'game-controller', 'medal', 'umbrella', 'gift', 'bicycle',
-];
 
 export default function ChatsScreen() {
   const router = useRouter();
   const colors = useColors();
   const { layout } = useResponsive();
-  const { theme: appTheme } = useTheme();
   
   const chats = useStore(state => state.chats);
   const createChat = useStore(state => state.createChat);
@@ -46,9 +36,8 @@ export default function ChatsScreen() {
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   
-  const searchInputRef = useRef<TextInput>(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const searchBarRef = useRef<SearchBarRef>(null);  // 型を明示的に指定
+  const searchBarRef = useRef<SearchBarRef>(null);
   const pendingSearchRef = useRef<string | null>(null); // 保留中の検索テキスト
   
   // 検索結果に基づいたチャットリスト
@@ -148,7 +137,9 @@ export default function ChatsScreen() {
   
   // 検索用コールバック - IME対応
   const handleSearch = (text: string) => {
-    console.log('Search triggered with:', text);
+    if (__DEV__) {
+      console.log('Search triggered with:', text);
+    }
     
     // 入力テキストを保持
     pendingSearchRef.current = text;
@@ -271,7 +262,7 @@ export default function ChatsScreen() {
                       />
                     ) : (
                       <Ionicons 
-                        name={(item.iconId || "chatbubbles-outline") as any} 
+                        name={(item.iconId as keyof typeof Ionicons.glyphMap) ?? 'chatbubbles-outline'} 
                         size={24} 
                         color={colors.primary} 
                       />
@@ -383,7 +374,7 @@ export default function ChatsScreen() {
                 />
               ) : (
                 <Ionicons 
-                  name={(selectedChat.iconId || "chatbubbles-outline") as any} 
+                  name={(selectedChat.iconId as keyof typeof Ionicons.glyphMap) ?? 'chatbubbles-outline'} 
                   size={32} 
                   color={colors.primary} 
                 />

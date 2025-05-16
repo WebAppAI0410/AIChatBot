@@ -102,12 +102,13 @@ export const createImageSlice: StateCreator<
     const { sdxlQuota, dalleQuota } = get();
 
     // クォータチェック
+    let targetModel = model;
     if (model === 'dalle' && dalleQuota.remaining <= 0) {
       // DALL-Eクォータ超過時はSDXLにフォールバック
-      model = 'sdxl';
+      targetModel = 'sdxl';
     }
 
-    if (model === 'sdxl' && sdxlQuota.remaining <= 0) {
+    if (targetModel === 'sdxl' && sdxlQuota.remaining <= 0) {
       throw new Error('本日の画像生成回数上限に達しました');
     }
 
@@ -119,22 +120,22 @@ export const createImageSlice: StateCreator<
         prompt,
         size,
         quality,
-        model
+        model: targetModel
       });
 
       // 生成履歴に追加
       get().addGeneratedImage({
         url: imageUrl,
         prompt,
-        model,
+        model: targetModel,
         chatId,
       });
 
       // 使用カウント増加
-      get().incrementImageUsage(model);
+      get().incrementImageUsage(targetModel);
       
       // ユーザーストアの画像生成カウントも増加
-      get().incrementImageGenCount();
+      (get() as any).incrementImageGenCount?.();
 
       return imageUrl;
     } catch (error: any) {
@@ -153,6 +154,11 @@ export const createImageSlice: StateCreator<
     // ランダムなモック画像を返す
     const randomIndex = Math.floor(Math.random() * MOCK_IMAGES.length);
     const imageUrl = MOCK_IMAGES[randomIndex];
+
+    // 実際の画像生成と同様に履歴とクォータを更新
+    get().addGeneratedImage({ url: imageUrl, prompt, model, chatId });
+    get().incrementImageUsage(model);
+    (get() as any).incrementImageGenCount?.();
 
     return imageUrl;
   },
@@ -204,7 +210,7 @@ export const createImageSlice: StateCreator<
     });
     
     // ユーザーストアの画像生成カウントもリセット
-    get().resetImageGenCount();
+    (get() as any).resetImageGenCount?.();
   },
 
   // 生成履歴に追加
