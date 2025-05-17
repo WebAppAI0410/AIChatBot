@@ -13,7 +13,11 @@ import {
   Alert,
   SafeAreaView,
   StatusBar,
-  Modal
+  Modal,
+  Appearance,
+  Share,
+  ScrollView,
+  useWindowDimensions
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
@@ -36,6 +40,7 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { showCentralToast } from '../components/CentralToast';
+import BalloonActionMenu, { BalloonAction } from '../components/BalloonActionMenu';
 
 export default function ChatScreen() {
   const { id, image_mode } = useLocalSearchParams<{ id: string; image_mode?: string }>();
@@ -56,6 +61,15 @@ export default function ChatScreen() {
   const [showLocalCentralToast, setShowLocalCentralToast] = useState(false);
   const [localCentralToastMsg, setLocalCentralToastMsg] = useState('');
   const localCentralToastTimer = useRef<NodeJS.Timeout | null>(null);
+  const [balloonMenuVisible, setBalloonMenuVisible] = useState(false);
+  const [balloonMenuPos, setBalloonMenuPos] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [balloonMenuActions, setBalloonMenuActions] = useState<BalloonAction[]>([]);
+  const [balloonMenuDark, setBalloonMenuDark] = useState(false);
+  const balloonTargetRef = useRef<any>(null);
+  const [balloonTargetMsg, setBalloonTargetMsg] = useState<Message | null>(null);
+  const [showPartialCopyModal, setShowPartialCopyModal] = useState(false);
+  const [selectedTextContent, setSelectedTextContent] = useState('');
+  const [selectedText, setSelectedText] = useState('');
   
   const colors = useColors();
   const chats = useStore(state => state.chats);
@@ -179,7 +193,7 @@ export default function ChatScreen() {
       // 入力欄をクリア
       setInput('');
       
-      // 「生成中...」メッセージをアシスタントから一時的に表示
+      // "生成中..."メッセージをアシスタントから一時的に表示
       addMessage(chat.id, {
         content: '画像を生成中...',
         role: 'assistant'
@@ -572,14 +586,80 @@ export default function ChatScreen() {
       justifyContent: 'center',
       alignItems: 'center',
     },
+    partialCopyModalContainer: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    partialCopyModalContent: {
+      width: '90%',
+      maxHeight: '80%',
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 16,
+      elevation: 5,
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 2
+      },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+    },
+    partialCopyHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    partialCopyTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    partialCopyScrollView: {
+      maxHeight: 300,
+    },
+    partialCopyInput: {
+      backgroundColor: colors.background,
+      padding: 16,
+      borderRadius: 8,
+      color: colors.text,
+      minHeight: 150,
+      textAlignVertical: 'top',
+    },
+    partialCopyButtonContainer: {
+      marginTop: 16,
+      alignItems: 'center',
+    },
+    partialCopyButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    partialCopyButtonDisabled: {
+      opacity: 0.5,
+    },
+    partialCopyButtonText: {
+      color: colors.textOnPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
   }), [colors, theme.safeArea.top]);
   
   const renderMessage = ({ item }: { item: Message }) => {
+    const isImage = !!item.imageUrl;
+    const ref = React.createRef<any>();
     return (
       <ChatBubble 
+        ref={ref}
         message={item} 
         onImagePress={handleImagePress}
-        onLongPress={() => handleMessageLongPress(item)}
+        onLongPress={() => openBalloonMenu(ref.current, item, isImage)}
       />
     );
   };
@@ -619,7 +699,7 @@ export default function ChatScreen() {
   };
   
   // 画像プレビュー用アクションハンドラ
-  const handleImageAction = async (action: 'copy' | 'note' | 'save' | 'share', imageUrl: string, prompt: string) => {
+  const handleImageAction = async (action: 'copy' | 'note' | 'partial_copy' | 'save' | 'share', imageUrl: string, prompt: string) => {
     try {
       if (action === 'copy') {
         await Clipboard.setStringAsync(prompt + '\n' + imageUrl);
@@ -683,6 +763,121 @@ export default function ChatScreen() {
         setIsSharing(false);
       }
     }
+  };
+
+  // バルーンメニューを開く
+  const openBalloonMenu = (ref: any, message: Message, isImage: boolean) => {
+    if (!ref) return;
+    ref.measureInWindow((x: number, y: number, width: number, height: number) => {
+      setBalloonMenuPos({ x, y, width, height });
+      setBalloonTargetMsg(message);
+      // ダークモード判定
+      const colorScheme = Appearance.getColorScheme();
+      setBalloonMenuDark(colorScheme === 'dark');
+      // アクションリスト生成
+      const actions: BalloonAction[] = [
+        {
+          key: 'copy',
+          label: 'コピー',
+          icon: 'copy-outline' as const,
+          onPress: () => handleBalloonAction('copy', message, isImage),
+        },
+        // テキストメッセージのみ部分コピーオプションを追加
+        ...(isImage ? [] : [
+          {
+            key: 'partial_copy',
+            label: '部分コピー',
+            icon: 'text-outline' as const,
+            onPress: () => handleBalloonAction('partial_copy', message, isImage),
+          }
+        ]),
+        {
+          key: 'note',
+          label: 'ノート',
+          icon: 'document-text-outline' as const,
+          onPress: () => handleBalloonAction('note', message, isImage),
+        },
+        // 画像メッセージなら写真保存オプションを追加
+        ...(isImage ? [
+          {
+            key: 'save',
+            label: '写真に保存',
+            icon: 'download-outline' as const,
+            onPress: () => handleBalloonAction('save', message, isImage),
+          },
+        ] : []),
+        // 共有オプションを追加（画像とテキスト両方）
+        {
+          key: 'share',
+          label: '共有',
+          icon: 'share-social-outline' as const,
+          onPress: () => handleBalloonAction('share', message, isImage),
+        },
+      ];
+      setBalloonMenuActions(actions);
+      setBalloonMenuVisible(true);
+    });
+  };
+
+  // バルーンアクション実行
+  const handleBalloonAction = async (action: 'copy' | 'note' | 'partial_copy' | 'save' | 'share', message: Message, isImage: boolean) => {
+    setBalloonMenuVisible(false);
+    // 既存のMessageActions/handleImageActionのロジックを流用
+    if (isImage && message.imageUrl) {
+      await handleImageAction(action, message.imageUrl, message.content);
+    } else {
+      // テキストメッセージ
+      if (action === 'copy') {
+        await Clipboard.setStringAsync(message.content);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setLocalCentralToastMsg('コピーしました');
+        setShowLocalCentralToast(true);
+        if (localCentralToastTimer.current) clearTimeout(localCentralToastTimer.current);
+        localCentralToastTimer.current = setTimeout(() => setShowLocalCentralToast(false), 1500);
+      } else if (action === 'partial_copy') {
+        // 部分コピーの処理
+        setSelectedTextContent(message.content);
+        setShowPartialCopyModal(true);
+      } else if (action === 'note') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast('ノート保存機能は将来的に実装されます', true);
+      } else if (action === 'share') {
+        // テキスト共有処理
+        try {
+          setIsSharing(true);
+          await Share.share({
+            message: message.content,
+            title: 'AIチャットの会話',
+          });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (error) {
+          console.error('共有エラー:', error);
+          showToast('共有に失敗しました');
+        } finally {
+          setIsSharing(false);
+        }
+      }
+    }
+  };
+
+  // 部分コピー確定
+  const handlePartialCopyConfirm = async () => {
+    if (selectedText) {
+      await Clipboard.setStringAsync(selectedText);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setLocalCentralToastMsg('選択部分をコピーしました');
+      setShowLocalCentralToast(true);
+      if (localCentralToastTimer.current) clearTimeout(localCentralToastTimer.current);
+      localCentralToastTimer.current = setTimeout(() => setShowLocalCentralToast(false), 1500);
+    }
+    setShowPartialCopyModal(false);
+    setSelectedText('');
+  };
+
+  // 部分コピーキャンセル
+  const handlePartialCopyCancel = () => {
+    setShowPartialCopyModal(false);
+    setSelectedText('');
   };
 
   return (
@@ -915,6 +1110,100 @@ export default function ChatScreen() {
             onDismiss={handleMessageActionsDismiss}
           />
         )}
+
+        {/* BalloonActionMenu */}
+        <BalloonActionMenu
+          visible={balloonMenuVisible}
+          x={balloonMenuPos.x}
+          y={balloonMenuPos.y}
+          width={balloonMenuPos.width}
+          height={balloonMenuPos.height}
+          actions={balloonMenuActions}
+          onRequestClose={() => setBalloonMenuVisible(false)}
+          isDarkMode={balloonMenuDark}
+        />
+        
+        {/* 画面全体に表示するローカル中央トースト */}
+        {showLocalCentralToast && !showImagePreview && (
+          <View style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000, // 他の要素よりも上に表示
+            pointerEvents: 'none', // タッチイベントを下層に通過させる
+          }}>
+            <View style={{
+              padding: 24,
+              borderRadius: 16,
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: 180,
+              maxWidth: '80%',
+              backgroundColor: 'rgba(0,0,0,0.8)',
+            }}>
+              <Ionicons name="checkmark-circle-outline" size={64} color="#4CAF50" />
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600', marginTop: 16, textAlign: 'center' }}>{localCentralToastMsg}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* 部分コピー用モーダル */}
+        <Modal
+          visible={showPartialCopyModal}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={handlePartialCopyCancel}
+        >
+          <View style={styles.partialCopyModalContainer}>
+            <View style={styles.partialCopyModalContent}>
+              <View style={styles.partialCopyHeader}>
+                <Text style={styles.partialCopyTitle}>テキスト選択</Text>
+                <TouchableOpacity onPress={handlePartialCopyCancel}>
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.partialCopyScrollView}>
+                <TextInput
+                  style={styles.partialCopyInput}
+                  multiline
+                  value={selectedTextContent}
+                  onChangeText={setSelectedTextContent}
+                  onSelectionChange={(event) => {
+                    const { selection } = event.nativeEvent;
+                    if (selection.start !== selection.end) {
+                      setSelectedText(
+                        selectedTextContent.substring(selection.start, selection.end)
+                      );
+                    } else {
+                      setSelectedText('');
+                    }
+                  }}
+                  autoFocus
+                />
+              </ScrollView>
+
+              <View style={styles.partialCopyButtonContainer}>
+                <TouchableOpacity 
+                  style={[
+                    styles.partialCopyButton, 
+                    !selectedText && styles.partialCopyButtonDisabled
+                  ]}
+                  onPress={handlePartialCopyConfirm}
+                  disabled={!selectedText}
+                >
+                  <Text style={styles.partialCopyButtonText}>
+                    選択部分をコピー
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </MessageActionsProvider>
   );

@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import theme from '../ui/theme';
 import useColors from '../constants/colors';
 import { Message } from '../store/chatStore';
-import { ImageBubble } from './ImageBubble';
+import ImageBubble from './ImageBubble';
 
 type ChatBubbleProps = {
   message: Message;
@@ -12,7 +12,7 @@ type ChatBubbleProps = {
   onLongPress?: () => void;
 };
 
-const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onImagePress, onLongPress }) => {
+const ChatBubble = forwardRef<any, ChatBubbleProps>(({ message, onImagePress, onLongPress }, ref) => {
   const isUser = message.role === 'user';
   const colors = useColors();
   
@@ -26,6 +26,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onImagePress, onLongPr
   if (hasImage && message.imageUrl) {
     return (
       <ImageBubble
+        ref={ref}
         imageUrl={message.imageUrl}
         prompt={message.content}
         timestamp={formattedTime}
@@ -39,6 +40,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onImagePress, onLongPr
   // テキストメッセージの場合
   return (
     <Pressable
+      ref={ref}
       onLongPress={onLongPress}
       style={[
       styles.messageContainer,
@@ -64,7 +66,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onImagePress, onLongPr
       </View>
     </Pressable>
   );
-};
+});
 
 const styles = StyleSheet.create({
   messageContainer: {

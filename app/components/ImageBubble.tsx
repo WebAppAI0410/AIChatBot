@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import theme from '../ui/theme';
@@ -13,18 +13,19 @@ interface ImageBubbleProps {
   onLongPress?: () => void;
 }
 
-export const ImageBubble: React.FC<ImageBubbleProps> = ({ 
+export const ImageBubble = forwardRef<any, ImageBubbleProps>(({ 
   imageUrl, 
   prompt, 
   timestamp, 
   isSent = false,
   onPress,
   onLongPress
-}) => {
+}, ref) => {
   const colors = useColors();
   
   return (
     <Pressable 
+      ref={ref}
       style={[
         styles.container,
         isSent ? styles.sentContainer : styles.receivedContainer
@@ -58,7 +59,7 @@ export const ImageBubble: React.FC<ImageBubbleProps> = ({
       </View>
     </Pressable>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -97,4 +98,6 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.xs,
     marginTop: 4,
   },
-}); 
+});
+
+export default ImageBubble; 
