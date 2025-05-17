@@ -1,4 +1,4 @@
-import React, { createContext } from 'react';
+import React, { createContext, useEffect } from 'react';
 import { Slot, Stack, Tabs } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
@@ -16,6 +16,8 @@ import { ResetDailyQuotaProvider } from './providers/ResetDailyQuotaProvider';
 import { Toast } from './components/MessageActions';
 import { CentralToast } from './components/CentralToast';
 import { View } from 'react-native';
+import { SQLiteProvider } from 'expo-sqlite';
+import { setDatabase } from './services/sqlite';
 
 // ColorsType型を定義
 type ColorsType = typeof lightColors;
@@ -43,26 +45,43 @@ export default function RootLayout() {
     return null;
   }
 
+  // データベース初期化ハンドラ
+  const handleDatabaseInit = async (db: any) => {
+    // データベース参照をsqlite.tsに設定
+    setDatabase(db);
+  };
+  
+  // エラーハンドラ
+  const handleDatabaseError = (error: Error) => {
+    console.error('SQLite initialization error:', error);
+  };
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <TamaguiProvider config={config}>
           <Theme name={activeTheme}>
-            <ColorsContext.Provider value={colors}>
-              <ThemeProvider>
-                <OrientationProvider>
-                  <ResetDailyQuotaProvider>
-                    <StatusBar style={activeTheme === 'dark' ? 'light' : 'dark'} />
-                    <CentralToast />
-                    <View style={{ flex: 1 }}>
-                      <Slot />
-                      {/* グローバルトースト表示 */}
-                      <Toast />
-                    </View>
-                  </ResetDailyQuotaProvider>
-                </OrientationProvider>
-              </ThemeProvider>
-            </ColorsContext.Provider>
+            <SQLiteProvider 
+              databaseName="notes.db"
+              onInit={handleDatabaseInit}
+              onError={handleDatabaseError}
+            >
+              <ColorsContext.Provider value={colors}>
+                <ThemeProvider>
+                  <OrientationProvider>
+                    <ResetDailyQuotaProvider>
+                      <StatusBar style={activeTheme === 'dark' ? 'light' : 'dark'} />
+                      <CentralToast />
+                      <View style={{ flex: 1 }}>
+                        <Slot />
+                        {/* グローバルトースト表示 */}
+                        <Toast />
+                      </View>
+                    </ResetDailyQuotaProvider>
+                  </OrientationProvider>
+                </ThemeProvider>
+              </ColorsContext.Provider>
+            </SQLiteProvider>
           </Theme>
         </TamaguiProvider>
       </SafeAreaProvider>

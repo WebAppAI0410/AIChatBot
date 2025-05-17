@@ -6,13 +6,15 @@ import { createChatSlice, ChatState } from './chatStore';
 import { createUserSlice, UserState } from './userStore';
 import { createSettingsSlice, SettingsState } from './settingsStore';
 import { createImageSlice, ImageState } from './imageStore';
+import { createNoteSlice, NoteState } from './noteStore';
 
 export type StoreState = 
   & LocalModelState
   & ChatState
   & UserState
   & SettingsState
-  & ImageState;
+  & ImageState
+  & NoteState;
 
 export const useStore = create<StoreState>()(
   persist(
@@ -22,6 +24,7 @@ export const useStore = create<StoreState>()(
       ...createUserSlice(...a),
       ...createSettingsSlice(...a),
       ...createImageSlice(...a),
+      ...createNoteSlice(...a),
     }),
     {
       name: 'ai-chatbot-store',

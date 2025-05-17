@@ -27,7 +27,8 @@ module.exports = {
       bundler: "metro"
     },
     plugins: [
-      "expo-router"
+      "expo-router",
+      "expo-sqlite"
     ],
     scheme: "aichatbot",
     // 環境変数
