@@ -13,6 +13,9 @@ import { useColorScheme } from 'react-native';
 import { ThemeProvider, useTheme } from './ui/ThemeProvider';
 import { OrientationProvider } from './providers/OrientationProvider';
 import { ResetDailyQuotaProvider } from './providers/ResetDailyQuotaProvider';
+import { Toast } from './components/MessageActions';
+import { CentralToast } from './components/CentralToast';
+import { View } from 'react-native';
 
 // ColorsType型を定義
 type ColorsType = typeof lightColors;
@@ -50,7 +53,13 @@ export default function RootLayout() {
                 <OrientationProvider>
                   <ResetDailyQuotaProvider>
                     <StatusBar style={activeTheme === 'dark' ? 'light' : 'dark'} />
-                    <Slot />
+                    <View style={{ flex: 1 }}>
+                      <Slot />
+                      {/* グローバルトースト表示 */}
+                      <Toast />
+                      {/* 中央トースト表示 */}
+                      <CentralToast />
+                    </View>
                   </ResetDailyQuotaProvider>
                 </OrientationProvider>
               </ThemeProvider>

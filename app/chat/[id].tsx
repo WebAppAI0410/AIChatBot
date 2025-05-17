@@ -29,6 +29,13 @@ import LocalModelInstallModal from '../components/LocalModelInstallModal';
 import Header from '../components/Header';
 import ChatBubble from '../components/ChatBubble';
 import { ImageGenerationPanel, ImageGenerationPanelHandle } from '../components/ImageGenerationPanel';
+import MessageActions, { MessageActionsProvider, showToast } from '../components/MessageActions';
+import * as Clipboard from 'expo-clipboard';
+import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
+import * as Haptics from 'expo-haptics';
+import { showCentralToast } from '../components/CentralToast';
 
 export default function ChatScreen() {
   const { id, image_mode } = useLocalSearchParams<{ id: string; image_mode?: string }>();
@@ -44,6 +51,8 @@ export default function ChatScreen() {
   const [showImageOptions, setShowImageOptions] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showImagePreview, setShowImagePreview] = useState(false);
+  const [showMessageActions, setShowMessageActions] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   
   const colors = useColors();
   const chats = useStore(state => state.chats);
@@ -54,6 +63,9 @@ export default function ChatScreen() {
   const updateChatModel = useStore(state => state.updateChatModel);
   const localModelStatus = useStore(state => state.localModelStatus);
   const plan = useStore(state => state.plan);
+  const selectMessage = useStore(state => state.selectMessage);
+  const clearSelectedMessage = useStore(state => state.clearSelectedMessage);
+  const selectedMessageId = useStore(state => state.selectedMessageId);
   
   const chat = chats.find(c => c.id === id);
   const flatListRef = useRef<FlatList>(null);
@@ -293,6 +305,18 @@ export default function ChatScreen() {
     setShowImagePreview(true);
   };
   
+  // メッセージ長押し時の処理
+  const handleMessageLongPress = (message: Message) => {
+    selectMessage(message.id);
+    setShowMessageActions(true);
+  };
+  
+  // メッセージアクション閉じる
+  const handleMessageActionsDismiss = () => {
+    setShowMessageActions(false);
+    clearSelectedMessage();
+  };
+
   const handleModelSelect = () => {
     setShowModelSelect(true);
   };
@@ -552,9 +576,7 @@ export default function ChatScreen() {
       <ChatBubble 
         message={item} 
         onImagePress={handleImagePress}
-        onLongPress={() => {
-          // TODO: メッセージアクションメニュー表示（修正05で実装予定）
-        }}
+        onLongPress={() => handleMessageLongPress(item)}
       />
     );
   };
@@ -593,158 +615,271 @@ export default function ChatScreen() {
     );
   };
   
+  // 画像プレビュー用アクションハンドラ
+  const handleImageAction = async (action: 'copy' | 'note' | 'save' | 'share', imageUrl: string, prompt: string) => {
+    try {
+      if (action === 'copy') {
+        await Clipboard.setStringAsync(prompt + '\n' + imageUrl);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showCentralToast('コピーしました');
+      } else if (action === 'note') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast('ノート保存機能は将来的に実装されます', true);
+      } else if (action === 'save') {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status !== 'granted') {
+          showToast('写真へのアクセス権限が必要です');
+          return;
+        }
+        let localUri = imageUrl;
+        if (imageUrl.startsWith('http')) {
+          const filename = `temp_${Date.now()}.jpg`;
+          localUri = `${FileSystem.cacheDirectory}${filename}`;
+          const downloadResult = await FileSystem.downloadAsync(imageUrl, localUri);
+          if (downloadResult.status !== 200) {
+            throw new Error('画像のダウンロードに失敗しました');
+          }
+        }
+        const asset = await MediaLibrary.createAssetAsync(localUri);
+        await MediaLibrary.createAlbumAsync('AI Chat', asset, false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showCentralToast('保存しました');
+      } else if (action === 'share') {
+        if (await Sharing.isAvailableAsync()) {
+          setIsSharing(true);
+          let localUri = imageUrl;
+          if (imageUrl.startsWith('http')) {
+            const filename = `temp_share_${Date.now()}.jpg`;
+            localUri = `${FileSystem.cacheDirectory}${filename}`;
+            const downloadResult = await FileSystem.downloadAsync(imageUrl, localUri);
+            if (downloadResult.status !== 200) {
+              setIsSharing(false);
+              throw new Error('画像のダウンロードに失敗しました');
+            }
+          }
+          await Sharing.shareAsync(localUri, {
+            mimeType: 'image/jpeg',
+            dialogTitle: 'AIチャットの画像を共有',
+          });
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else {
+          showToast('共有機能が利用できません');
+        }
+      }
+    } catch (error) {
+      showToast('処理に失敗しました');
+      console.error('画像アクションエラー:', error);
+    } finally {
+      if (action === 'share') {
+        setIsSharing(false);
+      }
+    }
+  };
+
   return (
-    <View style={styles.container}>
-      <Stack.Screen
-        options={{
-          headerShown: false,
-        }}
-      />
-      
-      <Header
-        title={chat?.title || 'チャット'}
-        showBack={true}
-        onTitleEdit={handleToggleEditTitle}
-        onBackPress={() => router.replace('/(tabs)/chats')}
-        rightComponent={<ModelSelectButton />}
-      />
-      
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        {chat && (
-          <>
-            {isEditingTitle && (
-              <View style={styles.editTitleContainer}>
-                <TextInput
-                  style={styles.titleInput}
-                  value={editTitle}
-                  onChangeText={setEditTitle}
-                  placeholder="チャットのタイトルを入力"
-                  placeholderTextColor={colors.gray}
-                  autoFocus
-                />
+    <MessageActionsProvider>
+      <View style={styles.container}>
+        <Stack.Screen
+          options={{
+            headerShown: false,
+          }}
+        />
+        
+        <Header
+          title={chat?.title || 'チャット'}
+          showBack={true}
+          onTitleEdit={handleToggleEditTitle}
+          onBackPress={() => router.replace('/(tabs)/chats')}
+          rightComponent={<ModelSelectButton />}
+        />
+        
+        <KeyboardAvoidingView 
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        >
+          {chat && (
+            <>
+              {isEditingTitle && (
+                <View style={styles.editTitleContainer}>
+                  <TextInput
+                    style={styles.titleInput}
+                    value={editTitle}
+                    onChangeText={setEditTitle}
+                    placeholder="チャットのタイトルを入力"
+                    placeholderTextColor={colors.gray}
+                    autoFocus
+                  />
+                  <TouchableOpacity 
+                    style={styles.titleSaveButton} 
+                    onPress={handleSaveTitle}
+                  >
+                    <Text style={styles.titleSaveText}>保存</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* チャットメッセージリスト */}
+              <FlatList
+                ref={flatListRef}
+                data={[...chat.messages].reverse()} // メッセージの順序を逆にする
+                keyExtractor={(item, index) => `${item.role}-${index}`}
+                renderItem={renderMessage}
+                contentContainerStyle={styles.messagesContainer}
+                inverted={true} // FlatListを反転
+                onContentSizeChange={handleContentSizeChange}
+              />
+            
+              <View>
+                <View style={styles.inputContainer}>
+                  <TouchableOpacity 
+                    style={[
+                      styles.imageButton,
+                      showImageOptions ? { backgroundColor: colors.accentBlue } : undefined
+                    ]}
+                    onPress={handleToggleImageOptions}
+                  >
+                    <Ionicons 
+                      name="image-outline" 
+                      size={24} 
+                      color="#fff" 
+                    />
+                  </TouchableOpacity>
+
+                  <TextInput
+                    style={styles.input}
+                    placeholder={showImageOptions ? "画像の説明を入力..." : "メッセージを入力"}
+                    placeholderTextColor={colors.gray}
+                    value={input}
+                    onChangeText={setInput}
+                    multiline
+                  />
+                  <TouchableOpacity 
+                    style={[
+                      styles.sendButton,
+                      showImageOptions && isGenerating && { opacity: 0.5 }
+                    ]} 
+                    onPress={handleSend}
+                    disabled={
+                      (showImageOptions && isGenerating) || 
+                      (!showImageOptions && (!input.trim() || isLoading))
+                    }
+                  >
+                    {isLoading || isGenerating ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Ionicons 
+                        name={showImageOptions ? "image" : "send"} 
+                        size={20} 
+                        color="#fff" 
+                      />
+                    )}
+                  </TouchableOpacity>
+                </View>
+                
+                {/* 画像生成オプション - 入力欄の下に配置 */}
+                {showImageOptions && (
+                  <ImageGenerationPanel
+                    ref={imageGenPanelRef}
+                    prompt={input}
+                    onImageGenerated={handleImageGenerated}
+                    onClose={() => setShowImageOptions(false)}
+                  />
+                )}
+              </View>
+            </>
+          )}
+        </KeyboardAvoidingView>
+        
+        <ModelSelectModal
+          visible={showModelSelect}
+          onClose={() => setShowModelSelect(false)}
+          onSelectModel={handleSelectModel}
+          currentModelId={chat?.modelId || 'gpt-3.5-turbo'}
+        />
+        
+        <LocalModelInstallModal
+          visible={showLocalModelInstall}
+          onClose={() => setShowLocalModelInstall(false)}
+        />
+
+        {/* 画像プレビュー */}
+        <Modal
+          visible={showImagePreview}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setShowImagePreview(false)}
+        >
+          <Pressable 
+            style={styles.imagePreviewModal}
+            onPress={() => setShowImagePreview(false)}
+          >
+            {selectedImage && (
+              <Image
+                source={{ uri: selectedImage }}
+                style={styles.imagePreview}
+                contentFit="contain"
+              />
+            )}
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setShowImagePreview(false)}
+            >
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+            {/* アクションバー */}
+            {selectedImage && (
+              <View style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                flexDirection: 'row',
+                justifyContent: 'space-around',
+                alignItems: 'center',
+                paddingVertical: 16,
+                paddingHorizontal: 8,
+              }}>
+                <TouchableOpacity onPress={() => handleImageAction('copy', selectedImage, chat?.messages.find(m => m.imageUrl === selectedImage)?.content || '')}>
+                  <Ionicons name="copy-outline" size={28} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 12, textAlign: 'center' }}>コピー</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleImageAction('note', selectedImage, chat?.messages.find(m => m.imageUrl === selectedImage)?.content || '')}>
+                  <Ionicons name="document-text-outline" size={28} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 12, textAlign: 'center' }}>ノート</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleImageAction('save', selectedImage, chat?.messages.find(m => m.imageUrl === selectedImage)?.content || '')}>
+                  <Ionicons name="download-outline" size={28} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 12, textAlign: 'center' }}>写真に保存</Text>
+                </TouchableOpacity>
                 <TouchableOpacity 
-                  style={styles.titleSaveButton} 
-                  onPress={handleSaveTitle}
+                  onPress={() => handleImageAction('share', selectedImage, chat?.messages.find(m => m.imageUrl === selectedImage)?.content || '')}
+                  disabled={isSharing}
                 >
-                  <Text style={styles.titleSaveText}>保存</Text>
+                  {isSharing ? (
+                    <ActivityIndicator size="small" color="#fff" style={{width: 28, height: 28}} />
+                  ) : (
+                    <Ionicons name="share-social-outline" size={28} color="#fff" />
+                  )}
+                  <Text style={{ color: '#fff', fontSize: 12, textAlign: 'center' }}>共有</Text>
                 </TouchableOpacity>
               </View>
             )}
+          </Pressable>
+        </Modal>
 
-            {/* チャットメッセージリスト */}
-            <FlatList
-              ref={flatListRef}
-              data={[...chat.messages].reverse()} // メッセージの順序を逆にする
-              keyExtractor={(item, index) => `${item.role}-${index}`}
-              renderItem={renderMessage}
-              contentContainerStyle={styles.messagesContainer}
-              inverted={true} // FlatListを反転
-              onContentSizeChange={handleContentSizeChange}
-            />
-          
-            <View>
-              <View style={styles.inputContainer}>
-                <TouchableOpacity 
-                  style={[
-                    styles.imageButton,
-                    showImageOptions ? { backgroundColor: colors.accentBlue } : undefined
-                  ]}
-                  onPress={handleToggleImageOptions}
-                >
-                  <Ionicons 
-                    name="image-outline" 
-                    size={24} 
-                    color="#fff" 
-                  />
-                </TouchableOpacity>
-
-                <TextInput
-                  style={styles.input}
-                  placeholder={showImageOptions ? "画像の説明を入力..." : "メッセージを入力"}
-                  placeholderTextColor={colors.gray}
-                  value={input}
-                  onChangeText={setInput}
-                  multiline
-                />
-                <TouchableOpacity 
-                  style={[
-                    styles.sendButton,
-                    showImageOptions && isGenerating && { opacity: 0.5 }
-                  ]} 
-                  onPress={handleSend}
-                  disabled={
-                    (showImageOptions && isGenerating) || 
-                    (!showImageOptions && (!input.trim() || isLoading))
-                  }
-                >
-                  {isLoading || isGenerating ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Ionicons 
-                      name={showImageOptions ? "image" : "send"} 
-                      size={20} 
-                      color="#fff" 
-                    />
-                  )}
-                </TouchableOpacity>
-              </View>
-              
-              {/* 画像生成オプション - 入力欄の下に配置 */}
-              {showImageOptions && (
-                <ImageGenerationPanel
-                  ref={imageGenPanelRef}
-                  prompt={input}
-                  onImageGenerated={handleImageGenerated}
-                  onClose={() => setShowImageOptions(false)}
-                />
-              )}
-            </View>
-          </>
+        {/* メッセージアクション */}
+        {showMessageActions && selectedMessageId && chat && (
+          <MessageActions
+            messageId={selectedMessageId}
+            messageType={chat.messages.find(m => m.id === selectedMessageId)?.imageUrl ? 'image' : 'text'}
+            content={chat.messages.find(m => m.id === selectedMessageId)?.content || ''}
+            imageUri={chat.messages.find(m => m.id === selectedMessageId)?.imageUrl}
+            onDismiss={handleMessageActionsDismiss}
+          />
         )}
-      </KeyboardAvoidingView>
-      
-      <ModelSelectModal
-        visible={showModelSelect}
-        onClose={() => setShowModelSelect(false)}
-        onSelectModel={handleSelectModel}
-        currentModelId={chat?.modelId || 'gpt-3.5-turbo'}
-      />
-      
-      <LocalModelInstallModal
-        visible={showLocalModelInstall}
-        onClose={() => setShowLocalModelInstall(false)}
-      />
-
-      {/* 画像プレビュー */}
-      <Modal
-        visible={showImagePreview}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setShowImagePreview(false)}
-      >
-        <Pressable 
-          style={styles.imagePreviewModal}
-          onPress={() => setShowImagePreview(false)}
-        >
-          {selectedImage && (
-            <Image
-              source={{ uri: selectedImage }}
-              style={styles.imagePreview}
-              contentFit="contain"
-            />
-          )}
-          <TouchableOpacity 
-            style={styles.closeButton}
-            onPress={() => setShowImagePreview(false)}
-          >
-            <Ionicons name="close" size={24} color="#fff" />
-          </TouchableOpacity>
-        </Pressable>
-      </Modal>
-    </View>
+      </View>
+    </MessageActionsProvider>
   );
 }

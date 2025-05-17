@@ -49,6 +49,13 @@ export interface ChatState {
   setCurrentChat: (chatId: string | null) => void;
   markChatAsRead: (chatId: string) => void;
   getLastUsedModel: () => string;
+  
+  // メッセージアクション関連
+  selectedMessageId: string | null;
+  isActionSheetVisible: boolean;
+  selectMessage: (messageId: string) => void;
+  clearSelectedMessage: () => void;
+  getSelectedMessage: () => Message | undefined;
 }
 
 // メッセージ追加の共通ロジック
@@ -198,6 +205,25 @@ export const createChatSlice: StateCreator<
     
     // デフォルトモデル
     return 'gpt-3.5-turbo';
+  },
+  selectedMessageId: null,
+  isActionSheetVisible: false,
+  selectMessage: (messageId) => {
+    set({ selectedMessageId: messageId });
+  },
+  clearSelectedMessage: () => {
+    set({ selectedMessageId: null });
+  },
+  getSelectedMessage: () => {
+    const currentChatId = get().currentChatId;
+    if (currentChatId) {
+      const currentChat = get().chats.find(chat => chat.id === currentChatId);
+      if (currentChat) {
+        const selectedMessage = currentChat.messages.find(m => m.id === get().selectedMessageId);
+        return selectedMessage;
+      }
+    }
+    return undefined;
   },
 });
 

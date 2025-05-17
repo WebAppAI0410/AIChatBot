@@ -1,74 +1,100 @@
 import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
 import { Image } from 'expo-image';
-import { styled, Text, YStack } from 'tamagui';
+import theme from '../ui/theme';
+import useColors from '../constants/colors';
 
-export type ImageBubbleProps = {
+interface ImageBubbleProps {
   imageUrl: string;
   prompt: string;
   timestamp: string;
-  isSent: boolean;
-  onLongPress?: () => void;
+  isSent?: boolean;
   onPress?: () => void;
-};
+  onLongPress?: () => void;
+}
 
-export const ImageBubble: React.FC<ImageBubbleProps> = ({
-  imageUrl,
-  prompt,
-  timestamp,
-  isSent,
-  onLongPress,
+export const ImageBubble: React.FC<ImageBubbleProps> = ({ 
+  imageUrl, 
+  prompt, 
+  timestamp, 
+  isSent = false,
   onPress,
+  onLongPress
 }) => {
+  const colors = useColors();
+  
   return (
-    <Container 
-      onLongPress={onLongPress}
+    <Pressable 
+      style={[
+        styles.container,
+        isSent ? styles.sentContainer : styles.receivedContainer
+      ]}
       onPress={onPress}
-      alignSelf={isSent ? 'flex-end' : 'flex-start'}
-      backgroundColor={isSent ? '$primary' : '$backgroundHover'}
-      accessibilityRole="button"
-      accessibilityLabel={`Generated image from prompt: ${prompt}`}
-      accessibilityHint={onPress ? "Tap to view image in full screen" : undefined}
+      onLongPress={onLongPress}
     >
-      <Image
-        source={{ uri: imageUrl }}
-        style={{ width: '100%', aspectRatio: 1 }}
-        contentFit="cover"
-        transition={300}
-        accessible={true}
-        accessibilityLabel={`Image generated from prompt: ${prompt}`}
-        onError={(error) => console.error('Image loading error:', error)}
-      />
-
-      <ContentContainer>
-        <Text
-          color={isSent ? 'white' : '$color'}
-          numberOfLines={2}
-        >
+      <View style={[
+        styles.imageBubble,
+        isSent 
+          ? [styles.sentImageBubble, { backgroundColor: colors.card }] 
+          : [styles.receivedImageBubble, { backgroundColor: colors.card }]
+      ]}>
+        <Image
+          source={{ uri: imageUrl }}
+          style={styles.image}
+          contentFit="cover"
+        />
+        <Text style={[
+          styles.promptText,
+          { color: colors.text }
+        ]}>
           {prompt}
         </Text>
-
-        <Text
-          color={isSent ? 'rgba(255, 255, 255, 0.7)' : '$colorFocus'}
-          fontSize="$1"
-          marginTop="$1"
-        >
+        <Text style={[
+          styles.timestampText,
+          { color: colors.secondaryText }
+        ]}>
           {timestamp}
         </Text>
-      </ContentContainer>
-    </Container>
+      </View>
+    </Pressable>
   );
 };
 
-const Container = styled(YStack, {
-  marginVertical: '$3',
-  maxWidth: '80%',
-  borderRadius: '$4',
-  overflow: 'hidden',
-  pressStyle: {
-    opacity: 0.8,
+const styles = StyleSheet.create({
+  container: {
+    marginVertical: 12,
+    maxWidth: '80%',
   },
-});
-
-const ContentContainer = styled(YStack, {
-  padding: '$3',
+  imageBubble: {
+    padding: 12,
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden',
+  },
+  sentContainer: {
+    alignSelf: 'flex-end',
+  },
+  receivedContainer: {
+    alignSelf: 'flex-start',
+  },
+  sentImageBubble: {
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  receivedImageBubble: {
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
+  },
+  image: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: theme.radius.md,
+  },
+  promptText: {
+    fontSize: theme.fontSizes.sm,
+    marginTop: 8,
+  },
+  timestampText: {
+    fontSize: theme.fontSizes.xs,
+    marginTop: 4,
+  },
 }); 
