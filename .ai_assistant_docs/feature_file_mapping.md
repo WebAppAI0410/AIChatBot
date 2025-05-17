@@ -37,11 +37,17 @@
 - `services/sharing.ts`: 共有機能
 
 ## ノート機能
-- `app/notes/[id].tsx`: ノート編集画面
-- `app/notes/index.tsx`: ノート一覧
-- `components/NoteEditor.tsx`: ノートエディタ
-- `store/noteStore.ts`: ノート状態管理
-- `services/api.ts`: AI アシスト機能
+- `app/(tabs)/notes.tsx`: ノート一覧（フォルダ階層、右下FAB、AIアシストドロワー）
+- `app/notes/[id].tsx`: ノート編集（Apple純正ノート風UI/UX、タップ編集・自動保存、AIアシスト[質問/編集/部分モード切替]）
+- `components/note/WebViewEditor.tsx`: WYSIWYGエディタ（タップ編集・自動保存、テキスト選択アクションバブル）
+- `components/note/NoteAIAssist.tsx`: AIアシスト（質問/編集モード切替、チャットUI）
+- `components/note/PartialEditAIAssist.tsx`: 部分編集AIアシスト（選択テキスト編集特化）
+- `components/note/TagSelector.tsx`: タグ管理・一括編集・タグ名変更
+- `components/note/DiffViewer.tsx`: AI編集提案の差分表示
+- `store/noteStore.ts`: ノート・フォルダ・タグ・AIアシストの状態管理（自動保存・一括編集対応）
+- `services/api.ts`: AIアシストAPI呼び出し、ノート・タグ管理API
+- `services/sqlite.ts`: expo-sqliteによるローカルDB管理
+- `assets/editor/editor.html`: TipTap/TOAST UI EditorのWebViewHTML（選択時アクションバブル含む）
 
 ## 設定
 - `app/settings/index.tsx`: 設定画面
