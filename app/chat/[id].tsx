@@ -875,6 +875,33 @@ export default function ChatScreen() {
                 </TouchableOpacity>
               </View>
             )}
+            {/* 画像プレビューモーダル専用のローカル中央トースト */}
+            {showLocalCentralToast && (
+              <View style={{
+                position: 'absolute', // Modal内で中央に配置するため
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                justifyContent: 'center',
+                alignItems: 'center',
+                // zIndex は Modal 内部での重なりなので、大きな値は不要な場合が多い
+                // ただし、他のモーダル内要素との兼ね合いで調整が必要な場合がある
+              }}>
+                <View style={{
+                  padding: 24,
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: 180,
+                  maxWidth: '80%',
+                  backgroundColor: 'rgba(0,0,0,0.8)',
+                }}>
+                  <Ionicons name="checkmark-circle-outline" size={64} color="#4CAF50" />
+                  <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600', marginTop: 16, textAlign: 'center' }}>{localCentralToastMsg}</Text>
+                </View>
+              </View>
+            )}
           </Pressable>
         </Modal>
 
@@ -887,32 +914,6 @@ export default function ChatScreen() {
             imageUri={chat.messages.find(m => m.id === selectedMessageId)?.imageUrl}
             onDismiss={handleMessageActionsDismiss}
           />
-        )}
-
-        {showLocalCentralToast && (
-          <View style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 10000,
-          }}>
-            <View style={{
-              padding: 24,
-              borderRadius: 16,
-              alignItems: 'center',
-              justifyContent: 'center',
-              minWidth: 180,
-              maxWidth: '80%',
-              backgroundColor: 'rgba(0,0,0,0.8)',
-            }}>
-              <Ionicons name="checkmark-circle-outline" size={64} color="#4CAF50" />
-              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600', marginTop: 16, textAlign: 'center' }}>{localCentralToastMsg}</Text>
-            </View>
-          </View>
         )}
       </View>
     </MessageActionsProvider>
