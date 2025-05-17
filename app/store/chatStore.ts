@@ -40,6 +40,7 @@ export interface ChatState {
   createChat: (modelId: string) => string;
   addMessage: (chatId: string, message: Omit<Message, 'id' | 'timestamp' | 'isRead'>) => void;
   addImageMessage: (chatId: string, params: { content: string; imageUrl: string; role: 'user' | 'assistant' }) => void;
+  replaceMessage: (chatId: string, messageId: string, newMessage: Omit<Message, 'id' | 'timestamp' | 'isRead'>) => void;
   updateChatTitle: (chatId: string, title: string) => void;
   updateChatModel: (chatId: string, modelId: string) => void;
   updateChatIcon: (chatId: string, icon: { iconType: 'default' | 'custom'; iconId?: string; iconUri?: string }) => void;
@@ -130,6 +131,40 @@ export const createChatSlice: StateCreator<
   },
   addImageMessage: (chatId, { content, imageUrl, role }) => {
     set((state) => appendMessageToChat(state, chatId, { content, imageUrl, role }, 'img_'));
+  },
+  replaceMessage: (chatId, messageId, newMessage) => {
+    set((state) => {
+      // 指定したチャットのメッセージを見つけて置き換える
+      const updatedChats = state.chats.map((chat) => {
+        if (chat.id === chatId) {
+          const updatedMessages = chat.messages.map((msg) => {
+            if (msg.id === messageId) {
+              // 新しいメッセージで置き換え（IDとタイムスタンプは保持）
+              return {
+                ...newMessage,
+                id: msg.id,
+                timestamp: msg.timestamp,
+                isRead: msg.isRead,
+              };
+            }
+            return msg;
+          });
+          
+          return {
+            ...chat,
+            messages: updatedMessages,
+            updatedAt: Date.now(),
+          };
+        }
+        return chat;
+      });
+      
+      if (__DEV__) {
+        console.log(`Message replaced - ChatID: ${chatId}, MessageID: ${messageId}`);
+      }
+      
+      return { ...state, chats: updatedChats };
+    });
   },
   updateChatTitle: (chatId, title) => {
     set((state) => ({

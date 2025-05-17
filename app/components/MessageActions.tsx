@@ -243,7 +243,22 @@ export const MessageActions: React.FC<MessageActionProps> = ({
 
       // ローカルファイルからメディアライブラリに保存
       const asset = await MediaLibrary.createAssetAsync(localUri);
-      await MediaLibrary.createAlbumAsync('AI Chat', asset, false);
+      
+      try {
+        // まず新規アルバム作成を試みる
+        await MediaLibrary.createAlbumAsync('AI Chat', asset, false);
+      } catch (e) {
+        // アルバムが既に存在する場合は、既存アルバムに追加
+        if ((e as Error).message?.includes('exists')) {
+          const album = await MediaLibrary.getAlbumAsync('AI Chat');
+          if (album) {
+            await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+          }
+        } else {
+          // その他のエラーは再スロー
+          throw e;
+        }
+      }
 
       // 一時ファイルを削除
       if (isTemp) {

@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { StoreState } from './index';
+import { StoreSlice } from './types';
 
 export type UserPlan = 'free' | 'lite' | 'premium';
 
@@ -37,7 +37,7 @@ const IMAGE_GEN_LIMITS = {
 };
 
 export const createUserSlice: StateCreator<
-  StoreState,
+  StoreSlice,
   [],
   [],
   UserState
@@ -70,13 +70,13 @@ export const createUserSlice: StateCreator<
       state.resetDailyQuotas();
     }
   },
-  incrementTokensUsed: (amount) => set((state) => ({
+  incrementTokensUsed: (amount) => set((state: UserState) => ({
     monthlyTokensUsed: state.monthlyTokensUsed + amount,
   })),
-  incrementImageGenCount: () => set((state) => ({
+  incrementImageGenCount: () => set((state: UserState) => ({
     dailyImageGenCount: state.dailyImageGenCount + 1,
   })),
-  incrementModelUsageCount: (modelId) => set((state) => ({
+  incrementModelUsageCount: (modelId) => set((state: UserState) => ({
     dailyModelQuotasCount: {
       ...state.dailyModelQuotasCount,
       [modelId]: (state.dailyModelQuotasCount[modelId] || 0) + 1

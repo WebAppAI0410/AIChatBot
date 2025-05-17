@@ -29,6 +29,7 @@ import { MODELS } from '../constants/models';
 import { theme } from '../ui/theme';
 import { fetchChatCompletion, ChatMessage as ApiChatMessage } from '../services/api';
 import { Message } from '../store/chatStore';
+import { generateUuid } from '../store/chatStore';
 import ModelSelectModal from '../components/ModelSelectModal';
 import LocalModelInstallModal from '../components/LocalModelInstallModal';
 import Header from '../components/Header';
@@ -76,6 +77,7 @@ export default function ChatScreen() {
   const chats = useStore(state => state.chats);
   const addMessage = useStore(state => state.addMessage);
   const addImageMessage = useStore(state => state.addImageMessage);
+  const replaceMessage = useStore(state => state.replaceMessage);
   const markChatAsRead = useStore(state => state.markChatAsRead);
   const updateChatTitle = useStore(state => state.updateChatTitle);
   const updateChatModel = useStore(state => state.updateChatModel);
@@ -194,8 +196,10 @@ export default function ChatScreen() {
       // 入力欄をクリア
       setInput('');
       
-      // "生成中..."メッセージをアシスタントから一時的に表示
+      // "生成中..."メッセージをアシスタントから一時的に表示し、生成後に画像で置き換えるためにIDを保存
+      const pendingMessageId = generateUuid();
       addMessage(chat.id, {
+        id: pendingMessageId,
         content: '画像を生成中...',
         role: 'assistant'
       });
@@ -210,8 +214,8 @@ export default function ChatScreen() {
         const success = await imageGenPanelRef.current.generateImage();
         if (!success) {
           setIsGenerating(false);
-          // 生成に失敗した場合、新しいエラーメッセージを追加
-          addMessage(chat.id, {
+          // "生成中..."メッセージを失敗メッセージに置き換え
+          replaceMessage(chat.id, pendingMessageId, {
             content: '画像生成に失敗しました。もう一度お試しください。',
             role: 'assistant'
           });
@@ -219,8 +223,8 @@ export default function ChatScreen() {
       } catch (e) {
         console.error('Image generation failed:', e);
         setIsGenerating(false);
-        // 例外発生時も新しいエラーメッセージを追加
-        addMessage(chat.id, {
+        // "生成中..."メッセージを失敗メッセージに置き換え
+        replaceMessage(chat.id, pendingMessageId, {
           content: '画像生成中にエラーが発生しました。もう一度お試しください。',
           role: 'assistant'
         });
@@ -929,7 +933,7 @@ export default function ChatScreen() {
               <FlatList
                 ref={flatListRef}
                 data={[...chat.messages].reverse()} // メッセージの順序を逆にする
-                keyExtractor={(item, index) => `${item.role}-${index}`}
+                keyExtractor={(item) => item.id}
                 renderItem={renderMessage}
                 contentContainerStyle={styles.messagesContainer}
                 inverted={true} // FlatListを反転

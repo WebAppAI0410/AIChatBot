@@ -21,6 +21,7 @@ import { ImageGenerationPanel, ImageGenerationPanelHandle } from '../../app/comp
 import useColors from '../constants/colors';
 import theme from '../ui/theme';
 import { GeneratedImage } from '../../app/store/imageStore';
+import { generateUuid } from '../../app/store/chatStore';
 
 const SUGGESTIONS = [
   'リアルなキツネの写真',
@@ -87,11 +88,12 @@ export default function ImageScreen() {
     generatedPrompt: string,
     model: 'sdxl' | 'dalle' = 'sdxl' // デフォルト値を設定して後方互換性を保つ
   ) => {
-    // 最後に使用したモデルを取得
-    const modelToUse = getLastUsedModel();
+    // 画像パネルで選択されているモデルを取得
+    const panelModel = 
+      imagePanelRef.current?.getSettings?.()?.model ?? 'sdxl';
     
     // 新しいチャットを作成
-    const chatId = createChat(modelToUse); // 最後に使用したモデルを使用
+    const chatId = createChat(panelModel);
 
     // ユーザーのプロンプトをチャットに追加
     addMessage(chatId, {
@@ -139,11 +141,12 @@ export default function ImageScreen() {
       return;
     }
     
-    // 最後に使用したモデルを取得
-    const modelToUse = getLastUsedModel();
+    // 画像パネルで選択されているモデルを取得
+    const panelModel = 
+      imagePanelRef.current?.getSettings?.()?.model ?? 'sdxl';
     
     // 先にチャットを作成
-    const chatId = createChat(modelToUse); // 最後に使用したモデルを使用
+    const chatId = createChat(panelModel);
     
     // ユーザーのプロンプトをチャットに追加
     addMessage(chatId, {
@@ -156,7 +159,9 @@ export default function ImageScreen() {
     updateChatTitle(chatId, title);
     
     // "生成中..."メッセージを追加
+    const pendingId = generateUuid();
     addMessage(chatId, {
+      id: pendingId,
       role: 'assistant',
       content: '画像を生成中...',
     });
@@ -178,16 +183,16 @@ export default function ImageScreen() {
           model: imagePanelRef.current.getSettings?.()?.model || 'sdxl',
           chatId,
         }).then(imageUrl => {
-          // 生成された画像をアシスタントの返信として追加（チャットルーム側で自動的に表示される）
-          addImageMessage(chatId, {
+          // 生成された画像で一時メッセージを置き換え
+          replaceMessage(chatId, pendingId, {
             role: 'assistant',
             content: '生成された画像です',
             imageUrl,
           });
         }).catch(err => {
           console.error('Image generation error:', err);
-          // エラーメッセージをチャットに追加
-          addMessage(chatId, {
+          // エラーメッセージで一時メッセージを置き換え
+          replaceMessage(chatId, pendingId, {
             role: 'assistant',
             content: `画像生成に失敗しました: ${err.message || 'エラーが発生しました'}`,
           });
