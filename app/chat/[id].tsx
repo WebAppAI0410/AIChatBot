@@ -53,6 +53,9 @@ export default function ChatScreen() {
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [showMessageActions, setShowMessageActions] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [showLocalCentralToast, setShowLocalCentralToast] = useState(false);
+  const [localCentralToastMsg, setLocalCentralToastMsg] = useState('');
+  const localCentralToastTimer = useRef<NodeJS.Timeout | null>(null);
   
   const colors = useColors();
   const chats = useStore(state => state.chats);
@@ -621,7 +624,10 @@ export default function ChatScreen() {
       if (action === 'copy') {
         await Clipboard.setStringAsync(prompt + '\n' + imageUrl);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        showCentralToast('コピーしました');
+        setLocalCentralToastMsg('コピーしました');
+        setShowLocalCentralToast(true);
+        if (localCentralToastTimer.current) clearTimeout(localCentralToastTimer.current);
+        localCentralToastTimer.current = setTimeout(() => setShowLocalCentralToast(false), 1500);
       } else if (action === 'note') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         showToast('ノート保存機能は将来的に実装されます', true);
@@ -643,7 +649,10 @@ export default function ChatScreen() {
         const asset = await MediaLibrary.createAssetAsync(localUri);
         await MediaLibrary.createAlbumAsync('AI Chat', asset, false);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        showCentralToast('保存しました');
+        setLocalCentralToastMsg('保存しました');
+        setShowLocalCentralToast(true);
+        if (localCentralToastTimer.current) clearTimeout(localCentralToastTimer.current);
+        localCentralToastTimer.current = setTimeout(() => setShowLocalCentralToast(false), 1500);
       } else if (action === 'share') {
         if (await Sharing.isAvailableAsync()) {
           setIsSharing(true);
@@ -878,6 +887,32 @@ export default function ChatScreen() {
             imageUri={chat.messages.find(m => m.id === selectedMessageId)?.imageUrl}
             onDismiss={handleMessageActionsDismiss}
           />
+        )}
+
+        {showLocalCentralToast && (
+          <View style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 10000,
+          }}>
+            <View style={{
+              padding: 24,
+              borderRadius: 16,
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: 180,
+              maxWidth: '80%',
+              backgroundColor: 'rgba(0,0,0,0.8)',
+            }}>
+              <Ionicons name="checkmark-circle-outline" size={64} color="#4CAF50" />
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600', marginTop: 16, textAlign: 'center' }}>{localCentralToastMsg}</Text>
+            </View>
+          </View>
         )}
       </View>
     </MessageActionsProvider>

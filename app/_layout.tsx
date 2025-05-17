@@ -53,12 +53,11 @@ export default function RootLayout() {
                 <OrientationProvider>
                   <ResetDailyQuotaProvider>
                     <StatusBar style={activeTheme === 'dark' ? 'light' : 'dark'} />
+                    <CentralToast />
                     <View style={{ flex: 1 }}>
                       <Slot />
                       {/* グローバルトースト表示 */}
                       <Toast />
-                      {/* 中央トースト表示 */}
-                      <CentralToast />
                     </View>
                   </ResetDailyQuotaProvider>
                 </OrientationProvider>
