@@ -108,8 +108,19 @@ serve(async (req) => {
         }
       }
       
-      // レスポンスを転送
-      const responseData = await openRouterResponse.json()
+      // ストリーミングモードの場合はレスポンスをそのまま返す
+      if (stream) {
+        return new Response(openRouterResponse.body, {
+          status: openRouterResponse.status,
+          headers: {
+            ...Object.fromEntries(openRouterResponse.headers.entries()),
+            'Access-Control-Allow-Origin': '*',
+          },
+        });
+      }
+      
+      // 通常のレスポンスの場合はJSONとして処理
+      const responseData = await openRouterResponse.json();
       
       return new Response(JSON.stringify(responseData), {
         status: openRouterResponse.status,
@@ -117,7 +128,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
         },
-      })
+      });
     } catch (fetchError) {
       console.error('OpenRouter API fetch error:', fetchError.message || fetchError);
       // より具体的なエラーメッセージ

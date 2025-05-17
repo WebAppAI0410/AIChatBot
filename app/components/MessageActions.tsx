@@ -18,7 +18,7 @@ export const Toast: React.FC = () => {
   const [message, setMessage] = useState('');
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const colors = useColors();
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // グローバル関数に自身の表示関数をセット
   useEffect(() => {
@@ -230,7 +230,9 @@ export const MessageActions: React.FC<MessageActionProps> = ({
 
       // リモートURLの場合はローカルにダウンロード
       let localUri = imageUri;
+      let isTemp = false;
       if (imageUri.startsWith('http')) {
+        isTemp = true;
         const filename = `temp_${Date.now()}.jpg`;
         localUri = `${FileSystem.cacheDirectory}${filename}`;
         const downloadResult = await FileSystem.downloadAsync(imageUri, localUri);
@@ -242,6 +244,11 @@ export const MessageActions: React.FC<MessageActionProps> = ({
       // ローカルファイルからメディアライブラリに保存
       const asset = await MediaLibrary.createAssetAsync(localUri);
       await MediaLibrary.createAlbumAsync('AI Chat', asset, false);
+
+      // 一時ファイルを削除
+      if (isTemp) {
+        await FileSystem.deleteAsync(localUri, { idempotent: true });
+      }
 
       // 成功時の振動フィードバックと通知
       showToast('画像を保存しました', true);
@@ -258,27 +265,31 @@ export const MessageActions: React.FC<MessageActionProps> = ({
         // 画像共有
         if (await Sharing.isAvailableAsync()) {
           // リモートURLの場合はダウンロードが必要
+          let localUri = imageUri;
+          let isTemp = false;
+          
           if (imageUri.startsWith('http')) {
-            const localUri = FileSystem.cacheDirectory + 'temp_share_image.jpg';
+            isTemp = true;
+            const filename = `temp_share_${Date.now()}.jpg`;
+            localUri = `${FileSystem.cacheDirectory}${filename}`;
             const downloadResult = await FileSystem.downloadAsync(imageUri, localUri);
             
-            if (downloadResult.status === 200) {
-              await Sharing.shareAsync(localUri, {
-                mimeType: 'image/jpeg',
-                dialogTitle: 'AIチャットの画像を共有',
-              });
-              showToast('共有しました', true);
-            } else {
+            if (downloadResult.status !== 200) {
               throw new Error('画像のダウンロードに失敗しました');
             }
-          } else {
-            // ローカルURIの場合はそのまま共有
-            await Sharing.shareAsync(imageUri, {
-              mimeType: 'image/jpeg',
-              dialogTitle: 'AIチャットの画像を共有',
-            });
-            showToast('共有しました', true);
           }
+          
+          await Sharing.shareAsync(localUri, {
+            mimeType: 'image/jpeg',
+            dialogTitle: 'AIチャットの画像を共有',
+          });
+          
+          // 一時ファイルを削除
+          if (isTemp) {
+            await FileSystem.deleteAsync(localUri, { idempotent: true });
+          }
+          
+          showToast('共有しました', true);
         } else {
           showToast('共有機能が利用できません');
         }

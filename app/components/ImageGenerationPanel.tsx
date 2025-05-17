@@ -74,10 +74,11 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
   // モデル切り替え - SDXLとDALL-Eのトグル
   const toggleModel = () => {
     // 常に切り替え可能にする。ただし実際に使用する時はクォータをチェック
-    setModel(model === 'sdxl' ? 'dalle' : 'sdxl');
+    const nextModel = model === 'sdxl' ? 'dalle' : 'sdxl';
+    setModel(nextModel);
     
     // DALL-Eが使えない場合は警告を表示
-    if (model === 'sdxl' && !canUseDalle) {
+    if (nextModel === 'dalle' && !canUseDalle) {
       console.warn('DALL-E 3はプレミアムプランでのみ利用可能です');
       // ここで警告表示を出すこともできます
     }
@@ -191,7 +192,7 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
     if (width === height) {
       return width; // 正方形の場合は一辺の長さだけ表示
     } else {
-      return `${width}x${height.slice(-3)}`; // 長い方のサイズは省略表示
+      return `${width}x${height}`; // 切り捨てをやめて完全表示
     }
   };
 

@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useStore } from '../store';
 
 // 前日のリセット日を確認し、日付が変わっていたらクォータをリセットする
-const checkAndResetDailyQuotas = async (resetImageGenCount: () => void, resetDailyQuotas: () => void) => {
+const checkAndResetDailyQuotas = async (resetImageGenCount: () => void, resetDailyQuotas?: () => void) => {
   try {
     // 現在の日付（YYYY-MM-DD形式）
     const today = new Date().toISOString().split('T')[0];
@@ -15,7 +15,11 @@ const checkAndResetDailyQuotas = async (resetImageGenCount: () => void, resetDai
     if (!lastResetDate || lastResetDate !== today) {
       // 日付が変わっていたらリセット
       resetImageGenCount();
-      resetDailyQuotas(); // 画像生成クォータもリセット
+      
+      // resetDailyQuotasが存在する場合のみ実行
+      if (typeof resetDailyQuotas === 'function') {
+        resetDailyQuotas();
+      }
       
       // 最終リセット日を更新
       await AsyncStorage.setItem('lastQuotaResetDate', today);
@@ -32,7 +36,8 @@ interface ResetDailyQuotaProviderProps {
 
 export const ResetDailyQuotaProvider = ({ children }: ResetDailyQuotaProviderProps) => {
   const resetImageGenCount = useStore((state) => state.resetImageGenCount);
-  const resetDailyQuotas = useStore((state) => state.resetDailyQuotas);
+  // resetDailyQuotasはundefinedの可能性があるため、型を適切に対応
+  const resetDailyQuotas = useStore((state: any) => state.resetDailyQuotas);
 
   // アプリ起動時に確認
   useEffect(() => {

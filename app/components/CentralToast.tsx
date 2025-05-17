@@ -17,7 +17,7 @@ export const CentralToast: React.FC = () => {
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const colors = useColors();
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     globalShowCentralToast = (msg: string, duration: number = 1500) => {

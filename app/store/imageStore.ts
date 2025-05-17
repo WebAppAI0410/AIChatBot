@@ -44,6 +44,7 @@ export interface ImageState {
   // UI状態
   isGenerating: boolean;
   generationError: string | null;
+  errorCode?: string | null;
 
   // アクション
   generateImage: (params: {
@@ -96,6 +97,7 @@ export const createImageSlice: StateCreator<
   generatedImages: [],
   isGenerating: false,
   generationError: null,
+  errorCode: null,
 
   // 画像生成（実装後のAPI版）
   generateImage: async ({ prompt, size, quality, model, chatId }) => {
@@ -109,11 +111,15 @@ export const createImageSlice: StateCreator<
     }
 
     if (targetModel === 'sdxl' && sdxlQuota.remaining <= 0) {
+      set({ 
+        generationError: '本日の画像生成回数上限に達しました', 
+        errorCode: 'QUOTA_EXCEEDED' 
+      });
       throw new Error('本日の画像生成回数上限に達しました');
     }
 
     try {
-      set({ isGenerating: true, generationError: null });
+      set({ isGenerating: true, generationError: null, errorCode: null });
 
       // 実際のAPIを呼び出し
       const imageUrl = await apiGenerateImage({
@@ -139,7 +145,30 @@ export const createImageSlice: StateCreator<
 
       return imageUrl;
     } catch (error: any) {
-      set({ generationError: error.message });
+      // より具体的なエラーハンドリング
+      const errorMessage = error.message || '不明なエラーが発生しました';
+      let errorCode = 'UNKNOWN_ERROR';
+      
+      // エラーメッセージからエラータイプを判別
+      if (errorMessage.includes('quota') || errorMessage.includes('上限')) {
+        errorCode = 'QUOTA_EXCEEDED';
+      } else if (errorMessage.includes('network') || errorMessage.includes('ネットワーク')) {
+        errorCode = 'NETWORK_ERROR';
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('タイムアウト')) {
+        errorCode = 'TIMEOUT_ERROR';
+      } else if (errorMessage.includes('content policy') || errorMessage.includes('コンテンツポリシー')) {
+        errorCode = 'CONTENT_POLICY_VIOLATION';
+      } else if (errorMessage.includes('authentication') || errorMessage.includes('認証')) {
+        errorCode = 'AUTH_ERROR';
+      } else if (errorMessage.includes('server') || errorMessage.includes('サーバー')) {
+        errorCode = 'SERVER_ERROR';
+      }
+      
+      set({ 
+        generationError: errorMessage,
+        errorCode
+      });
+      
       throw error;
     } finally {
       set({ isGenerating: false });

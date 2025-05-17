@@ -21,6 +21,7 @@ export interface UserState {
   incrementImageGenCount: () => void;
   incrementModelUsageCount: (modelId: string) => void;
   resetImageGenCount: () => void;
+  resetDailyQuotas: () => void;
 }
 
 const TOKEN_LIMITS = {
@@ -58,6 +59,8 @@ export const createUserSlice: StateCreator<
       plan,
       monthlyTokensLimit: TOKEN_LIMITS[plan],
       dailyImageGenLimit: IMAGE_GEN_LIMITS[plan],
+      dailyImageGenCount: 0,
+      dailyModelQuotasCount: {},
     });
     
     // プラン変更時に画像クォータを即時リセットする
@@ -82,6 +85,12 @@ export const createUserSlice: StateCreator<
   resetImageGenCount: () => set({
     dailyImageGenCount: 0,
     dailyModelQuotasCount: {}
+  }),
+
+  /** Reset all per-day quotas (image + model) */
+  resetDailyQuotas: () => set({
+    dailyImageGenCount: 0,
+    dailyModelQuotasCount: {},
   }),
 });
 

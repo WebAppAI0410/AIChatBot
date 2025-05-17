@@ -17,7 +17,8 @@ import {
   Appearance,
   Share,
   ScrollView,
-  useWindowDimensions
+  useWindowDimensions,
+  Keyboard
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
@@ -60,7 +61,7 @@ export default function ChatScreen() {
   const [isSharing, setIsSharing] = useState(false);
   const [showLocalCentralToast, setShowLocalCentralToast] = useState(false);
   const [localCentralToastMsg, setLocalCentralToastMsg] = useState('');
-  const localCentralToastTimer = useRef<NodeJS.Timeout | null>(null);
+  const localCentralToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [balloonMenuVisible, setBalloonMenuVisible] = useState(false);
   const [balloonMenuPos, setBalloonMenuPos] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [balloonMenuActions, setBalloonMenuActions] = useState<BalloonAction[]>([]);
@@ -838,6 +839,7 @@ export default function ChatScreen() {
         // 部分コピーの処理
         setSelectedTextContent(message.content);
         setShowPartialCopyModal(true);
+        Keyboard.dismiss(); // キーボードを閉じる
       } else if (action === 'note') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         showToast('ノート保存機能は将来的に実装されます', true);
@@ -1184,6 +1186,9 @@ export default function ChatScreen() {
                     }
                   }}
                   autoFocus
+                  keyboardType="default"
+                  autoCorrect={false}
+                  editable={false}
                 />
               </ScrollView>
 

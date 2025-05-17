@@ -43,6 +43,7 @@ export const ImageBubble = forwardRef<any, ImageBubbleProps>(({
           source={{ uri: imageUrl }}
           style={styles.image}
           contentFit="cover"
+          accessibilityLabel={prompt}
         />
         <Text style={[
           styles.promptText,
