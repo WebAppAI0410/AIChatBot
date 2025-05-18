@@ -1,45 +1,50 @@
 import React, { useRef, useEffect } from 'react';
 import { StyleSheet, View, Platform, KeyboardAvoidingView } from 'react-native';
 import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
-import { useTheme } from '../../ui/ThemeProvider'; // ThemeProviderからテーマを取得
-import { useColors } from '../../constants/colors'; // useColorsフックを使用
+import { useTheme } from '../../ui/ThemeProvider';
+import { useColors } from '../../constants/colors';
 import { Bold, Italic, Underline, Strikethrough, List, ListOrdered, Pilcrow, Heading1, Heading2, Heading3, Quote, Link, Image, Trash } from 'lucide-react-native';
 
 export type WebViewEditorProps = {
   content: string;
   onContentChange: (content: string) => void;
   readOnly?: boolean;
-  isDarkMode?: boolean; // isDarkModeプロパティを追加
-  themeColors?: any; // themeColorsプロパティはオプションとして残す
+  isDarkMode?: boolean;
+  themeColors?: any;
   onFocus?: () => void;
   onBlur?: () => void;
   placeholder?: string;
-  autoFocus?: boolean; // オートフォーカスプロパティ追加
+  autoFocus?: boolean;
 };
 
 const WebViewEditor: React.FC<WebViewEditorProps> = ({
   content,
   onContentChange,
   readOnly = false,
-  isDarkMode = false, // isDarkModeをpropsから受け取る
+  isDarkMode = false,
   themeColors,
   onFocus,
   onBlur,
   placeholder = 'ここに内容を入力してください...',
-  autoFocus = false, // デフォルトはfalse
+  autoFocus = false,
 }) => {
   const richText = useRef<RichEditor>(null);
-  const { theme } = useTheme(); // ThemeProviderからテーマを取得
-  const colors = useColors(); // useColorsフックを使用
+  const { theme } = useTheme();
+  const colors = useColors();
 
-  // Pell Rich Editorのテーマカラー設定
-  const editorStyle = {
-    backgroundColor: isDarkMode ? colors.background : colors.background, // 背景色
-    color: isDarkMode ? colors.text : colors.text, // テキスト色
-    placeholderColor: isDarkMode ? colors.gray : colors.gray, // プレースホルダー色
-    // caretColor: isDarkMode ? colors.primary : colors.primary, // キャレット色 (Pellでは直接指定不可の場合がある)
-    // contentCSSText: `body { caret-color: ${isDarkMode ? colors.primary : colors.primary}; }`, // キャレットカラーをCSSで試みる
+  const editorStyleForAndroid = {
+    color: isDarkMode ? colors.text : colors.text,
+    placeholderColor: isDarkMode ? colors.gray : colors.gray,
   };
+  const editorStyleForIOS = {
+    backgroundColor: isDarkMode ? colors.background : colors.background,
+    color: isDarkMode ? colors.text : colors.text,
+    placeholderColor: isDarkMode ? colors.gray : colors.gray,
+  };
+  const editorStyle = Platform.select({
+    ios: editorStyleForIOS,
+    android: editorStyleForAndroid,
+  });
 
   const handleContentChange = (html: string) => {
     onContentChange(html);
@@ -47,15 +52,13 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
 
   useEffect(() => {
     if (autoFocus && richText.current && !readOnly) {
-      // 少し遅延させてフォーカスを試みる
       setTimeout(() => {
         richText.current?.focusContentEditor();
       }, 100);
     }
   }, [autoFocus, readOnly]);
-
-  // カスタムアイコンの定義
-  const iconMap = {
+  
+  const iconMapForIOS = {
     [actions.setBold]: ({ tintColor }: { tintColor?: string }) => <Bold size={20} color={tintColor || colors.text} />,
     [actions.setItalic]: ({ tintColor }: { tintColor?: string }) => <Italic size={20} color={tintColor || colors.text} />,
     [actions.setUnderline]: ({ tintColor }: { tintColor?: string }) => <Underline size={20} color={tintColor || colors.text} />,
@@ -69,60 +72,75 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
     [actions.insertImage]: ({ tintColor }: { tintColor?: string }) => <Image size={20} color={tintColor || colors.text} />,
     [actions.removeFormat]: ({ tintColor }: { tintColor?: string }) => <Trash size={20} color={tintColor || colors.text} />,
     [actions.setParagraph]: ({ tintColor }: { tintColor?: string }) => <Pilcrow size={20} color={tintColor || colors.text} />,
-    // [actions.insertBlockquote]: ({ tintColor }: { tintColor?: string }) => <Quote size={20} color={tintColor || colors.text} />, // 一旦コメントアウト
-    // 他の必要なアクションも同様に追加
   };
+
+  // Androidでも正しく動作するようにするために、確実に配列を返すようにする
+  const editorActionsForIOS = [
+    actions.setBold,
+    actions.setItalic,
+    actions.setUnderline,
+    actions.setStrikethrough,
+    actions.insertOrderedList,
+    actions.insertBulletsList,
+    actions.heading1,
+    actions.heading2,
+    actions.heading3,
+    actions.insertLink,
+    actions.removeFormat,
+    actions.setParagraph,
+  ];
+
+  const editorActionsForAndroid = [
+    actions.setBold, 
+    actions.setItalic,
+    actions.setUnderline,
+  ];
+
+  // Platform.selectを使わず、明示的に条件分岐させて確実に配列を返す
+  const editorActions = Platform.OS === 'ios' 
+    ? editorActionsForIOS 
+    : editorActionsForAndroid;
+
+  // AndroidではiconMapを渡さない (デフォルトアイコンにフォールバックさせる)
+  const iconMap = Platform.OS === 'ios' ? iconMapForIOS : undefined;
 
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === "ios" ? "padding" : "height"} 
       style={styles.container}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0} // ヘッダーの高さを考慮
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
     >
       {!readOnly && (
         <RichToolbar
           editor={richText}
-          actions={[
-            actions.setBold,
-            actions.setItalic,
-            actions.setUnderline,
-            actions.setStrikethrough,
-            actions.insertOrderedList,
-            actions.insertBulletsList,
-            actions.heading1,
-            actions.heading2,
-            actions.heading3,
-            actions.insertLink,
-            actions.removeFormat,
-            actions.setParagraph,
-          ]}
+          actions={editorActions} // 必ず配列型になるように修正
           iconMap={iconMap}
-          selectedIconTint={colors.primary} // 選択時のアイコン色
-          unselectedIconTint={colors.text} // 非選択時のアイコン色
-          style={[styles.toolbar, { backgroundColor: isDarkMode ? colors.card : colors.lightGray }]} // backgroundSecondary を card に変更 (または存在する色に)
-          itemStyle={{ paddingHorizontal: Platform.OS === 'ios' ? 8 : 10 }} // アイコン間のパディング調整
+          selectedIconTint={colors.primary}
+          unselectedIconTint={colors.text}
+          style={[styles.toolbar, { backgroundColor: isDarkMode ? colors.card : colors.lightGray }]}
+          itemStyle={{ paddingHorizontal: Platform.OS === 'ios' ? 8 : 10 }}
         />
       )}
       <RichEditor
         ref={richText}
-        initialContentHTML={content}
+        initialContentHTML={content || ''}
         onChange={handleContentChange}
-        style={styles.editor}
+        style={styles.editor} 
         editorStyle={editorStyle}
-        useContainer={Platform.OS !== 'android'} // Androidではfalseを推奨、iOSではtrueも可
+        useContainer={Platform.OS === 'ios'} 
         disabled={readOnly}
         onFocus={onFocus}
         onBlur={onBlur}
         placeholder={placeholder}
-        initialFocus={autoFocus} // 初期フォーカス
+        initialFocus={Platform.OS === 'ios' ? autoFocus : false}
         editorInitializedCallback={() => {
-          if (autoFocus && richText.current && !readOnly) {
+          if (autoFocus && richText.current && !readOnly && Platform.OS === 'ios') {
             richText.current?.focusContentEditor();
           }
         }}
-        // WebView固有のプロパティ (必要に応じて調整)
         scrollEnabled={true}
         showsVerticalScrollIndicator={true}
+        dataDetectorTypes={['none']}
       />
     </KeyboardAvoidingView>
   );
