@@ -48,8 +48,8 @@ export default function RootLayout() {
   // データベース初期化ハンドラ
   const handleDatabaseInit = async (db: any) => {
     try {
-      // データベース参照をsqlite.tsに設定
-      setDatabase(db);
+    // データベース参照をsqlite.tsに設定
+    setDatabase(db);
       
       // データベーススキーマの初期化と必要なマイグレーションを実行
       await initDatabase();

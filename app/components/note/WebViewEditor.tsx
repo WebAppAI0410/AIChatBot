@@ -1,11 +1,11 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { StyleSheet, View, Platform, KeyboardAvoidingView, useColorScheme } from 'react-native';
 import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
 import { useTheme } from '../../ui/ThemeProvider';
 import { useColors } from '../../constants/colors';
 import { useStore } from '../../store';
-import { Bold, Italic, Underline, Strikethrough, List, ListOrdered, Heading1, Heading2, Heading3, Quote, Link, Image, ListChecks, Highlighter } from 'lucide-react-native';
-
+import { Bold, Italic, Underline, Strikethrough, List, ListOrdered, Heading1, Heading2, Heading3, Quote, Link, Image, ListChecks, Highlighter, RotateCcw, RotateCw } from 'lucide-react-native';
+      
 // WebViewとRichEditorの型定義
 type DataDetectorTypes = 'phoneNumber' | 'link' | 'address' | 'calendarEvent' | 'none' | 'trackingNumber' | 'flightNumber';
 type OverScrollModeType = 'always' | 'content' | 'never';
@@ -21,24 +21,38 @@ export type WebViewEditorProps = {
   placeholder?: string;
   autoFocus?: boolean;
   onTextSelection?: (selectedText: string) => void;
+  onHistoryStateChange?: (canUndo: boolean, canRedo: boolean) => void;
 };
 
-const WebViewEditor: React.FC<WebViewEditorProps> = ({
-  content,
-  onContentChange,
-  readOnly = false,
-  isDarkMode: propIsDarkMode, // Props経由のisDarkMode
-  themeColors,
-  onFocus,
-  onBlur,
-  placeholder = 'ここに内容を入力してください',
-  autoFocus = false,
-  onTextSelection,
-}) => {
+// refを使用するためにforwardRefを実装
+const WebViewEditor = forwardRef<{ 
+  editor: { richText: RichEditor }, 
+  undo: () => void, 
+  redo: () => void,
+  canUndo: boolean,
+  canRedo: boolean 
+}, WebViewEditorProps>((
+  {
+    content,
+    onContentChange,
+    readOnly = false,
+    isDarkMode: propIsDarkMode, // Props経由のisDarkMode
+    themeColors,
+    onFocus,
+    onBlur,
+    placeholder = 'ここに内容を入力してください',
+    autoFocus = false,
+    onTextSelection,
+    onHistoryStateChange,
+  }, 
+  ref
+) => {
   const richText = useRef<RichEditor>(null);
   const { theme } = useTheme();
   const colors = useColors();
   const systemColorScheme = useColorScheme();
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
 
   // グローバルなテーマ設定から正確なダークモード状態を取得
   const globalTheme = useStore(state => state.theme);
@@ -51,6 +65,54 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
   
   const [selectedText, setSelectedText] = useState('');
   
+  // 親コンポーネントから参照できるようにする
+  useImperativeHandle(ref, () => ({
+    editor: {
+      richText: richText.current as RichEditor,
+    },
+    undo: () => {
+      if (richText.current) {
+        richText.current.commandDOM('document.execCommand("undo", false, null)');
+        // undo後に履歴状態を更新
+        setTimeout(() => checkHistoryState(), 50);
+      }
+    },
+    redo: () => {
+      if (richText.current) {
+        richText.current.commandDOM('document.execCommand("redo", false, null)');
+        // redo後に履歴状態を更新
+        setTimeout(() => checkHistoryState(), 50);
+      }
+    },
+    canUndo,
+    canRedo
+  }));
+  
+  // 履歴状態（Undo/Redoの可否）を確認
+  const checkHistoryState = useCallback(() => {
+    if (richText.current) {
+      richText.current.commandDOM(`
+        (function() {
+          try {
+            // documentのcommandStateを使ってundo/redoの可否を確認
+            const canUndo = document.queryCommandEnabled('undo');
+            const canRedo = document.queryCommandEnabled('redo');
+            
+            // ネイティブ側に結果を返す
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'historyState',
+              canUndo: canUndo,
+              canRedo: canRedo
+            }));
+          } catch (e) {
+            console.error('履歴状態確認エラー:', e);
+          }
+          return true;
+        })()
+      `);
+    }
+  }, [richText]);
+
   // ダークモード状態をログに出力して確認
   useEffect(() => {
     console.log('WebViewEditor: ダークモード状態確認:', {
@@ -70,6 +132,9 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
   const handleContentChange = (html: string) => {
     console.log("WebViewEditor: handleContentChange", html.substring(0, 100)); 
     onContentChange(html);
+    
+    // 内容変更後に履歴状態を確認（少し遅延させて確実に状態を反映）
+    setTimeout(() => checkHistoryState(), 50);
   };
 
   const handleSelectionChange = (data: { type: string; text: string; selection: any }) => {
@@ -81,14 +146,14 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
       console.log('WebViewEditor: テキスト選択:', data.text);
     }
   };
-
+          
   // ハイライトスタイルの設定（文字色は常に黒にして視認性を確保）
   const getHighlightStyles = useCallback(() => {
     // ダークモード時は暗い黄色を使用し、文字色は常に黒にする
-    return {
+          return {
       bgColor: calculatedIsDarkMode ? '#FFB800' : 'yellow',
       textColor: 'black' // 常に黒で視認性を確保
-    };
+          };
   }, [calculatedIsDarkMode]);
 
   // ハイライトスタイルを初期化する関数
@@ -120,7 +185,7 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
         })();
       `;
       richText.current.commandDOM(script);
-    }
+          }
   }, [getHighlightStyles]);
 
   // ダークモード状態が変わったらハイライトスタイルを更新
@@ -132,7 +197,7 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
   const handleHighlight = () => {
     if (richText.current) {
       console.log('WebViewEditor: ハイライトボタン実行, isDarkMode:', calculatedIsDarkMode);
-      
+        
       // スタイルを取得
       const { bgColor, textColor } = getHighlightStyles();
       
@@ -177,7 +242,7 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
       console.log('WebViewEditor: richText.current がありません');
     }
   };
-
+  
   useEffect(() => {
     if (autoFocus && richText.current && !readOnly) {
       setTimeout(() => {
@@ -185,6 +250,30 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
       }, 300);
     }
   }, [autoFocus, readOnly]);
+
+  // Undoアクションハンドラー
+  const handleUndo = () => {
+    if (richText.current && canUndo) {
+      console.log('WebViewEditor: Undoアクション実行');
+      richText.current.commandDOM('document.execCommand("undo", false, null)');
+      // 操作後に履歴状態を更新
+      setTimeout(() => checkHistoryState(), 50);
+    } else {
+      console.log('WebViewEditor: Undo不可または参照なし');
+    }
+  };
+
+  // Redoアクションハンドラー
+  const handleRedo = () => {
+    if (richText.current && canRedo) {
+      console.log('WebViewEditor: Redoアクション実行');
+      richText.current.commandDOM('document.execCommand("redo", false, null)');
+      // 操作後に履歴状態を更新
+      setTimeout(() => checkHistoryState(), 50);
+    } else {
+      console.log('WebViewEditor: Redo不可または参照なし');
+    }
+  };
   
   const customIconMap = {
     [actions.setBold]: ({ tintColor }: { tintColor?: string }) => <Bold size={20} color={tintColor || colors.text} />,
@@ -201,13 +290,22 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
     [actions.blockquote]: ({ tintColor }: { tintColor?: string }) => <Quote size={20} color={tintColor || colors.text} />,
     [actions.checkboxList]: ({ tintColor }: { tintColor?: string }) => <ListChecks size={20} color={tintColor || colors.text} />,
     ['highlight']: ({ tintColor }: { tintColor?: string }) => <Highlighter size={20} color={tintColor || colors.text} />,
+    ['undo']: ({ tintColor }: { tintColor?: string }) => (
+      <RotateCcw size={20} color={canUndo ? (tintColor || colors.text) : colors.gray} opacity={canUndo ? 1 : 0.5} />
+    ),
+    ['redo']: ({ tintColor }: { tintColor?: string }) => (
+      <RotateCw size={20} color={canRedo ? (tintColor || colors.text) : colors.gray} opacity={canRedo ? 1 : 0.5} />
+    ),
   };
 
   const customActions = {
-    highlight: handleHighlight, 
+    highlight: handleHighlight,
+    undo: handleUndo,
+    redo: handleRedo,
   };
   
   const editorActions = [
+    'undo', 'redo', // Undo/Redoボタンを先頭に追加
     actions.heading1, actions.heading2, actions.heading3, actions.blockquote,
     actions.setBold, actions.setItalic, actions.setUnderline, actions.setStrikethrough,
     'highlight', 
@@ -245,12 +343,35 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
             }));
           }
         });
+        
+        // 履歴状態を定期的に確認
+        setTimeout(function checkUndoRedoState() {
+          try {
+            const canUndo = document.queryCommandEnabled('undo');
+            const canRedo = document.queryCommandEnabled('redo');
+            
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'historyState',
+              canUndo: canUndo,
+              canRedo: canRedo
+            }));
+          } catch (e) {
+            console.error('Undo/Redo状態確認エラー:', e);
+          }
+          
+          // 状態を定期的に確認
+          setTimeout(checkUndoRedoState, 1000);
+        }, 500);
+        
         true; 
       `;
       richText.current.commandDOM(script);
       
       // ハイライトスタイルの初期化
       initializeHighlightStyles();
+      
+      // 初期化時に履歴状態を確認
+      setTimeout(() => checkHistoryState(), 500);
     }
   };
 
@@ -287,6 +408,13 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
     }
   }, [readOnly, autoFocus, propIsDarkMode, globalTheme, systemColorScheme, calculatedIsDarkMode]);
 
+  // Undo/Redo状態変更時に親コンポーネントに通知
+  useEffect(() => {
+    if (onHistoryStateChange) {
+      onHistoryStateChange(canUndo, canRedo);
+    }
+  }, [canUndo, canRedo, onHistoryStateChange]);
+
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === "ios" ? "padding" : "height"} 
@@ -298,14 +426,18 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
           editor={richText}
           actions={editorActions}
           iconMap={customIconMap}
+          customAction={customActions}
           selectedIconTint={colors.primary}
           unselectedIconTint={colors.text}
+          disabledIconTint={colors.gray}
           style={[styles.toolbar, { backgroundColor: calculatedIsDarkMode ? colors.card : colors.lightGray }]}
           itemStyle={{ paddingHorizontal: 10 }}
           iconSize={20}
           onPressAddImage={() => { console.log("WebViewEditor: onPressAddImage"); }} 
           onInsertLink={() => { console.log("WebViewEditor: onInsertLink"); }} 
           highlight={handleHighlight}
+          undo={handleUndo}
+          redo={handleRedo}
         />
       )}
       <RichEditor
@@ -326,11 +458,15 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
             const messageData = event.data; 
             if (messageData && typeof messageData === 'string') {
               const parsedData = JSON.parse(messageData);
-              console.log("WebViewEditor: onMessage parsedData:", parsedData);
+              
               if (parsedData.type === 'selection') {
                 handleSelectionChange(parsedData);
               } else if (parsedData.type === 'contentChange') {
                 console.log("WebViewEditor: onMessage contentChange from WebView:", parsedData.data.substring(0,100));
+              } else if (parsedData.type === 'historyState') {
+                // Undo/Redo状態の更新
+                setCanUndo(parsedData.canUndo);
+                setCanRedo(parsedData.canRedo);
               }
             }
           } catch (e) {
@@ -342,7 +478,7 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
       />
     </KeyboardAvoidingView>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

@@ -727,17 +727,17 @@ export default function ChatScreen() {
         let tempFile = false;
         
         try {
-          if (imageUrl.startsWith('http')) {
-            const filename = `temp_${Date.now()}.jpg`;
-            localUri = `${FileSystem.cacheDirectory}${filename}`;
+        if (imageUrl.startsWith('http')) {
+          const filename = `temp_${Date.now()}.jpg`;
+          localUri = `${FileSystem.cacheDirectory}${filename}`;
             const { uri } = await FileSystem.downloadAsync(imageUrl, localUri);
             localUri = uri;
             tempFile = true;
           }
           
-          const asset = await MediaLibrary.createAssetAsync(localUri);
+        const asset = await MediaLibrary.createAssetAsync(localUri);
           try {
-            await MediaLibrary.createAlbumAsync('AI Chat', asset, false);
+        await MediaLibrary.createAlbumAsync('AI Chat', asset, false);
           } catch (error: any) {
             // アルバムがすでに存在する場合は無視
             if (!error.message?.includes('E_ALBUM_EXISTS')) {
@@ -751,11 +751,11 @@ export default function ChatScreen() {
             }
           }
           
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          setLocalCentralToastMsg('保存しました');
-          setShowLocalCentralToast(true);
-          if (localCentralToastTimer.current) clearTimeout(localCentralToastTimer.current);
-          localCentralToastTimer.current = setTimeout(() => setShowLocalCentralToast(false), 1500);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setLocalCentralToastMsg('保存しました');
+        setShowLocalCentralToast(true);
+        if (localCentralToastTimer.current) clearTimeout(localCentralToastTimer.current);
+        localCentralToastTimer.current = setTimeout(() => setShowLocalCentralToast(false), 1500);
         } finally {
           // 一時ファイルのクリーンアップ
           if (tempFile && localUri) {
@@ -772,8 +772,8 @@ export default function ChatScreen() {
           return;
         }
         
-        setIsSharing(true);
-        let localUri = imageUrl;
+          setIsSharing(true);
+          let localUri = imageUrl;
         let tempFile = false;
         
         try {
@@ -783,7 +783,7 @@ export default function ChatScreen() {
             const { uri } = await FileSystem.downloadAsync(imageUrl, localUri);
             localUri = uri;
             tempFile = true;
-          }
+            }
           
           await Sharing.shareAsync(localUri, {
             mimeType: 'image/jpeg',

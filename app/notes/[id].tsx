@@ -1,13 +1,12 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, TextInput, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { XStack, YStack, Text, Button, ScrollView, Input } from 'tamagui';
-import { ArrowLeft, Star, Tag, Plus, X } from 'lucide-react-native';
+import { ArrowLeft, Star, Tag, Plus, X, Undo, Redo } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useNoteStore } from '../store/noteStore';
 import WebViewEditor from '../components/note/WebViewEditor';
 import NoteAIAssist from '../components/note/NoteAIAssist';
-import Header from '../components/Header';
 import { Tag as TagType } from '../services/sqlite';
 import { useColors } from '../constants/colors';
 import { useTheme } from '../ui/ThemeProvider';
@@ -22,6 +21,9 @@ export default function NoteScreen() {
   const { theme } = useTheme();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  
+  // WebViewEditorへの参照を作成
+  const editorRef = useRef<any>(null);
   
   const { 
     getNoteById, createNote, updateNote, currentFolder,
@@ -156,6 +158,20 @@ export default function NoteScreen() {
     setSelectedText('');
   }, [content, selectedText, handleContentChange]);
 
+  // Undo処理の実行
+  const handleUndo = useCallback(() => {
+    if (editorRef.current?.undo) {
+      editorRef.current.undo();
+    }
+  }, []);
+
+  // Redo処理の実行
+  const handleRedo = useCallback(() => {
+    if (editorRef.current?.redo) {
+      editorRef.current.redo();
+    }
+  }, []);
+
   // タグ追加
   const handleAddTag = useCallback(async () => {
     if (!newTagName.trim()) return;
@@ -202,11 +218,91 @@ export default function NoteScreen() {
     }
   }, [isNewNote, noteId, id, removeTagFromNote, loadNoteTags]);
 
+  // カスタムヘッダーの実装
+  const renderCustomHeader = () => {
+    return (
+      <View style={[styles.headerContainer, { backgroundColor: colors.primary }]}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.replace('/notes')}
+          accessibilityLabel="戻る"
+        >
+          <ArrowLeft size={22} color={colors.textOnPrimary} />
+        </TouchableOpacity>
+        
+        <View style={styles.editButtonsContainer}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={handleUndo}
+            accessibilityLabel="操作を取り消す"
+          >
+            <Undo size={22} color={colors.textOnPrimary} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={handleRedo}
+            accessibilityLabel="操作をやり直す"
+          >
+            <Redo size={22} color={colors.textOnPrimary} />
+          </TouchableOpacity>
+        </View>
+        
+        <TouchableOpacity
+          style={styles.headerActionButton}
+          onPress={toggleAiAssist}
+          accessibilityLabel="AIアシスト"
+        >
+          <Star size={22} color={colors.textOnPrimary} />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   // スタイルを動的に生成
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: colors.background,
+    },
+    headerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingTop: 50, // ステータスバー分の余白
+      paddingBottom: 12,
+      paddingHorizontal: 12,
+      height: 96, // ヘッダーの高さを固定
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    editButtonsContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 16,
+    },
+    editButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerActionButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     titleInput: {
       fontSize: 24,
@@ -279,22 +375,8 @@ export default function NoteScreen() {
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       
-      <Header
-        title={isNewNote ? t('new_note') : t('edit_note')}
-        showBack={true}
-        onBackPress={() => {
-          router.replace('/notes');
-        }}
-        rightComponent={
-          <XStack gap={8}>
-            <Button
-              icon={<Star size={20} />}
-              variant="outlined"
-              onPress={toggleAiAssist}
-            />
-          </XStack>
-        }
-      />
+      {/* カスタムヘッダー */}
+      {renderCustomHeader()}
       
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -360,6 +442,7 @@ export default function NoteScreen() {
           </View>
           
           <WebViewEditor
+            ref={editorRef}
             content={content}
             onContentChange={handleContentChange}
             onTextSelection={handleTextSelection}
