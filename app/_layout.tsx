@@ -17,7 +17,7 @@ import { Toast } from './components/MessageActions';
 import { CentralToast } from './components/CentralToast';
 import { View } from 'react-native';
 import { SQLiteProvider } from 'expo-sqlite';
-import { setDatabase } from './services/sqlite';
+import { setDatabase, initDatabase } from './services/sqlite';
 
 // ColorsType型を定義
 type ColorsType = typeof lightColors;
@@ -47,8 +47,16 @@ export default function RootLayout() {
 
   // データベース初期化ハンドラ
   const handleDatabaseInit = async (db: any) => {
-    // データベース参照をsqlite.tsに設定
-    setDatabase(db);
+    try {
+      // データベース参照をsqlite.tsに設定
+      setDatabase(db);
+      
+      // データベーススキーマの初期化と必要なマイグレーションを実行
+      await initDatabase();
+      console.log('Database initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize database:', error);
+    }
   };
   
   // エラーハンドラ

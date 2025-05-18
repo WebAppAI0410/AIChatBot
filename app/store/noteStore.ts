@@ -22,9 +22,15 @@ import {
   getNoteTags,
   getNoteTagIds,
   getNotesByTag,
+  addAttachment as dbAddAttachment,
+  getAttachment as dbGetAttachment,
+  getNoteAttachments as dbGetNoteAttachments,
+  deleteAttachment as dbDeleteAttachment,
   Note,
   Folder,
-  Tag
+  Tag,
+  NoteAttachment,
+  getNotesInFolder
 } from '../services/sqlite';
 
 export interface NoteState {
@@ -48,6 +54,7 @@ export interface NoteState {
   
   // ノート操作
   loadNotes: () => Promise<void>;
+  loadNotesInFolder: (folderId: string | null) => Promise<Note[]>;
   createNote: (note: Partial<Note>) => Promise<string>;
   updateNote: (id: string, changes: Partial<Note>) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
@@ -62,6 +69,12 @@ export interface NoteState {
   addTagToNote: (noteId: string, tagId: string) => Promise<void>;
   removeTagFromNote: (noteId: string, tagId: string) => Promise<void>;
   getNotesByTag: (tagId: string) => Promise<Note[]>;
+
+  // 添付ファイル操作
+  addAttachment: (noteId: string, contentType: string, data: string) => Promise<NoteAttachment>;
+  getAttachment: (id: string) => Promise<NoteAttachment | null>;
+  getNoteAttachments: (noteId: string) => Promise<NoteAttachment[]>;
+  deleteAttachment: (id: string) => Promise<void>;
 }
 
 export const createNoteSlice: StateCreator<
@@ -181,6 +194,8 @@ export const createNoteSlice: StateCreator<
   
   navigateToFolder: (folderId) => {
     set({ currentFolder: folderId });
+    // フォルダ変更時に自動的にそのフォルダ内のノートをロード
+    get().loadNotesInFolder(folderId);
   },
   
   // ノート操作
@@ -195,6 +210,22 @@ export const createNoteSlice: StateCreator<
         error: error instanceof Error ? error.message : 'ノートの読み込みに失敗しました', 
         isLoading: false 
       });
+    }
+  },
+
+  loadNotesInFolder: async (folderId) => {
+    set({ isLoading: true, error: null });
+    try {
+      const notes = await getNotesInFolder(folderId);
+      set({ isLoading: false });
+      return notes;
+    } catch (error) {
+      console.error('Failed to load notes in folder:', error);
+      set({ 
+        error: error instanceof Error ? error.message : 'フォルダ内のノート読み込みに失敗しました', 
+        isLoading: false 
+      });
+      return [];
     }
   },
   
@@ -382,6 +413,56 @@ export const createNoteSlice: StateCreator<
     } catch (error) {
       console.error('Failed to get notes by tag:', error);
       return [];
+    }
+  },
+
+  // 添付ファイル操作
+  addAttachment: async (noteId, contentType, data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const attachment = await dbAddAttachment(noteId, contentType, data);
+      set({ isLoading: false });
+      return attachment;
+    } catch (error) {
+      console.error('Failed to add attachment:', error);
+      set({ 
+        error: error instanceof Error ? error.message : '添付ファイルの追加に失敗しました', 
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
+
+  getAttachment: async (id) => {
+    try {
+      return await dbGetAttachment(id);
+    } catch (error) {
+      console.error('Failed to get attachment:', error);
+      return null;
+    }
+  },
+
+  getNoteAttachments: async (noteId) => {
+    try {
+      return await dbGetNoteAttachments(noteId);
+    } catch (error) {
+      console.error('Failed to get note attachments:', error);
+      return [];
+    }
+  },
+
+  deleteAttachment: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      await dbDeleteAttachment(id);
+      set({ isLoading: false });
+    } catch (error) {
+      console.error('Failed to delete attachment:', error);
+      set({ 
+        error: error instanceof Error ? error.message : '添付ファイルの削除に失敗しました', 
+        isLoading: false 
+      });
+      throw error;
     }
   }
 });

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <style>
+    :root {
+      --text-color: #333333;
+      --bg-color: #ffffff;
+      --primary-color: #007aff;
+      --border-color: #eeeeee;
+      --light-gray: #f5f5f5;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      padding: 16px;
+      margin: 0;
+      color: var(--text-color);
+      background-color: var(--bg-color);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .editor-container {
+      display: flex;
+      flex-direction: column;
+      min-height: 90vh;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 16px;
+    }
+
+    .toolbar button {
+      background: transparent;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 8px;
+      margin: 0 4px 4px 0;
+      color: var(--text-color);
+      cursor: pointer;
+    }
+
+    .toolbar button.active {
+      background-color: var(--primary-color);
+      color: white;
+    }
+
+    .toolbar button:active {
+      background-color: var(--light-gray);
+    }
+
+    #editor {
+      flex: 1;
+      outline: none;
+      min-height: 200px;
+      padding: 8px 0;
+      line-height: 1.5;
+      cursor: text;
+      font-size: 16px;
+      -webkit-user-select: text;
+      user-select: text;
+      -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    }
+
+    #editor h1, #editor h2, #editor h3 {
+      margin-top: 16px;
+      margin-bottom: 8px;
+    }
+
+    #editor p {
+      margin-top: 0;
+      margin-bottom: 16px;
+    }
+
+    #editor ul, #editor ol {
+      margin-bottom: 16px;
+      padding-left: 24px;
+    }
+
+    #editor blockquote {
+      border-left: 3px solid var(--primary-color);
+      margin-left: 0;
+      padding-left: 16px;
+      color: #666;
+    }
+
+    .selection-bubble {
+      position: absolute;
+      background: var(--primary-color);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 16px;
+      font-size: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <div class="editor-container">
+    <div class="toolbar">
+      <button type="button" data-command="bold"><b>B</b></button>
+      <button type="button" data-command="italic"><i>I</i></button>
+      <button type="button" data-command="underline"><u>U</u></button>
+      <button type="button" data-command="heading" data-value="H1">H1</button>
+      <button type="button" data-command="heading" data-value="H2">H2</button>
+      <button type="button" data-command="heading" data-value="H3">H3</button>
+      <button type="button" data-command="insertUnorderedList">• List</button>
+      <button type="button" data-command="insertOrderedList">1. List</button>
+      <button type="button" data-command="blockquote">Quote</button>
+      <button type="button" data-command="removeFormat">Clear</button>
+    </div>
+    <div id="editor" contenteditable="true"></div>
+  </div>
+
+  <script>
+    // エディタの初期化
+    const editor = document.getElementById('editor');
+    const toolbar = document.querySelector('.toolbar');
+    let lastContent = '';
+    let isEditing = false;
+    let isReady = false;
+
+    // ダークモード対応
+    function updateTheme(colors) {
+      document.documentElement.style.setProperty('--text-color', colors.text);
+      document.documentElement.style.setProperty('--bg-color', colors.background);
+      document.documentElement.style.setProperty('--primary-color', colors.primary);
+      document.documentElement.style.setProperty('--border-color', colors.border);
+      document.documentElement.style.setProperty('--light-gray', colors.lightGray);
+    }
+
+    // 編集コマンド実行
+    function execCommand(command, value = null) {
+      document.execCommand(command, false, value);
+      editor.focus();
+      checkActiveButtons();
+      
+      // 内容変更を通知
+      notifyContentChanged();
+    }
+
+    // アクティブボタンの状態確認
+    function checkActiveButtons() {
+      const buttons = toolbar.querySelectorAll('button');
+      buttons.forEach(button => {
+        const command = button.dataset.command;
+        
+        button.classList.remove('active');
+        
+        if (command === 'bold' && document.queryCommandState('bold')) {
+          button.classList.add('active');
+        } else if (command === 'italic' && document.queryCommandState('italic')) {
+          button.classList.add('active');
+        } else if (command === 'underline' && document.queryCommandState('underline')) {
+          button.classList.add('active');
+        } else if (command === 'insertUnorderedList' && document.queryCommandState('insertUnorderedList')) {
+          button.classList.add('active');
+        } else if (command === 'insertOrderedList' && document.queryCommandState('insertOrderedList')) {
+          button.classList.add('active');
+        } else if (command === 'blockquote') {
+          // blockquoteの状態確認はより複雑なため省略
+        }
+      });
+    }
+
+    // 変更内容通知
+    function notifyContentChanged() {
+      const content = editor.innerHTML;
+      if (content !== lastContent) {
+        lastContent = content;
+        
+        // ネイティブに内容変更を通知
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'contentChanged',
+          content: content
+        }));
+      }
+    }
+
+    // ツールバーボタンのクリックイベント
+    toolbar.addEventListener('click', (e) => {
+      const button = e.target.closest('button');
+      if (!button) return;
+      
+      const command = button.dataset.command;
+      const value = button.dataset.value || null;
+      
+      if (command === 'heading') {
+        // 見出しの処理
+        if (value === 'H1') execCommand('formatBlock', '<h1>');
+        else if (value === 'H2') execCommand('formatBlock', '<h2>');
+        else if (value === 'H3') execCommand('formatBlock', '<h3>');
+      } else {
+        // その他のコマンド
+        execCommand(command, value);
+      }
+    });
+
+    // キーアップイベントで変更を検知
+    editor.addEventListener('keyup', () => {
+      checkActiveButtons();
+      notifyContentChanged();
+    });
+
+    // 編集開始
+    editor.addEventListener('focus', () => {
+      isEditing = true;
+      
+      // ネイティブに編集開始を通知
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'editingStarted'
+      }));
+    });
+
+    // 編集終了
+    editor.addEventListener('blur', () => {
+      isEditing = false;
+      
+      // 内容が変更されていれば保存
+      notifyContentChanged();
+    });
+
+    // メッセージ処理
+    window.addEventListener('message', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'setContent') {
+          editor.innerHTML = data.content;
+          lastContent = data.content;
+          checkActiveButtons();
+        } else if (data.type === 'updateTheme') {
+          updateTheme(data.colors);
+        } else if (data.type === 'execCommand') {
+          execCommand(data.command, data.value);
+        } else if (data.type === 'setReadOnly') {
+          editor.contentEditable = !data.readOnly;
+          toolbar.style.display = data.readOnly ? 'none' : 'flex';
+        } else if (data.type === 'initEditor') {
+          // 明示的な初期化
+          editor.innerHTML = data.content;
+          lastContent = data.content;
+          
+          // 編集可能性を再確認
+          editor.contentEditable = 'true';
+          
+          // フォーカスを試みる
+          setTimeout(() => {
+            editor.focus();
+            
+            // キャレットを末尾に配置
+            const range = document.createRange();
+            const sel = window.getSelection();
+            
+            if (editor.childNodes.length > 0) {
+              const lastNode = editor.lastChild;
+              range.setStartAfter(lastNode);
+            } else {
+              range.setStart(editor, 0);
+            }
+            
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+            
+            // ネイティブに編集開始を通知
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'editingStarted'
+            }));
+          }, 300);
+        }
+      } catch (e) {
+        console.error('メッセージ処理エラー:', e);
+      }
+    });
+
+    // 準備完了通知
+    isReady = true;
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'editorReady'
+    }));
+  </script>
+</body>
+</html> 
