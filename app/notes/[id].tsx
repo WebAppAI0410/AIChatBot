@@ -351,6 +351,8 @@ export default function NoteScreen() {
             onTextSelection={handleTextSelection}
             isDarkMode={isDark}
             themeColors={colors}
+            autoFocus={isNewNote}
+            placeholder={t('enter_note_content')}
           />
         </ScrollView>
       </KeyboardAvoidingView>

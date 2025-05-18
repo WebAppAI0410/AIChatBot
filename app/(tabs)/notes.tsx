@@ -161,7 +161,9 @@ export default function NotesScreen() {
                     fontSize="$2" 
                     color="$gray10"
                   >
-                    {new Date(item.updated_at).toLocaleDateString()}
+                    {item.updated_at
+                      ? new Date(item.updated_at).toLocaleDateString()
+                      : ''}
                   </Text>
                 </YStack>
               </XStack>

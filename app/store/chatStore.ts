@@ -2,7 +2,7 @@ import { StateCreator } from 'zustand';
 // import { v4 as uuidv4 } from 'uuid';
 
 // Hermesエンジン対応のUUID生成関数
-const generateUuid = (): string => {
+export const generateUuid = (): string => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0;
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -38,7 +38,7 @@ export interface ChatState {
   chatToDelete: string | null;
   isDeleteDialogVisible: boolean;
   createChat: (modelId: string) => string;
-  addMessage: (chatId: string, message: Omit<Message, 'id' | 'timestamp' | 'isRead'>) => void;
+  addMessage: (chatId: string, message: { content: string; role: 'user' | 'assistant' | 'system'; id?: string; imageUrl?: string }) => void;
   addImageMessage: (chatId: string, params: { content: string; imageUrl: string; role: 'user' | 'assistant' }) => void;
   replaceMessage: (chatId: string, messageId: string, newMessage: Omit<Message, 'id' | 'timestamp' | 'isRead'>) => void;
   updateChatTitle: (chatId: string, title: string) => void;
@@ -60,10 +60,18 @@ export interface ChatState {
 }
 
 // メッセージ追加の共通ロジック
-const appendMessageToChat = (state: ChatState, chatId: string, messageContent: Omit<Message, 'id' | 'timestamp' | 'isRead'>, idPrefix: string = ''): ChatState => {
+const appendMessageToChat = (
+  state: ChatState, 
+  chatId: string, 
+  messageContent: { content: string; role: 'user' | 'assistant' | 'system'; id?: string; imageUrl?: string }, 
+  idPrefix: string = ''
+): ChatState => {
+  const messageId = messageContent.id || `${idPrefix}${generateUuid()}`;
+  const { id, ...restContent } = messageContent; // idを抽出して除外
+
   const newMessage: Message = {
-    id: `${idPrefix}${generateUuid()}`,
-    ...messageContent,
+    id: messageId,
+    ...restContent,
     timestamp: Date.now(),
     isRead: false, // デフォルトで未読に設定
   };

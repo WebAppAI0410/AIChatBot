@@ -17,11 +17,11 @@ import {
   getAllTags,
   updateTag as dbUpdateTag,
   deleteTag as dbDeleteTag,
-  addTagToNote,
-  removeTagFromNote,
+  addTagToNote as dbAddTagToNote,
+  removeTagFromNote as dbRemoveTagFromNote,
   getNoteTags,
   getNoteTagIds,
-  getNotesByTag,
+  getNotesByTag as dbGetNotesByTag,
   addAttachment as dbAddAttachment,
   getAttachment as dbGetAttachment,
   getNoteAttachments as dbGetNoteAttachments,
@@ -195,7 +195,10 @@ export const createNoteSlice: StateCreator<
   navigateToFolder: (folderId) => {
     set({ currentFolder: folderId });
     // フォルダ変更時に自動的にそのフォルダ内のノートをロード
-    get().loadNotesInFolder(folderId);
+    get()
+      .loadNotesInFolder(folderId)
+      .then((notes) => set({ notes }))
+      .catch((e) => console.error(e));
   },
   
   // ノート操作
@@ -217,7 +220,7 @@ export const createNoteSlice: StateCreator<
     set({ isLoading: true, error: null });
     try {
       const notes = await getNotesInFolder(folderId);
-      set({ isLoading: false });
+      set({ notes, isLoading: false });
       return notes;
     } catch (error) {
       console.error('Failed to load notes in folder:', error);
@@ -391,7 +394,7 @@ export const createNoteSlice: StateCreator<
   
   addTagToNote: async (noteId, tagId) => {
     try {
-      await addTagToNote(noteId, tagId);
+      await dbAddTagToNote(noteId, tagId);
     } catch (error) {
       console.error('Failed to add tag to note:', error);
       throw error;
@@ -400,7 +403,7 @@ export const createNoteSlice: StateCreator<
   
   removeTagFromNote: async (noteId, tagId) => {
     try {
-      await removeTagFromNote(noteId, tagId);
+      await dbRemoveTagFromNote(noteId, tagId);
     } catch (error) {
       console.error('Failed to remove tag from note:', error);
       throw error;
@@ -409,7 +412,7 @@ export const createNoteSlice: StateCreator<
   
   getNotesByTag: async (tagId) => {
     try {
-      return await getNotesByTag(tagId);
+      return await dbGetNotesByTag(tagId);
     } catch (error) {
       console.error('Failed to get notes by tag:', error);
       return [];

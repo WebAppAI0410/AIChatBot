@@ -227,7 +227,7 @@
     });
 
     // メッセージ処理
-    window.addEventListener('message', (event) => {
+    function handleMessage(event) {
       try {
         const data = JSON.parse(event.data);
         
@@ -278,7 +278,11 @@
       } catch (e) {
         console.error('メッセージ処理エラー:', e);
       }
-    });
+    }
+
+    // window.addEventListener と document.addEventListener の両方に登録
+    window.addEventListener('message', handleMessage);
+    document.addEventListener('message', handleMessage); // iOS向けフォールバック
 
     // 準備完了通知
     isReady = true;

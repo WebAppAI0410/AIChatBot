@@ -426,11 +426,23 @@ export const createTag = async (name: string): Promise<Tag> => {
   const db = getDatabase();
   const id = `tag_${uuidv4()}`;
   
-  const stmt = await db.prepareAsync(`INSERT INTO tags (id, name) VALUES (?, ?)`);
-  await stmt.executeAsync([id, name]);
-  await stmt.finalizeAsync();
-  
-  return { id, name };
+  try {
+    const stmt = await db.prepareAsync(`INSERT INTO tags (id, name) VALUES (?, ?)`);
+    await stmt.executeAsync([id, name]);
+    await stmt.finalizeAsync();
+    
+    return { id, name };
+  } catch (err: any) {
+    // UNIQUE制約違反の場合は既存のタグを返す
+    if (err.message?.includes('UNIQUE')) {
+      const existingTag = await db.getFirstAsync<Tag>('SELECT * FROM tags WHERE name = ?', [name]);
+      if (existingTag) {
+        return existingTag;
+      }
+    }
+    // その他のエラーは再スロー
+    throw err;
+  }
 };
 
 export const getAllTags = async (): Promise<Tag[]> => {

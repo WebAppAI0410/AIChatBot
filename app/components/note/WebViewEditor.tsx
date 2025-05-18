@@ -5,6 +5,10 @@ import { useTheme } from '../../ui/ThemeProvider';
 import { useColors } from '../../constants/colors';
 import { Bold, Italic, Underline, Strikethrough, List, ListOrdered, Pilcrow, Heading1, Heading2, Heading3, Quote, Link, Image, Trash } from 'lucide-react-native';
 
+// WebViewとRichEditorの型定義
+type DataDetectorTypes = 'phoneNumber' | 'link' | 'address' | 'calendarEvent' | 'none' | 'trackingNumber' | 'flightNumber';
+type OverScrollModeType = 'always' | 'content' | 'never';
+
 export type WebViewEditorProps = {
   content: string;
   onContentChange: (content: string) => void;
@@ -15,6 +19,7 @@ export type WebViewEditorProps = {
   onBlur?: () => void;
   placeholder?: string;
   autoFocus?: boolean;
+  onTextSelection?: (selectedText: string) => void;
 };
 
 const WebViewEditor: React.FC<WebViewEditorProps> = ({
@@ -27,38 +32,41 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
   onBlur,
   placeholder = 'ここに内容を入力してください...',
   autoFocus = false,
+  onTextSelection,
 }) => {
   const richText = useRef<RichEditor>(null);
   const { theme } = useTheme();
   const colors = useColors();
 
-  const editorStyleForAndroid = {
-    color: isDarkMode ? colors.text : colors.text,
-    placeholderColor: isDarkMode ? colors.gray : colors.gray,
-  };
-  const editorStyleForIOS = {
+  // エディタスタイル定義（プラットフォーム固有の設定を避ける）
+  const editorStyle = {
     backgroundColor: isDarkMode ? colors.background : colors.background,
-    color: isDarkMode ? colors.text : colors.text,
-    placeholderColor: isDarkMode ? colors.gray : colors.gray,
+    color: colors.text,
+    placeholderColor: colors.gray,
   };
-  const editorStyle = Platform.select({
-    ios: editorStyleForIOS,
-    android: editorStyleForAndroid,
-  });
 
   const handleContentChange = (html: string) => {
     onContentChange(html);
   };
 
+  // テキスト選択ハンドラ
+  const handleSelectionChange = (data: { type: string; text: string }) => {
+    if (data.type === 'selection' && data.text && onTextSelection) {
+      onTextSelection(data.text);
+    }
+  };
+
+  // 初期フォーカス設定
   useEffect(() => {
     if (autoFocus && richText.current && !readOnly) {
       setTimeout(() => {
         richText.current?.focusContentEditor();
-      }, 100);
+      }, 300);
     }
   }, [autoFocus, readOnly]);
   
-  const iconMapForIOS = {
+  // ツールバーアイコン定義（iOSのみ）
+  const iconMapForIOS = Platform.OS === 'ios' ? {
     [actions.setBold]: ({ tintColor }: { tintColor?: string }) => <Bold size={20} color={tintColor || colors.text} />,
     [actions.setItalic]: ({ tintColor }: { tintColor?: string }) => <Italic size={20} color={tintColor || colors.text} />,
     [actions.setUnderline]: ({ tintColor }: { tintColor?: string }) => <Underline size={20} color={tintColor || colors.text} />,
@@ -72,9 +80,10 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
     [actions.insertImage]: ({ tintColor }: { tintColor?: string }) => <Image size={20} color={tintColor || colors.text} />,
     [actions.removeFormat]: ({ tintColor }: { tintColor?: string }) => <Trash size={20} color={tintColor || colors.text} />,
     [actions.setParagraph]: ({ tintColor }: { tintColor?: string }) => <Pilcrow size={20} color={tintColor || colors.text} />,
-  };
+  } : undefined;
 
-  // Androidでも正しく動作するようにするために、確実に配列を返すようにする
+  // プラットフォームごとにツールバーアクションを定義
+  // iOS - 完全な機能セット
   const editorActionsForIOS = [
     actions.setBold,
     actions.setItalic,
@@ -90,19 +99,67 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
     actions.setParagraph,
   ];
 
+  // Android - 簡素化したセット（安定性のため）
   const editorActionsForAndroid = [
     actions.setBold, 
     actions.setItalic,
     actions.setUnderline,
   ];
 
-  // Platform.selectを使わず、明示的に条件分岐させて確実に配列を返す
+  // プラットフォームに応じたアクション配列
   const editorActions = Platform.OS === 'ios' 
     ? editorActionsForIOS 
     : editorActionsForAndroid;
 
-  // AndroidではiconMapを渡さない (デフォルトアイコンにフォールバックさせる)
-  const iconMap = Platform.OS === 'ios' ? iconMapForIOS : undefined;
+  // Androidに特化したWebViewプロパティの設定
+  const androidSpecificProps = Platform.OS === 'android' ? {
+    // 型エラー回避のために明示的に配列と指定
+    // dataDetectorTypes: ['none'] as DataDetectorTypes[],
+    originWhitelist: ['*'] as string[],
+    // その他のAndroid固有の設定
+    domStorageEnabled: true,
+    javaScriptEnabled: true,
+    overScrollMode: 'never' as OverScrollModeType,
+    allowFileAccess: true,
+    cacheEnabled: true,
+    // キーボード関連の設定
+    hideKeyboardAccessoryView: false,
+    autoFocus: false, // Androidでは手動フォーカス処理を使用
+  } : {};
+
+  // iOS固有のプロパティ
+  const iosSpecificProps = Platform.OS === 'ios' ? {
+    useContainer: true,
+    initialFocus: autoFocus,
+    allowsInlineMediaPlayback: true,
+    hideKeyboardAccessoryView: false,
+    bounces: false,
+  } : {};
+
+  // デバッグログ - 開発時にプロパティの型を確認
+  useEffect(() => {
+    if (__DEV__ && Platform.OS === 'android') {
+      console.log('WebViewEditor Android Props:', {
+        // その他のデバッグ情報
+      });
+    }
+  }, []);
+
+  // Android向けに編集内容のコンテキストメニューをカスタマイズするJavaScript
+  const customInjectJavaScript = `
+    if (window.ReactNativeWebView) {
+      document.addEventListener('selectionchange', function() {
+        const selection = window.getSelection();
+        if (selection && selection.toString()) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'selection',
+            text: selection.toString()
+          }));
+        }
+      });
+    }
+    true;
+  `;
 
   return (
     <KeyboardAvoidingView 
@@ -113,8 +170,8 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
       {!readOnly && (
         <RichToolbar
           editor={richText}
-          actions={editorActions} // 必ず配列型になるように修正
-          iconMap={iconMap}
+          actions={editorActions}
+          iconMap={Platform.OS === 'ios' ? iconMapForIOS : undefined}
           selectedIconTint={colors.primary}
           unselectedIconTint={colors.text}
           style={[styles.toolbar, { backgroundColor: isDarkMode ? colors.card : colors.lightGray }]}
@@ -127,20 +184,29 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
         onChange={handleContentChange}
         style={styles.editor} 
         editorStyle={editorStyle}
-        useContainer={Platform.OS === 'ios'} 
         disabled={readOnly}
         onFocus={onFocus}
         onBlur={onBlur}
         placeholder={placeholder}
-        initialFocus={Platform.OS === 'ios' ? autoFocus : false}
-        editorInitializedCallback={() => {
-          if (autoFocus && richText.current && !readOnly && Platform.OS === 'ios') {
-            richText.current?.focusContentEditor();
-          }
-        }}
         scrollEnabled={true}
         showsVerticalScrollIndicator={true}
-        dataDetectorTypes={['none']}
+        editorInitializedCallback={() => {
+          console.log('RichEditor initialized');
+        }}
+        // テキスト選択処理
+        onMessage={(event) => {
+          try {
+            const parsedData = JSON.parse(event.data);
+            handleSelectionChange(parsedData);
+          } catch (e) {
+            console.log('メッセージ解析エラー:', e);
+          }
+        }}
+        // インジェクトJavaScriptを追加
+        injectedJavaScript={customInjectJavaScript}
+        // プラットフォーム固有の設定を適用
+        {...androidSpecificProps}
+        {...iosSpecificProps}
       />
     </KeyboardAvoidingView>
   );

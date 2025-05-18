@@ -722,42 +722,85 @@ export default function ChatScreen() {
           showToast('写真へのアクセス権限が必要です');
           return;
         }
+        
         let localUri = imageUrl;
-        if (imageUrl.startsWith('http')) {
-          const filename = `temp_${Date.now()}.jpg`;
-          localUri = `${FileSystem.cacheDirectory}${filename}`;
-          const downloadResult = await FileSystem.downloadAsync(imageUrl, localUri);
-          if (downloadResult.status !== 200) {
-            throw new Error('画像のダウンロードに失敗しました');
+        let tempFile = false;
+        
+        try {
+          if (imageUrl.startsWith('http')) {
+            const filename = `temp_${Date.now()}.jpg`;
+            localUri = `${FileSystem.cacheDirectory}${filename}`;
+            const { uri } = await FileSystem.downloadAsync(imageUrl, localUri);
+            localUri = uri;
+            tempFile = true;
+          }
+          
+          const asset = await MediaLibrary.createAssetAsync(localUri);
+          try {
+            await MediaLibrary.createAlbumAsync('AI Chat', asset, false);
+          } catch (error: any) {
+            // アルバムがすでに存在する場合は無視
+            if (!error.message?.includes('E_ALBUM_EXISTS')) {
+              throw error;
+            }
+            // 既存のアルバムにアセットを追加
+            const albums = await MediaLibrary.getAlbumsAsync();
+            const aiChatAlbum = albums.find(a => a.title === 'AI Chat');
+            if (aiChatAlbum) {
+              await MediaLibrary.addAssetsToAlbumAsync([asset], aiChatAlbum, false);
+            }
+          }
+          
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          setLocalCentralToastMsg('保存しました');
+          setShowLocalCentralToast(true);
+          if (localCentralToastTimer.current) clearTimeout(localCentralToastTimer.current);
+          localCentralToastTimer.current = setTimeout(() => setShowLocalCentralToast(false), 1500);
+        } finally {
+          // 一時ファイルのクリーンアップ
+          if (tempFile && localUri) {
+            try {
+              await FileSystem.deleteAsync(localUri, { idempotent: true });
+            } catch (e) {
+              console.warn('一時ファイルの削除に失敗:', e);
+            }
           }
         }
-        const asset = await MediaLibrary.createAssetAsync(localUri);
-        await MediaLibrary.createAlbumAsync('AI Chat', asset, false);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setLocalCentralToastMsg('保存しました');
-        setShowLocalCentralToast(true);
-        if (localCentralToastTimer.current) clearTimeout(localCentralToastTimer.current);
-        localCentralToastTimer.current = setTimeout(() => setShowLocalCentralToast(false), 1500);
       } else if (action === 'share') {
-        if (await Sharing.isAvailableAsync()) {
-          setIsSharing(true);
-          let localUri = imageUrl;
+        if (!(await Sharing.isAvailableAsync())) {
+          showToast('共有機能が利用できません');
+          return;
+        }
+        
+        setIsSharing(true);
+        let localUri = imageUrl;
+        let tempFile = false;
+        
+        try {
           if (imageUrl.startsWith('http')) {
             const filename = `temp_share_${Date.now()}.jpg`;
             localUri = `${FileSystem.cacheDirectory}${filename}`;
-            const downloadResult = await FileSystem.downloadAsync(imageUrl, localUri);
-            if (downloadResult.status !== 200) {
-              setIsSharing(false);
-              throw new Error('画像のダウンロードに失敗しました');
-            }
+            const { uri } = await FileSystem.downloadAsync(imageUrl, localUri);
+            localUri = uri;
+            tempFile = true;
           }
+          
           await Sharing.shareAsync(localUri, {
             mimeType: 'image/jpeg',
             dialogTitle: 'AIチャットの画像を共有',
           });
+          
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } else {
-          showToast('共有機能が利用できません');
+        } finally {
+          setIsSharing(false);
+          // 一時ファイルのクリーンアップ
+          if (tempFile && localUri) {
+            try {
+              await FileSystem.deleteAsync(localUri, { idempotent: true });
+            } catch (e) {
+              console.warn('一時ファイルの削除に失敗:', e);
+            }
+          }
         }
       }
     } catch (error) {
@@ -1178,7 +1221,6 @@ export default function ChatScreen() {
                   style={styles.partialCopyInput}
                   multiline
                   value={selectedTextContent}
-                  onChangeText={setSelectedTextContent}
                   onSelectionChange={(event) => {
                     const { selection } = event.nativeEvent;
                     if (selection.start !== selection.end) {
@@ -1192,7 +1234,6 @@ export default function ChatScreen() {
                   autoFocus
                   keyboardType="default"
                   autoCorrect={false}
-                  editable={false}
                 />
               </ScrollView>
 
