@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, TextInput, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { XStack, YStack, Text, Button, ScrollView, Input } from 'tamagui';
-import { ArrowLeft, Save, Star, Tag, Plus, X } from 'lucide-react-native';
+import { ArrowLeft, Star, Tag, Plus, X } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useNoteStore } from '../store/noteStore';
 import WebViewEditor from '../components/note/WebViewEditor';
@@ -37,12 +37,16 @@ export default function NoteScreen() {
   const [noteTags, setNoteTags] = useState<TagType[]>([]);
   const [showTagInput, setShowTagInput] = useState(false);
   const [newTagName, setNewTagName] = useState('');
+  const [noteId, setNoteId] = useState<string | null>(null);
 
   // 初期データロード
   useEffect(() => {
     if (isNewNote) {
       setTitle('新しいノート');
       setContent('<p>ここに内容を入力してください...</p>');
+      
+      // 新規ノートを自動的に作成して保存
+      createNewNote();
       return;
     }
     
@@ -53,12 +57,35 @@ export default function NoteScreen() {
       loadNoteTags();
     } else {
       // ノートが見つからない場合は一覧に戻る
-      router.back();
+      router.replace('/notes');
     }
     
     // すべてのタグを読み込む
     loadAllTags();
-  }, [id, isNewNote, getNoteById, router]);
+  }, [id, isNewNote, getNoteById]);
+
+  // 新規ノートの作成
+  const createNewNote = useCallback(async () => {
+    try {
+      const newNoteId = await createNote({
+        title: '新しいノート',
+        content: '<p>ここに内容を入力してください...</p>',
+        folder_id: currentFolder
+      });
+      setNoteId(newNoteId);
+      
+      // URLを新しいノートIDに更新するが、画面は再レンダリングしない
+      if (typeof window !== 'undefined' && window.history) {
+        window.history.replaceState(
+          null, 
+          '', 
+          window.location.pathname.replace('/new', `/${newNoteId}`)
+        );
+      }
+    } catch (error) {
+      console.error('新規ノート作成エラー:', error);
+    }
+  }, [createNote, currentFolder]);
 
   // ノートのタグを読み込む
   const loadNoteTags = useCallback(async () => {
@@ -85,35 +112,25 @@ export default function NoteScreen() {
   const handleContentChange = useCallback((newContent: string) => {
     setContent(newContent);
     
-    // 自動保存（実際の実装では遅延保存が望ましい）
-    if (!isNewNote) {
+    // 自動保存
+    if (isNewNote && noteId) {
+      updateNote(noteId, { content: newContent });
+    } else if (!isNewNote) {
       updateNote(id, { content: newContent });
     }
-  }, [id, isNewNote, updateNote]);
+  }, [id, isNewNote, noteId, updateNote]);
 
   // タイトル変更ハンドラ
   const handleTitleChange = useCallback((newTitle: string) => {
     setTitle(newTitle);
     
-    // 自動保存（実際の実装では遅延保存が望ましい）
-    if (!isNewNote) {
+    // 自動保存
+    if (isNewNote && noteId) {
+      updateNote(noteId, { title: newTitle });
+    } else if (!isNewNote) {
       updateNote(id, { title: newTitle });
     }
-  }, [id, isNewNote, updateNote]);
-
-  // 新規ノート保存
-  const handleSaveNewNote = useCallback(async () => {
-    if (isNewNote) {
-      const noteId = await createNote({
-        title,
-        content,
-        folder_id: currentFolder
-      });
-      
-      // 新しく作成されたノートの画面に遷移
-      router.replace(`/notes/${noteId}`);
-    }
-  }, [isNewNote, title, content, currentFolder, createNote, router]);
+  }, [id, isNewNote, noteId, updateNote]);
 
   // テキスト選択ハンドラ
   const handleTextSelection = useCallback((text: string) => {
@@ -141,7 +158,10 @@ export default function NoteScreen() {
 
   // タグ追加
   const handleAddTag = useCallback(async () => {
-    if (!newTagName.trim() || isNewNote) return;
+    if (!newTagName.trim()) return;
+    
+    const targetId = isNewNote && noteId ? noteId : id;
+    if (!targetId) return;
     
     try {
       // 既存タグをチェック
@@ -158,7 +178,7 @@ export default function NoteScreen() {
       }
       
       // ノートにタグを追加
-      await addTagToNote(id, tagId);
+      await addTagToNote(targetId, tagId);
       
       // ノートのタグリストを更新
       loadNoteTags();
@@ -167,19 +187,20 @@ export default function NoteScreen() {
     } catch (error) {
       console.error('タグ追加エラー:', error);
     }
-  }, [newTagName, isNewNote, id, tags, createTag, addTagToNote, loadNoteTags, loadAllTags]);
+  }, [newTagName, isNewNote, noteId, id, tags, createTag, addTagToNote, loadNoteTags, loadAllTags]);
 
   // タグ削除
   const handleRemoveTag = useCallback(async (tagId: string) => {
-    if (isNewNote) return;
+    const targetId = isNewNote && noteId ? noteId : id;
+    if (!targetId) return;
     
     try {
-      await removeTagFromNote(id, tagId);
+      await removeTagFromNote(targetId, tagId);
       loadNoteTags();
     } catch (error) {
       console.error('タグ削除エラー:', error);
     }
-  }, [isNewNote, id, removeTagFromNote, loadNoteTags]);
+  }, [isNewNote, noteId, id, removeTagFromNote, loadNoteTags]);
 
   // スタイルを動的に生成
   const styles = StyleSheet.create({
@@ -262,17 +283,10 @@ export default function NoteScreen() {
         title={isNewNote ? t('new_note') : t('edit_note')}
         showBack={true}
         onBackPress={() => {
-          router.back();
+          router.replace('/notes');
         }}
         rightComponent={
           <XStack gap={8}>
-            {isNewNote && (
-              <Button
-                icon={<Save size={20} />}
-                variant="outlined"
-                onPress={handleSaveNewNote}
-              />
-            )}
             <Button
               icon={<Star size={20} />}
               variant="outlined"
@@ -364,7 +378,7 @@ export default function NoteScreen() {
             selectedText={selectedText}
             onClose={toggleAiAssist}
             onApplyEdit={handleApplyEdit}
-            noteId={id}
+            noteId={isNewNote && noteId ? noteId : id}
             noteContent={content}
             themeColors={colors}
             isDarkMode={isDark}

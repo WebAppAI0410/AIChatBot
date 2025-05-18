@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { v4 as uuidv4 } from 'uuid';
+import { generateUuid } from '../store/chatStore';
 import { SQLiteDatabase } from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system';
 import * as pako from 'pako';
@@ -52,7 +52,7 @@ export type DbVersion = {
 };
 
 // 現在のデータベースバージョン
-export const CURRENT_DB_VERSION = 1;
+export const CURRENT_DB_VERSION = 2;
 
 // シングルトンとしてデータベース参照を保持
 let _db: SQLiteDatabase | null = null;
@@ -78,6 +78,8 @@ export const initDatabase = async (): Promise<void> => {
   const db = getDatabase();
   
   try {
+    console.log('データベースの初期化を開始します...');
+    
     // データベースバージョン管理テーブル
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS db_version (
@@ -92,11 +94,24 @@ export const initDatabase = async (): Promise<void> => {
     `);
     
     const currentVersion = versionResult?.version || 0;
+    console.log(`現在のデータベースバージョン: ${currentVersion}, ターゲットバージョン: ${CURRENT_DB_VERSION}`);
     
     // マイグレーション実行
-    await runMigrations(currentVersion);
+    if (currentVersion < CURRENT_DB_VERSION) {
+      console.log(`マイグレーションを実行します (${currentVersion} → ${CURRENT_DB_VERSION})...`);
+      await runMigrations(currentVersion);
+      console.log('マイグレーションが完了しました');
+    } else {
+      console.log('マイグレーションは不要です');
+    }
+    
+    // テーブル構造を確認（デバッグ用）
+    const tableInfo = await db.getAllAsync<{name: string}>(`PRAGMA table_info(notes)`);
+    console.log('notesテーブルのカラム:', tableInfo.map(col => col.name).join(', '));
+    
+    console.log('データベースの初期化が完了しました');
   } catch (error) {
-    console.error('Database initialization error:', error);
+    console.error('データベース初期化エラー:', error);
     throw error;
   }
 };
@@ -181,6 +196,37 @@ const runMigrations = async (fromVersion: number): Promise<void> => {
       await recordMigration(1);
     }
     
+    // バージョン2のマイグレーション（既存テーブルにカラム追加）
+    if (fromVersion < 2) {
+      console.log('マイグレーション: バージョン2を適用します');
+      
+      // notesテーブルにis_compressedカラムが存在するかチェック
+      const columnInfo = await db.getAllAsync<{name: string}>(`PRAGMA table_info(notes)`);
+      const hasCompressedColumn = columnInfo.some(col => col.name === 'is_compressed');
+      
+      // カラムが存在しない場合のみ追加
+      if (!hasCompressedColumn) {
+        try {
+          console.log('notesテーブルにis_compressedカラムを追加します');
+          await db.execAsync(`
+            ALTER TABLE notes 
+            ADD COLUMN is_compressed INTEGER DEFAULT 0;
+          `);
+          console.log('is_compressedカラムの追加が完了しました');
+        } catch (e) {
+          // カラム追加のエラーをログに記録
+          console.error('is_compressedカラム追加エラー:', e);
+          // トランザクションはロールバックされるのでスローします
+          throw e;
+        }
+      } else {
+        console.log('is_compressedカラムは既に存在しています。スキップします。');
+      }
+      
+      // バージョン記録
+      await recordMigration(2);
+    }
+    
     // 将来のバージョンマイグレーションはここに追加
     
     // トランザクション完了
@@ -209,7 +255,7 @@ const recordMigration = async (version: number): Promise<void> => {
 // フォルダ操作
 export const createFolder = async (folder: Omit<Folder, 'id' | 'created_at' | 'updated_at'>): Promise<Folder> => {
   const db = getDatabase();
-  const id = `folder_${uuidv4()}`;
+  const id = `folder_${generateUuid()}`;
   const now = new Date().toISOString();
   
   const stmt = await db.prepareAsync(
@@ -290,7 +336,7 @@ const decompressContent = (compressed: string, isCompressed: boolean): string =>
 // ノート操作（圧縮機能対応）
 export const createNote = async (note: Omit<Note, 'id' | 'created_at' | 'updated_at'>): Promise<Note> => {
   const db = getDatabase();
-  const id = `note_${uuidv4()}`;
+  const id = `note_${generateUuid()}`;
   const now = new Date().toISOString();
   
   // 大きいコンテンツは圧縮
@@ -424,7 +470,7 @@ export const deleteNote = async (id: string): Promise<void> => {
 // タグ操作
 export const createTag = async (name: string): Promise<Tag> => {
   const db = getDatabase();
-  const id = `tag_${uuidv4()}`;
+  const id = `tag_${generateUuid()}`;
   
   try {
     const stmt = await db.prepareAsync(`INSERT INTO tags (id, name) VALUES (?, ?)`);
@@ -540,7 +586,7 @@ export const addAttachment = async (
   data: string
 ): Promise<NoteAttachment> => {
   const db = getDatabase();
-  const id = `attachment_${uuidv4()}`;
+  const id = `attachment_${generateUuid()}`;
   const now = new Date().toISOString();
   
   const stmt = await db.prepareAsync(
@@ -596,4 +642,52 @@ export const getDatabaseVersion = async (): Promise<number> => {
   );
   
   return result?.version || 0;
+};
+
+// 開発環境用: データベースをリセットする関数（注意: すべてのデータが削除されます）
+export const resetDatabase = async (): Promise<boolean> => {
+  // 開発環境でのみ実行可能にする
+  if (!__DEV__) {
+    console.error('resetDatabase関数は開発環境でのみ使用可能です');
+    return false;
+  }
+  
+  try {
+    console.log('データベースリセットを開始します...');
+    
+    // 現在のデータベース参照を取得
+    let db = getDatabase();
+    
+    // 既存の接続を閉じる
+    await db.closeAsync();
+    
+    // データベースファイルのパスを取得
+    // Expoではデータベースはデフォルトで以下のパスに保存される
+    const dbPath = `${FileSystem.documentDirectory}SQLite/app-default.db`;
+    
+    // ファイルの存在を確認
+    const fileInfo = await FileSystem.getInfoAsync(dbPath);
+    
+    if (fileInfo.exists) {
+      // ファイルを削除
+      await FileSystem.deleteAsync(dbPath);
+      console.log(`データベースファイルを削除しました: ${dbPath}`);
+    } else {
+      console.log(`データベースファイルが見つかりません: ${dbPath}`);
+    }
+    
+    // 新しくデータベースを再作成
+    console.log('データベースを再初期化します...');
+    
+    // _dbをnullにセットして再初期化を強制
+    _db = null;
+    
+    // アプリ側でデータベース参照を取得し直す必要があります
+    
+    console.log('データベースリセットが完了しました');
+    return true;
+  } catch (error) {
+    console.error('データベースリセットエラー:', error);
+    return false;
+  }
 }; 
