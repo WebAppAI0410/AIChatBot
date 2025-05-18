@@ -1,9 +1,10 @@
-import React, { useRef, useEffect } from 'react';
-import { StyleSheet, View, Platform, KeyboardAvoidingView } from 'react-native';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { StyleSheet, View, Platform, KeyboardAvoidingView, useColorScheme } from 'react-native';
 import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
 import { useTheme } from '../../ui/ThemeProvider';
 import { useColors } from '../../constants/colors';
-import { Bold, Italic, Underline, Strikethrough, List, ListOrdered, Pilcrow, Heading1, Heading2, Heading3, Quote, Link, Image, Trash } from 'lucide-react-native';
+import { useStore } from '../../store';
+import { Bold, Italic, Underline, Strikethrough, List, ListOrdered, Heading1, Heading2, Heading3, Quote, Link, Image, ListChecks, Highlighter } from 'lucide-react-native';
 
 // WebViewとRichEditorの型定義
 type DataDetectorTypes = 'phoneNumber' | 'link' | 'address' | 'calendarEvent' | 'none' | 'trackingNumber' | 'flightNumber';
@@ -26,7 +27,7 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
   content,
   onContentChange,
   readOnly = false,
-  isDarkMode = false,
+  isDarkMode: propIsDarkMode, // Props経由のisDarkMode
   themeColors,
   onFocus,
   onBlur,
@@ -37,26 +38,146 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
   const richText = useRef<RichEditor>(null);
   const { theme } = useTheme();
   const colors = useColors();
+  const systemColorScheme = useColorScheme();
 
-  // エディタスタイル定義（プラットフォーム固有の設定を避ける）
+  // グローバルなテーマ設定から正確なダークモード状態を取得
+  const globalTheme = useStore(state => state.theme);
+  
+  // 正確なダークモード状態を計算
+  const calculatedIsDarkMode = 
+    propIsDarkMode !== undefined 
+      ? propIsDarkMode 
+      : globalTheme === 'dark' || (globalTheme === 'system' && systemColorScheme === 'dark');
+  
+  const [selectedText, setSelectedText] = useState('');
+  
+  // ダークモード状態をログに出力して確認
+  useEffect(() => {
+    console.log('WebViewEditor: ダークモード状態確認:', {
+      propIsDarkMode,
+      globalTheme,
+      systemColorScheme,
+      calculatedIsDarkMode
+    });
+  }, [propIsDarkMode, globalTheme, systemColorScheme, calculatedIsDarkMode]);
+
   const editorStyle = {
-    backgroundColor: isDarkMode ? colors.background : colors.background,
+    backgroundColor: calculatedIsDarkMode ? colors.background : colors.background,
     color: colors.text,
     placeholderColor: colors.gray,
   };
 
   const handleContentChange = (html: string) => {
+    console.log("WebViewEditor: handleContentChange", html.substring(0, 100)); 
     onContentChange(html);
   };
 
-  // テキスト選択ハンドラ
-  const handleSelectionChange = (data: { type: string; text: string }) => {
-    if (data.type === 'selection' && data.text && onTextSelection) {
-      onTextSelection(data.text);
+  const handleSelectionChange = (data: { type: string; text: string; selection: any }) => {
+    if (data.type === 'selection' && data.text) {
+      setSelectedText(data.text); 
+      if (onTextSelection) {
+        onTextSelection(data.text);
+      }
+      console.log('WebViewEditor: テキスト選択:', data.text);
     }
   };
 
-  // 初期フォーカス設定
+  // ハイライトスタイルの設定（文字色は常に黒にして視認性を確保）
+  const getHighlightStyles = useCallback(() => {
+    // ダークモード時は暗い黄色を使用し、文字色は常に黒にする
+    return {
+      bgColor: calculatedIsDarkMode ? '#FFB800' : 'yellow',
+      textColor: 'black' // 常に黒で視認性を確保
+    };
+  }, [calculatedIsDarkMode]);
+
+  // ハイライトスタイルを初期化する関数
+  const initializeHighlightStyles = useCallback(() => {
+    if (richText.current) {
+      const { bgColor, textColor } = getHighlightStyles();
+      const script = `
+        (function() {
+          try {
+            // ハイライト用のグローバルCSS変数を設定
+            document.documentElement.style.setProperty('--highlight-bg-color', '${bgColor}');
+            document.documentElement.style.setProperty('--highlight-text-color', '${textColor}');
+            
+            // スタイルシートがなければ作成
+            if (!document.getElementById('highlight-styles')) {
+              const style = document.createElement('style');
+              style.id = 'highlight-styles';
+              style.textContent = 'span.highlight-text { background-color: var(--highlight-bg-color) !important; color: var(--highlight-text-color) !important; }';
+              document.head.appendChild(style);
+              console.log("FROM EDIT: ハイライトスタイル初期化: bgColor=" + '${bgColor}' + ", textColor=" + '${textColor}');
+            } else {
+              const style = document.getElementById('highlight-styles');
+              style.textContent = 'span.highlight-text { background-color: var(--highlight-bg-color) !important; color: var(--highlight-text-color) !important; }';
+              console.log("FROM EDIT: ハイライトスタイル更新: bgColor=" + '${bgColor}' + ", textColor=" + '${textColor}');
+            }
+          } catch (e) {
+            console.error("FROM EDIT: ハイライトスタイル設定エラー", e);
+          }
+        })();
+      `;
+      richText.current.commandDOM(script);
+    }
+  }, [getHighlightStyles]);
+
+  // ダークモード状態が変わったらハイライトスタイルを更新
+  useEffect(() => {
+    initializeHighlightStyles();
+    console.log('WebViewEditor: ダークモード変更:', calculatedIsDarkMode);
+  }, [calculatedIsDarkMode, initializeHighlightStyles]);
+
+  const handleHighlight = () => {
+    if (richText.current) {
+      console.log('WebViewEditor: ハイライトボタン実行, isDarkMode:', calculatedIsDarkMode);
+      
+      // スタイルを取得
+      const { bgColor, textColor } = getHighlightStyles();
+      
+      const script = `
+        (function() {
+          try {
+            console.log("FROM EDIT: ハイライト実行: isDarkMode=${calculatedIsDarkMode}, bgColor=${bgColor}, textColor=${textColor}");
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return false;
+            
+            const range = selection.getRangeAt(0);
+            if (range.collapsed) {
+              console.log('FROM EDIT: WebViewEditor: ハイライト - 選択範囲なし');
+              return false;
+            }
+
+            const span = document.createElement('span');
+            span.className = 'highlight-text'; // クラス名を使用
+            span.style.backgroundColor = '${bgColor}'; // 直接スタイルも設定
+            span.style.color = '${textColor}';
+            
+            try {
+              range.surroundContents(span);
+              console.log('FROM EDIT: WebViewEditor: ハイライト - surroundContents成功');
+            } catch (e) {
+              console.error('FROM EDIT: WebViewEditor: ハイライト - surroundContentsエラー:', e);
+              const selectedHtml = range.toString();
+              const highlightedHtml = '<span class="highlight-text" style="background-color: ${bgColor} !important; color: ${textColor} !important;">' + selectedHtml + '</span>';
+              document.execCommand('insertHTML', false, highlightedHtml);
+              console.log('FROM EDIT: WebViewEditor: ハイライト - insertHTML で代替実行');
+            }
+            
+            selection.removeAllRanges(); 
+          } catch (e) {
+            console.error("FROM EDIT: ハイライト実行エラー", e);
+          }
+          return true;
+        })();
+      `;
+      richText.current.commandDOM(script);
+    } else {
+      console.log('WebViewEditor: richText.current がありません');
+    }
+  };
+
   useEffect(() => {
     if (autoFocus && richText.current && !readOnly) {
       setTimeout(() => {
@@ -65,7 +186,6 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
     }
   }, [autoFocus, readOnly]);
   
-  // ツールバーアイコン定義
   const customIconMap = {
     [actions.setBold]: ({ tintColor }: { tintColor?: string }) => <Bold size={20} color={tintColor || colors.text} />,
     [actions.setItalic]: ({ tintColor }: { tintColor?: string }) => <Italic size={20} color={tintColor || colors.text} />,
@@ -78,65 +198,73 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
     [actions.heading3]: ({ tintColor }: { tintColor?: string }) => <Heading3 size={20} color={tintColor || colors.text} />,
     [actions.insertLink]: ({ tintColor }: { tintColor?: string }) => <Link size={20} color={tintColor || colors.text} />,
     [actions.insertImage]: ({ tintColor }: { tintColor?: string }) => <Image size={20} color={tintColor || colors.text} />,
-    [actions.removeFormat]: ({ tintColor }: { tintColor?: string }) => <Trash size={20} color={tintColor || colors.text} />,
-    [actions.setParagraph]: ({ tintColor }: { tintColor?: string }) => <Pilcrow size={20} color={tintColor || colors.text} />,
+    [actions.blockquote]: ({ tintColor }: { tintColor?: string }) => <Quote size={20} color={tintColor || colors.text} />,
+    [actions.checkboxList]: ({ tintColor }: { tintColor?: string }) => <ListChecks size={20} color={tintColor || colors.text} />,
+    ['highlight']: ({ tintColor }: { tintColor?: string }) => <Highlighter size={20} color={tintColor || colors.text} />,
   };
 
-  // プラットフォームごとにツールバーアクションを定義
-  // iOS - 完全な機能セット
-  const editorActionsForIOS = [
-    actions.setBold,
-    actions.setItalic,
-    actions.setUnderline,
-    actions.setStrikethrough,
-    actions.insertOrderedList,
-    actions.insertBulletsList,
-    actions.heading1,
-    actions.heading2,
-    actions.heading3,
+  const customActions = {
+    highlight: handleHighlight, 
+  };
+  
+  const editorActions = [
+    actions.heading1, actions.heading2, actions.heading3, actions.blockquote,
+    actions.setBold, actions.setItalic, actions.setUnderline, actions.setStrikethrough,
+    'highlight', 
+    actions.insertOrderedList, actions.insertBulletsList, actions.checkboxList,
     actions.insertLink,
-    actions.removeFormat,
-    actions.setParagraph,
   ];
 
-  // Android - 簡素化したセット（安定性のため）
-  const editorActionsForAndroid = [
-    actions.setBold,
-    actions.setItalic,
-    actions.setUnderline,
-    actions.setStrikethrough,
-    actions.insertOrderedList,
-    actions.insertBulletsList,
-    actions.heading1,
-    actions.heading2,
-    actions.heading3,
-    actions.insertLink,
-    actions.removeFormat,
-    actions.setParagraph,
-  ];
+  const handleEditorInitialized = () => {
+    console.log('WebViewEditor: RichEditor initialized, isDarkMode:', calculatedIsDarkMode);
+    if (richText.current) {
+      if (content === undefined || content === null || content.trim() === '') {
+         console.log('WebViewEditor: 初期コンテンツが空のため、空のHTMLをセット');
+         richText.current.setContentHTML('');
+      } else {
+         console.log('WebViewEditor: 初期コンテンツをセット:', content.substring(0,100));
+         richText.current.setContentHTML(content);
+      }
+      
+      // 選択イベントのリスナー設定
+      const script = `
+        document.addEventListener('selectionchange', function() {
+          const selection = window.getSelection();
+          if (selection && window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'selection',
+              text: selection.toString(),
+              selection: { 
+                  anchorNode: selection.anchorNode ? selection.anchorNode.nodeName : null,
+                  anchorOffset: selection.anchorOffset,
+                  focusNode: selection.focusNode ? selection.focusNode.nodeName : null,
+                  focusOffset: selection.focusOffset,
+                  isCollapsed: selection.isCollapsed,
+                  rangeCount: selection.rangeCount
+              }
+            }));
+          }
+        });
+        true; 
+      `;
+      richText.current.commandDOM(script);
+      
+      // ハイライトスタイルの初期化
+      initializeHighlightStyles();
+    }
+  };
 
-  // プラットフォームに応じたアクション配列
-  const editorActions = Platform.OS === 'ios' 
-    ? editorActionsForIOS 
-    : editorActionsForAndroid;
-
-  // Androidに特化したWebViewプロパティの設定
   const androidSpecificProps = Platform.OS === 'android' ? {
-    // 型エラー回避のために明示的に配列と指定
-    // dataDetectorTypes: ['none'] as DataDetectorTypes[],
     originWhitelist: ['*'] as string[],
-    // その他のAndroid固有の設定
     domStorageEnabled: true,
     javaScriptEnabled: true,
     overScrollMode: 'never' as OverScrollModeType,
     allowFileAccess: true,
     cacheEnabled: true,
-    // キーボード関連の設定
     hideKeyboardAccessoryView: false,
-    autoFocus: false, // Androidでは手動フォーカス処理を使用
+    autoFocus: false,
   } : {};
 
-  // iOS固有のプロパティ
   const iosSpecificProps = Platform.OS === 'ios' ? {
     useContainer: true,
     initialFocus: autoFocus,
@@ -145,30 +273,19 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
     bounces: false,
   } : {};
 
-  // デバッグログ - 開発時にプロパティの型を確認
   useEffect(() => {
-    if (__DEV__ && Platform.OS === 'android') {
-      console.log('WebViewEditor Android Props:', {
-        // その他のデバッグ情報
+    if (__DEV__) {
+      console.log('WebViewEditor Props:', { 
+        Platform: Platform.OS, 
+        readOnly, 
+        autoFocus, 
+        propIsDarkMode,
+        globalTheme,
+        systemColorScheme,
+        calculatedIsDarkMode
       });
     }
-  }, []);
-
-  // Android向けに編集内容のコンテキストメニューをカスタマイズするJavaScript
-  const customInjectJavaScript = `
-    if (window.ReactNativeWebView) {
-      document.addEventListener('selectionchange', function() {
-        const selection = window.getSelection();
-        if (selection && selection.toString()) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'selection',
-            text: selection.toString()
-          }));
-        }
-      });
-    }
-    true;
-  `;
+  }, [readOnly, autoFocus, propIsDarkMode, globalTheme, systemColorScheme, calculatedIsDarkMode]);
 
   return (
     <KeyboardAvoidingView 
@@ -183,37 +300,43 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
           iconMap={customIconMap}
           selectedIconTint={colors.primary}
           unselectedIconTint={colors.text}
-          style={[styles.toolbar, { backgroundColor: isDarkMode ? colors.card : colors.lightGray }]}
-          itemStyle={{ paddingHorizontal: Platform.OS === 'ios' ? 8 : 10 }}
+          style={[styles.toolbar, { backgroundColor: calculatedIsDarkMode ? colors.card : colors.lightGray }]}
+          itemStyle={{ paddingHorizontal: 10 }}
+          iconSize={20}
+          onPressAddImage={() => { console.log("WebViewEditor: onPressAddImage"); }} 
+          onInsertLink={() => { console.log("WebViewEditor: onInsertLink"); }} 
+          highlight={handleHighlight}
         />
       )}
       <RichEditor
         ref={richText}
-        initialContentHTML={content || ''}
+        initialContentHTML={content || ''} 
         onChange={handleContentChange}
         style={styles.editor} 
         editorStyle={editorStyle}
         disabled={readOnly}
-        onFocus={onFocus}
-        onBlur={onBlur}
+        onFocus={() => { console.log("WebViewEditor: onFocus"); if(onFocus) onFocus(); }}
+        onBlur={() => { console.log("WebViewEditor: onBlur"); if(onBlur) onBlur(); }}
         placeholder={placeholder}
         scrollEnabled={true}
         showsVerticalScrollIndicator={true}
-        editorInitializedCallback={() => {
-          console.log('RichEditor initialized');
-        }}
-        // テキスト選択処理
+        editorInitializedCallback={handleEditorInitialized}
         onMessage={(event) => {
           try {
-            const parsedData = JSON.parse(event.data);
-            handleSelectionChange(parsedData);
+            const messageData = event.data; 
+            if (messageData && typeof messageData === 'string') {
+              const parsedData = JSON.parse(messageData);
+              console.log("WebViewEditor: onMessage parsedData:", parsedData);
+              if (parsedData.type === 'selection') {
+                handleSelectionChange(parsedData);
+              } else if (parsedData.type === 'contentChange') {
+                console.log("WebViewEditor: onMessage contentChange from WebView:", parsedData.data.substring(0,100));
+              }
+            }
           } catch (e) {
-            console.log('メッセージ解析エラー:', e);
+            console.error('WebViewEditor: メッセージ解析エラー:', e, "受信データ:", event.data); 
           }
         }}
-        // インジェクトJavaScriptを追加
-        injectedJavaScript={customInjectJavaScript}
-        // プラットフォーム固有の設定を適用
         {...androidSpecificProps}
         {...iosSpecificProps}
       />
