@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, FlatList, Pressable, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, StyleSheet, FlatList, Pressable, ActivityIndicator, TouchableOpacity, Alert, TextInput } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { XStack, YStack, Text, Button } from 'tamagui';
 import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { useNoteStore } from '../store/noteStore';
 import Header from '../components/Header';
 import { useColors } from '../constants/colors';
 import { useTheme } from '../ui/ThemeProvider';
+import { Swipeable } from 'react-native-gesture-handler';
 
 /**
  * ノート一覧画面
@@ -19,12 +20,16 @@ export default function NotesScreen() {
   const router = useRouter();
   const { 
     notes, folders, currentFolder, isLoading, error,
-    initNoteModule, navigateToFolder, createFolder
+    initNoteModule, navigateToFolder, createFolder, deleteFolder, deleteNote, updateFolder
   } = useNoteStore();
   const colors = useColors();
   const { theme } = useTheme();
   
   const [isListView, setIsListView] = useState(true);
+  const [newFolderId, setNewFolderId] = useState<string | null>(null);
+  const [editingFolderName, setEditingFolderName] = useState('');
+  const newFolderInputRef = useRef<TextInput>(null);
+  const swipeableRefs = useRef<{[key: string]: Swipeable | null}>({});
   
   // 初期化
   useEffect(() => {
@@ -61,11 +66,15 @@ export default function NotesScreen() {
   // アイテムタップ処理
   const handleItemPress = useCallback((item: { type: 'folder' | 'note', id: string, name?: string, title?: string }) => {
     if (item.type === 'folder') {
+      // 編集中のフォルダの場合は、編集モードを終了してから移動
+      if (newFolderId === item.id) {
+        handleFolderNameSubmit();
+      }
       navigateToFolder(item.id);
     } else {
       router.push(`/notes/${item.id}`);
     }
-  }, [navigateToFolder, router]);
+  }, [navigateToFolder, router, newFolderId]);
   
   // 新規ノート作成
   const handleCreateNote = useCallback(() => {
@@ -73,12 +82,66 @@ export default function NotesScreen() {
   }, [router]);
   
   // 新規フォルダ作成
-  const handleCreateFolder = useCallback(() => {
-    // 現在のフォルダ内のフォルダ数を数える
-    const folderCount = folders.filter(f => f.parent_id === currentFolder).length;
+  const handleCreateFolder = useCallback(async () => {
+    try {
+      const folder = await createFolder(t('untitled_folder', '無題のフォルダ'));
+      setNewFolderId(folder.id);
+      setEditingFolderName(folder.name);
+      
+      // フォーカスを当てるためにタイマーを使用（レンダリング完了後）
+      setTimeout(() => {
+        if (newFolderInputRef.current) {
+          newFolderInputRef.current.focus();
+        }
+      }, 100);
+    } catch (error) {
+      console.error('フォルダ作成エラー:', error);
+    }
+  }, [createFolder, t]);
+  
+  // フォルダ名の編集確定
+  const handleFolderNameSubmit = useCallback(() => {
+    if (newFolderId && editingFolderName.trim()) {
+      updateFolder(newFolderId, editingFolderName.trim());
+    }
+    setNewFolderId(null);
+    setEditingFolderName('');
+  }, [newFolderId, editingFolderName, updateFolder]);
+  
+  // アイテム削除処理
+  const handleDelete = useCallback((item: { type: 'folder' | 'note', id: string, name?: string, title?: string }) => {
+    const itemName = item.type === 'folder' ? item.name : item.title;
+    const confirmMessage = item.type === 'folder' 
+      ? t('delete_folder_confirm', `フォルダ「${itemName}」を削除しますか？\nフォルダ内のすべてのノートも削除されます。`)
+      : t('delete_note_confirm', `ノート「${itemName}」を削除しますか？`);
     
-    createFolder(`${t('new_folder')} ${folderCount + 1}`);
-  }, [createFolder, folders, currentFolder, t]);
+    Alert.alert(
+      t('confirm_delete', '削除の確認'),
+      confirmMessage,
+      [
+        {
+          text: t('cancel', 'キャンセル'),
+          style: 'cancel'
+        },
+        {
+          text: t('delete', '削除'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (item.type === 'folder') {
+                await deleteFolder(item.id);
+              } else {
+                await deleteNote(item.id);
+              }
+            } catch (error) {
+              console.error('削除エラー:', error);
+              Alert.alert(t('error', 'エラー'), t('delete_failed', '削除に失敗しました'));
+            }
+          }
+        }
+      ]
+    );
+  }, [deleteFolder, deleteNote, t]);
   
   // 親フォルダへ戻る
   const handleBack = useCallback(() => {
@@ -88,21 +151,51 @@ export default function NotesScreen() {
     navigateToFolder(parentFolder);
   }, [currentFolder, folders, navigateToFolder]);
   
+  // 削除スワイプアクションのレンダリング
+  const renderRightActions = useCallback((item: { type: 'folder' | 'note', id: string }) => {
+    return (
+      <TouchableOpacity
+        style={[styles.deleteAction, { backgroundColor: colors.error }]}
+        onPress={() => handleDelete(item)}
+      >
+        <Feather name="trash-2" size={24} color="#fff" />
+      </TouchableOpacity>
+    );
+  }, [handleDelete, colors]);
+  
+  // Swipeableのrefを設定する関数
+  const setSwipeableRef = useCallback((ref: Swipeable | null, key: string) => {
+    swipeableRefs.current[key] = ref;
+  }, []);
+  
   // ヘッダーの右側に表示するコンポーネント
   const headerRightComponent = (
     <View style={styles.headerRightContainer}>
       <TouchableOpacity
         style={styles.headerButton}
         onPress={handleCreateNote}
-        accessibilityLabel={t('new_note')}
+        accessibilityLabel={t('new_note', '新規ノート')}
       >
         <Feather name="edit-3" size={22} color={colors.textOnPrimary} />
       </TouchableOpacity>
       
       <TouchableOpacity
         style={styles.headerButton}
+        onPress={handleCreateFolder}
+        accessibilityLabel={t('new_folder', '新規フォルダ')}
+      >
+        <View>
+          <MaterialIcons name="folder" size={22} color={colors.textOnPrimary} />
+          <View style={styles.folderPlusIcon}>
+            <Feather name="plus" size={12} color={colors.textOnPrimary} />
+          </View>
+        </View>
+      </TouchableOpacity>
+      
+      <TouchableOpacity
+        style={styles.headerButton}
         onPress={() => setIsListView(!isListView)}
-        accessibilityLabel={isListView ? t('grid_view') : t('list_view')}
+        accessibilityLabel={isListView ? t('grid_view', 'グリッド表示') : t('list_view', 'リスト表示')}
       >
         {isListView 
           ? <MaterialIcons name="grid-view" size={22} color={colors.textOnPrimary} />
@@ -155,13 +248,13 @@ export default function NotesScreen() {
             onPress={initNoteModule}
             backgroundColor={colors.primary}
           >
-            {t('retry')}
+            {t('retry', '再試行')}
           </Button>
         </View>
       ) : items().length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text fontSize="$4" fontWeight="600" color={colors.darkGray}>
-            {currentFolder ? t('empty_folder', 'フォルダは空です') : 'ノートがありません'}
+            {currentFolder ? t('empty_folder', 'フォルダは空です') : t('no_notes', 'ノートがありません')}
           </Text>
           <Button 
             mt="$4" 
@@ -171,7 +264,7 @@ export default function NotesScreen() {
           >
             <XStack space="$2" alignItems="center">
               <Feather name="edit-3" size={18} color={colors.textOnPrimary} />
-              <Text color={colors.textOnPrimary}>新規作成</Text>
+              <Text color={colors.textOnPrimary}>{t('create_new', '新規作成')}</Text>
             </XStack>
           </Button>
         </View>
@@ -179,33 +272,64 @@ export default function NotesScreen() {
         <FlatList
           data={items()}
           keyExtractor={item => `${item.type}-${item.id}`}
-          renderItem={({ item }) => (
-            <Pressable 
-              style={[styles.item, { borderBottomColor: colors.border }]} 
-              onPress={() => handleItemPress(item)}
-            >
-              <XStack alignItems="center" space="$3">
-                {item.type === 'folder' ? (
-                  <MaterialIcons name="folder" size={24} color={colors.primary} />
-                ) : (
-                  <MaterialIcons name="description" size={24} color={colors.primary} />
-                )}
-                <YStack>
-                  <Text fontSize="$4" color={colors.text}>
-                    {item.type === 'folder' ? item.name : item.title}
-                  </Text>
-                  <Text 
-                    fontSize="$2" 
-                    color={colors.secondaryText}
-                  >
-                    {item.updated_at
-                      ? new Date(item.updated_at).toLocaleDateString()
-                      : ''}
-                  </Text>
-                </YStack>
-              </XStack>
-            </Pressable>
-          )}
+          renderItem={({ item }) => {
+            const itemKey = `${item.type}-${item.id}`;
+            return (
+              <Swipeable
+                ref={(ref) => setSwipeableRef(ref, itemKey)}
+                renderRightActions={() => renderRightActions(item)}
+                overshootRight={false}
+                onSwipeableOpen={() => {
+                  // 他のスワイプ可能なアイテムを閉じる
+                  Object.entries(swipeableRefs.current).forEach(([key, ref]) => {
+                    if (key !== itemKey && ref) {
+                      ref.close();
+                    }
+                  });
+                }}
+              >
+                <Pressable 
+                  style={[styles.item, { borderBottomColor: colors.border }]} 
+                  onPress={() => handleItemPress(item)}
+                >
+                  <XStack alignItems="center" space="$3" flex={1}>
+                    {item.type === 'folder' ? (
+                      <MaterialIcons name="folder" size={24} color={colors.primary} />
+                    ) : (
+                      <MaterialIcons name="description" size={24} color={colors.primary} />
+                    )}
+                    
+                    {item.type === 'folder' && newFolderId === item.id ? (
+                      <TextInput
+                        ref={newFolderInputRef}
+                        style={[styles.folderNameInput, { color: colors.text }]}
+                        value={editingFolderName}
+                        onChangeText={setEditingFolderName}
+                        onBlur={handleFolderNameSubmit}
+                        onSubmitEditing={handleFolderNameSubmit}
+                        selectTextOnFocus
+                        autoFocus
+                      />
+                    ) : (
+                      <YStack flex={1}>
+                        <Text fontSize="$4" color={colors.text}>
+                          {item.type === 'folder' ? item.name : item.title}
+                        </Text>
+                        <Text 
+                          fontSize="$2" 
+                          color={colors.secondaryText}
+                        >
+                          {item.updated_at
+                            ? new Date(item.updated_at).toLocaleDateString()
+                            : ''}
+                        </Text>
+                      </YStack>
+                    )}
+                  </XStack>
+                </Pressable>
+              </Swipeable>
+            );
+          }}
         />
       )}
     </View>
@@ -248,10 +372,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   headerRightContainer: {
+    width: 140, // 3つのボタンを収める幅
     flexDirection: 'row',
-    alignItems: 'center',
-    width: 80,
-    justifyContent: 'flex-end',
+    justifyContent: 'space-around',
     paddingRight: 12,
   },
   headerButton: {
@@ -261,7 +384,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
+  },
+  folderPlusIcon: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 8,
+    width: 14,
+    height: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  item: {
+    padding: 16,
+    borderBottomWidth: 1,
+    backgroundColor: 'transparent',
   },
   loadingContainer: {
     flex: 1,
@@ -280,8 +418,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  item: {
-    padding: 16,
-    borderBottomWidth: 1,
+  deleteAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+  },
+  folderNameInput: {
+    flex: 1,
+    fontSize: 16,
+    padding: 0,
   },
 });
