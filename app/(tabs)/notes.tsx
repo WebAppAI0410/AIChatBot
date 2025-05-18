@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, FlatList, Pressable, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, FlatList, Pressable, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { XStack, YStack, Text, Button } from 'tamagui';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
 // @ts-ignore - react-i18nextの型定義がないため
 import { useTranslation } from 'react-i18next';
 import { useNoteStore } from '../store/noteStore';
 import Header from '../components/Header';
-import theme from '../ui/theme';
+import { useColors } from '../constants/colors';
+import { useTheme } from '../ui/ThemeProvider';
 
 /**
  * ノート一覧画面
- * フォルダ階層構造で表示し、新規ノート/フォルダ作成FABを備える
+ * フォルダ階層構造で表示、ヘッダーに新規作成ボタンを配置
  */
 export default function NotesScreen() {
   const { t = (key: string) => key } = useTranslation ? useTranslation() : { t: (key: string) => key };
@@ -20,9 +21,10 @@ export default function NotesScreen() {
     notes, folders, currentFolder, isLoading, error,
     initNoteModule, navigateToFolder, createFolder
   } = useNoteStore();
+  const colors = useColors();
+  const { theme } = useTheme();
   
   const [isListView, setIsListView] = useState(true);
-  const [showCreateOptions, setShowCreateOptions] = useState(false);
   
   // 初期化
   useEffect(() => {
@@ -31,9 +33,9 @@ export default function NotesScreen() {
   
   // 現在のフォルダ名を取得
   const currentFolderName = useCallback(() => {
-    if (!currentFolder) return t('notes');
+    if (!currentFolder) return t('notes_list', 'ノート一覧');
     const folder = folders.find(f => f.id === currentFolder);
-    return folder ? folder.name : t('notes');
+    return folder ? folder.name : t('notes_list', 'ノート一覧');
   }, [currentFolder, folders, t]);
   
   // 現在のフォルダのアイテム（フォルダとノート）を取得
@@ -65,21 +67,13 @@ export default function NotesScreen() {
     }
   }, [navigateToFolder, router]);
   
-  // 新規作成FAB
-  const handleCreatePress = useCallback(() => {
-    setShowCreateOptions(true);
-  }, []);
-  
   // 新規ノート作成
   const handleCreateNote = useCallback(() => {
-    setShowCreateOptions(false);
     router.push('/notes/new');
   }, [router]);
   
   // 新規フォルダ作成
   const handleCreateFolder = useCallback(() => {
-    setShowCreateOptions(false);
-    
     // 現在のフォルダ内のフォルダ数を数える
     const folderCount = folders.filter(f => f.parent_id === currentFolder).length;
     
@@ -94,49 +88,92 @@ export default function NotesScreen() {
     navigateToFolder(parentFolder);
   }, [currentFolder, folders, navigateToFolder]);
   
+  // ヘッダーの右側に表示するコンポーネント
+  const headerRightComponent = (
+    <View style={styles.headerRightContainer}>
+      <TouchableOpacity
+        style={styles.headerButton}
+        onPress={handleCreateNote}
+        accessibilityLabel={t('new_note')}
+      >
+        <Feather name="edit-3" size={22} color={colors.textOnPrimary} />
+      </TouchableOpacity>
+      
+      <TouchableOpacity
+        style={styles.headerButton}
+        onPress={() => setIsListView(!isListView)}
+        accessibilityLabel={isListView ? t('grid_view') : t('list_view')}
+      >
+        {isListView 
+          ? <MaterialIcons name="grid-view" size={22} color={colors.textOnPrimary} />
+          : <MaterialIcons name="list" size={22} color={colors.textOnPrimary} />
+        }
+      </TouchableOpacity>
+    </View>
+  );
+  
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen
         options={{
           headerShown: false,
         }}
       />
       
-      <Header
-        title={currentFolderName()}
-        showBack={!!currentFolder}
-        onBackPress={handleBack}
-        rightComponent={
-          <Button
-            icon={isListView ? <MaterialIcons name="grid-view" size={24} /> : <MaterialIcons name="list" size={24} />}
-            onPress={() => setIsListView(!isListView)}
-            aria-label={isListView ? t('grid_view') : t('list_view')}
-          />
-        }
-      />
+      {/* カスタムスタイルでヘッダーを中央配置 */}
+      <View style={[styles.headerContainer, { backgroundColor: colors.primary }]}>
+        <View style={styles.headerLeftPlaceholder}>
+          {!!currentFolder && (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={handleBack}
+              accessibilityLabel={t('header.backButton', '戻る')}
+            >
+              <Ionicons name="chevron-back" size={24} color={colors.textOnPrimary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle} color={colors.textOnPrimary}>
+            {currentFolderName()}
+          </Text>
+        </View>
+        
+        {headerRightComponent}
+      </View>
       
       {isLoading && items().length === 0 ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
-          <Text color="$red10" fontSize="$4">{error}</Text>
+          <Text color={colors.error} fontSize="$4">{error}</Text>
           <Button 
             mt="$4" 
             onPress={initNoteModule}
+            backgroundColor={colors.primary}
           >
             {t('retry')}
           </Button>
         </View>
       ) : items().length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text fontSize="$4" fontWeight="600" color="$gray10">
-            {currentFolder ? t('empty_folder') : t('no_notes')}
+          <Text fontSize="$4" fontWeight="600" color={colors.darkGray}>
+            {currentFolder ? t('empty_folder', 'フォルダは空です') : 'ノートがありません'}
           </Text>
-          <Text fontSize="$2" color="$gray9" textAlign="center" mt="$2">
-            {t('create_note_prompt')}
-          </Text>
+          <Button 
+            mt="$4" 
+            onPress={handleCreateNote}
+            backgroundColor={colors.primary}
+            color={colors.textOnPrimary}
+          >
+            <XStack space="$2" alignItems="center">
+              <Feather name="edit-3" size={18} color={colors.textOnPrimary} />
+              <Text color={colors.textOnPrimary}>新規作成</Text>
+            </XStack>
+          </Button>
         </View>
       ) : (
         <FlatList
@@ -144,22 +181,22 @@ export default function NotesScreen() {
           keyExtractor={item => `${item.type}-${item.id}`}
           renderItem={({ item }) => (
             <Pressable 
-              style={styles.item} 
+              style={[styles.item, { borderBottomColor: colors.border }]} 
               onPress={() => handleItemPress(item)}
             >
               <XStack alignItems="center" space="$3">
                 {item.type === 'folder' ? (
-                  <MaterialIcons name="folder" size={24} color="#007AFF" />
+                  <MaterialIcons name="folder" size={24} color={colors.primary} />
                 ) : (
-                  <MaterialIcons name="description" size={24} color="#007AFF" />
+                  <MaterialIcons name="description" size={24} color={colors.primary} />
                 )}
                 <YStack>
-                  <Text fontSize="$4">
+                  <Text fontSize="$4" color={colors.text}>
                     {item.type === 'folder' ? item.name : item.title}
                   </Text>
                   <Text 
                     fontSize="$2" 
-                    color="$gray10"
+                    color={colors.secondaryText}
                   >
                     {item.updated_at
                       ? new Date(item.updated_at).toLocaleDateString()
@@ -171,35 +208,6 @@ export default function NotesScreen() {
           )}
         />
       )}
-      
-      {/* FAB - 右下に配置（タブと重ならないように調整） */}
-      <Pressable 
-        style={styles.fab}
-        onPress={handleCreatePress}
-      >
-        <MaterialIcons name="add" color="#fff" size={24} />
-      </Pressable>
-      
-      {/* 新規作成オプション */}
-      {showCreateOptions && (
-        <View style={styles.createOptions}>
-          <Button 
-            icon={<MaterialIcons name="description" size={24} />}
-            onPress={handleCreateNote}
-            size="$3"
-          >
-            {t('new_note')}
-          </Button>
-          <Button 
-            icon={<MaterialIcons name="folder" size={24} />}
-            onPress={handleCreateFolder}
-            size="$3"
-            mt="$2"
-          >
-            {t('new_folder')}
-          </Button>
-        </View>
-      )}
     </View>
   );
 }
@@ -207,7 +215,53 @@ export default function NotesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 50, // ステータスバー分の余白
+    paddingBottom: 12,
+    height: 96, // ヘッダーの高さを固定
+  },
+  headerLeftPlaceholder: {
+    width: 80,
+    alignItems: 'flex-start',
+    paddingLeft: 12,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitleContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 80,
+    justifyContent: 'flex-end',
+    paddingRight: 12,
+  },
+  headerButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
   loadingContainer: {
     flex: 1,
@@ -229,35 +283,5 @@ const styles = StyleSheet.create({
   item: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 80,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  createOptions: {
-    position: 'absolute',
-    right: 24,
-    bottom: 150,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
   },
 });

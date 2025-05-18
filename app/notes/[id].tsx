@@ -42,8 +42,8 @@ export default function NoteScreen() {
   // 初期データロード
   useEffect(() => {
     if (isNewNote) {
-      setTitle('新しいノート');
-      setContent('<p>ここに内容を入力してください...</p>');
+      setTitle('');
+      setContent('');
       
       // 新規ノートを自動的に作成して保存
       createNewNote();
@@ -68,8 +68,8 @@ export default function NoteScreen() {
   const createNewNote = useCallback(async () => {
     try {
       const newNoteId = await createNote({
-        title: '新しいノート',
-        content: '<p>ここに内容を入力してください...</p>',
+        title: '',
+        content: '',
         folder_id: currentFolder
       });
       setNoteId(newNoteId);
@@ -305,7 +305,7 @@ export default function NoteScreen() {
             style={styles.titleInput}
             value={title}
             onChangeText={handleTitleChange}
-            placeholder={t('note_title')}
+            placeholder="タイトル"
             placeholderTextColor={colors.gray}
           />
           
@@ -366,7 +366,7 @@ export default function NoteScreen() {
             isDarkMode={isDark}
             themeColors={colors}
             autoFocus={isNewNote}
-            placeholder={t('enter_note_content')}
+            placeholder="ここに内容を入力してください"
           />
         </ScrollView>
       </KeyboardAvoidingView>

@@ -31,7 +31,7 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
   themeColors,
   onFocus,
   onBlur,
-  placeholder = 'ここに内容を入力してください...',
+  placeholder = 'ここに内容を入力してください',
   autoFocus = false,
   onTextSelection,
 }) => {
