@@ -65,8 +65,8 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
     }
   }, [autoFocus, readOnly]);
   
-  // ツールバーアイコン定義（iOSのみ）
-  const iconMapForIOS = Platform.OS === 'ios' ? {
+  // ツールバーアイコン定義
+  const customIconMap = {
     [actions.setBold]: ({ tintColor }: { tintColor?: string }) => <Bold size={20} color={tintColor || colors.text} />,
     [actions.setItalic]: ({ tintColor }: { tintColor?: string }) => <Italic size={20} color={tintColor || colors.text} />,
     [actions.setUnderline]: ({ tintColor }: { tintColor?: string }) => <Underline size={20} color={tintColor || colors.text} />,
@@ -80,7 +80,7 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
     [actions.insertImage]: ({ tintColor }: { tintColor?: string }) => <Image size={20} color={tintColor || colors.text} />,
     [actions.removeFormat]: ({ tintColor }: { tintColor?: string }) => <Trash size={20} color={tintColor || colors.text} />,
     [actions.setParagraph]: ({ tintColor }: { tintColor?: string }) => <Pilcrow size={20} color={tintColor || colors.text} />,
-  } : undefined;
+  };
 
   // プラットフォームごとにツールバーアクションを定義
   // iOS - 完全な機能セット
@@ -101,9 +101,18 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
 
   // Android - 簡素化したセット（安定性のため）
   const editorActionsForAndroid = [
-    actions.setBold, 
+    actions.setBold,
     actions.setItalic,
     actions.setUnderline,
+    actions.setStrikethrough,
+    actions.insertOrderedList,
+    actions.insertBulletsList,
+    actions.heading1,
+    actions.heading2,
+    actions.heading3,
+    actions.insertLink,
+    actions.removeFormat,
+    actions.setParagraph,
   ];
 
   // プラットフォームに応じたアクション配列
@@ -171,7 +180,7 @@ const WebViewEditor: React.FC<WebViewEditorProps> = ({
         <RichToolbar
           editor={richText}
           actions={editorActions}
-          iconMap={Platform.OS === 'ios' ? iconMapForIOS : undefined}
+          iconMap={customIconMap}
           selectedIconTint={colors.primary}
           unselectedIconTint={colors.text}
           style={[styles.toolbar, { backgroundColor: isDarkMode ? colors.card : colors.lightGray }]}
