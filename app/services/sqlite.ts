@@ -130,50 +130,50 @@ const runMigrations = async (fromVersion: number): Promise<void> => {
     
     // バージョン1のマイグレーション（初期スキーマ）
     if (fromVersion < 1) {
-      // フォルダテーブル作成
-      await db.execAsync(`
-        CREATE TABLE IF NOT EXISTS folders (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          parent_id TEXT,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL,
-          FOREIGN KEY (parent_id) REFERENCES folders (id) ON DELETE CASCADE
-        );
-      `);
-      
-      // ノートテーブル作成
-      await db.execAsync(`
-        CREATE TABLE IF NOT EXISTS notes (
-          id TEXT PRIMARY KEY,
-          title TEXT NOT NULL,
-          content TEXT NOT NULL,
-          folder_id TEXT,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL,
+    // フォルダテーブル作成
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS folders (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        parent_id TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (parent_id) REFERENCES folders (id) ON DELETE CASCADE
+      );
+    `);
+    
+    // ノートテーブル作成
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS notes (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        folder_id TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
           is_compressed INTEGER DEFAULT 0,
-          FOREIGN KEY (folder_id) REFERENCES folders (id) ON DELETE CASCADE
-        );
-      `);
-      
-      // タグテーブル作成
-      await db.execAsync(`
-        CREATE TABLE IF NOT EXISTS tags (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL UNIQUE
-        );
-      `);
-      
-      // ノートとタグの関連テーブル作成
-      await db.execAsync(`
-        CREATE TABLE IF NOT EXISTS note_tags (
-          note_id TEXT NOT NULL,
-          tag_id TEXT NOT NULL,
-          PRIMARY KEY (note_id, tag_id),
-          FOREIGN KEY (note_id) REFERENCES notes (id) ON DELETE CASCADE,
-          FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE
-        );
-      `);
+        FOREIGN KEY (folder_id) REFERENCES folders (id) ON DELETE CASCADE
+      );
+    `);
+    
+    // タグテーブル作成
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS tags (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE
+      );
+    `);
+    
+    // ノートとタグの関連テーブル作成
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS note_tags (
+        note_id TEXT NOT NULL,
+        tag_id TEXT NOT NULL,
+        PRIMARY KEY (note_id, tag_id),
+        FOREIGN KEY (note_id) REFERENCES notes (id) ON DELETE CASCADE,
+        FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE
+      );
+    `);
       
       // 画像添付テーブル作成
       await db.execAsync(`
@@ -473,11 +473,11 @@ export const createTag = async (name: string): Promise<Tag> => {
   const id = `tag_${generateUuid()}`;
   
   try {
-    const stmt = await db.prepareAsync(`INSERT INTO tags (id, name) VALUES (?, ?)`);
-    await stmt.executeAsync([id, name]);
-    await stmt.finalizeAsync();
-    
-    return { id, name };
+  const stmt = await db.prepareAsync(`INSERT INTO tags (id, name) VALUES (?, ?)`);
+  await stmt.executeAsync([id, name]);
+  await stmt.finalizeAsync();
+  
+  return { id, name };
   } catch (err: any) {
     // UNIQUE制約違反の場合は既存のタグを返す
     if (err.message?.includes('UNIQUE')) {

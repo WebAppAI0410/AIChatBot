@@ -33,8 +33,8 @@ module.exports = {
     scheme: "aichatbot",
     // 環境変数
     extra: {
-      supabaseUrl: process.env.SUPABASE_URL || "https://alperyqhdtpnivxfnqdi.supabase.co",
-      supabaseAnonKey: process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFscGVyeXFoZHRwbml2eGZucWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY4MDc5OTcsImV4cCI6MjA2MjM4Mzk5N30.0gTXgFtD2uIhGdSB4twConRJPF_0Ccz5zePqa0hD8B0",
+      supabaseUrl: process.env.SUPABASE_URL || "https://sywokupckgoqmimyiecb.supabase.co",
+      supabaseAnonKey: process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN5d29rdXBja2dvcW1pbXlpZWNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NzA1NDYsImV4cCI6MjA2MzI0NjU0Nn0.NAZfXnQnKUMiGYLJEQ8LRj0aQyLc1AH8NSWtqGmgKhU",
       // 開発時には環境変数が設定されているかを確認するためのメッセージ
       eas: {
         projectId: "your-project-id" // 必要に応じて設定

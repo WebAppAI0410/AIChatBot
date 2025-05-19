@@ -33,8 +33,8 @@ const WebViewEditor = forwardRef<{
   canRedo: boolean 
 }, WebViewEditorProps>((
   {
-    content,
-    onContentChange,
+  content,
+  onContentChange,
     readOnly = false,
     isDarkMode: propIsDarkMode, // Props経由のisDarkMode
     themeColors,
@@ -42,7 +42,7 @@ const WebViewEditor = forwardRef<{
     onBlur,
     placeholder = 'ここに内容を入力してください',
     autoFocus = false,
-    onTextSelection,
+  onTextSelection,
     onHistoryStateChange,
   }, 
   ref
@@ -205,10 +205,10 @@ const WebViewEditor = forwardRef<{
         (function() {
           try {
             console.log("FROM EDIT: ハイライト実行: isDarkMode=${calculatedIsDarkMode}, bgColor=${bgColor}, textColor=${textColor}");
-            const selection = window.getSelection();
+      const selection = window.getSelection();
             if (!selection.rangeCount) return false;
-            
-            const range = selection.getRangeAt(0);
+      
+      const range = selection.getRangeAt(0);
             if (range.collapsed) {
               console.log('FROM EDIT: WebViewEditor: ハイライト - 選択範囲なし');
               return false;
@@ -275,20 +275,613 @@ const WebViewEditor = forwardRef<{
     }
   };
   
+  // 現在の選択範囲のフォーマットをチェックするユーティリティ関数
+  const checkFormatState = () => {
+    if (richText.current) {
+      const script = `
+        (function() {
+          try {
+            // 現在のフォーマット状態を取得
+            const formatBlock = document.queryCommandValue('formatBlock') || '';
+            const isOrderedList = document.queryCommandState('insertOrderedList');
+            const isUnorderedList = document.queryCommandState('insertUnorderedList');
+            
+            // カスタム検出: チェックボックスリスト (ul.checklist)
+            const selection = window.getSelection();
+            let isCheckboxList = false;
+            if (selection && selection.rangeCount > 0) {
+              let node = selection.anchorNode;
+              // テキストノードの場合は親要素を取得
+              if (node.nodeType === 3) node = node.parentNode;
+              
+              // 親要素をたどってulかつchecklistクラスを持つものを探す
+              while (node && node !== document.body) {
+                if (node.nodeName === 'UL' && node.classList.contains('checklist')) {
+                  isCheckboxList = true;
+                  break;
+                }
+                node = node.parentNode;
+              }
+            }
+            
+            // 結果を返す
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'formatState',
+              formatBlock: formatBlock.toLowerCase(),
+              isOrderedList: isOrderedList,
+              isUnorderedList: isUnorderedList,
+              isCheckboxList: isCheckboxList
+            }));
+          } catch (e) {
+            console.error('フォーマット状態確認エラー:', e);
+          }
+          return true;
+        })();
+      `;
+      richText.current.commandDOM(script);
+    }
+  };
+
+  // フォーマット状態の管理
+  const [formatState, setFormatState] = useState({
+    formatBlock: '',
+    isOrderedList: false,
+    isUnorderedList: false,
+    isCheckboxList: false
+  });
+
+  // WebViewからのメッセージハンドラを拡張して、フォーマット状態を受け取る
+  const handleWebViewMessage = useCallback((message: any) => {
+    try {
+      const messageData = message.data;
+      if (messageData && typeof messageData === 'string') {
+        const parsedData = JSON.parse(messageData);
+        
+        if (parsedData.type === 'selection') {
+          handleSelectionChange(parsedData);
+          // 選択変更時にフォーマット状態もチェック
+          checkFormatState();
+        } else if (parsedData.type === 'contentChange') {
+          console.log("WebViewEditor: onMessage contentChange from WebView:", parsedData.data?.substring(0,100));
+          // コンテンツ変更時にフォーマット状態もチェック
+          checkFormatState();
+        } else if (parsedData.type === 'historyState') {
+          // Undo/Redo状態の更新
+          setCanUndo(parsedData.canUndo);
+          setCanRedo(parsedData.canRedo);
+        } else if (parsedData.type === 'formatState') {
+          // フォーマット状態の更新
+          setFormatState({
+            formatBlock: parsedData.formatBlock || '',
+            isOrderedList: parsedData.isOrderedList || false,
+            isUnorderedList: parsedData.isUnorderedList || false,
+            isCheckboxList: parsedData.isCheckboxList || false
+          });
+        }
+      }
+    } catch (e) {
+      console.error('WebViewEditor: メッセージ解析エラー:', e, "受信データ:", message.data);
+    }
+  }, [handleSelectionChange]);
+
+  // 選択範囲変更時やエディタ操作後にフォーマット状態を更新
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (richText.current) {
+        checkFormatState();
+      }
+    }, 500); // 500ms毎に状態をチェック
+    
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // カスタム見出し1ハンドラー
+  const handleCustomHeadingOne = () => {
+    if (richText.current) {
+      richText.current.commandDOM(makeHeadingScript('h1'));
+      setTimeout(() => checkFormatState(), 50);
+    }
+  };
+  
+  // カスタム見出し2ハンドラー
+  const handleCustomHeadingTwo = () => {
+    if (richText.current) {
+      richText.current.commandDOM(makeHeadingScript('h2'));
+      setTimeout(() => checkFormatState(), 50);
+    }
+  };
+  
+  // カスタム見出し3ハンドラー
+  const handleCustomHeadingThree = () => {
+    if (richText.current) {
+      richText.current.commandDOM(makeHeadingScript('h3'));
+      setTimeout(() => checkFormatState(), 50);
+    }
+  };
+  
+  // カスタム引用ハンドラー
+  const handleCustomBlockquote = () => {
+    if (richText.current) {
+      console.log('WebViewEditor: 引用 カスタムアクション実行');
+      const script = `
+        (function() {
+          try {
+            // 現在のフォーマット状態を取得
+            const formatBlock = document.queryCommandValue('formatBlock').toLowerCase();
+            const isOrderedList = document.queryCommandState('insertOrderedList');
+            const isUnorderedList = document.queryCommandState('insertUnorderedList');
+            
+            // チェックボックスリストの確認
+          const selection = window.getSelection();
+            let isCheckboxList = false;
+            if (selection && selection.rangeCount > 0) {
+              let node = selection.anchorNode;
+              if (node.nodeType === 3) node = node.parentNode;
+              while (node && node !== document.body) {
+                if (node.nodeName === 'UL' && node.classList.contains('checklist')) {
+                  isCheckboxList = true;
+                  break;
+                }
+                node = node.parentNode;
+              }
+            }
+            
+            // 排他的処理
+            if (formatBlock === 'blockquote') {
+              // 同じフォーマットが適用されていれば解除する（トグル動作）
+              document.execCommand('formatBlock', false, '<p>');
+            } else {
+              // リスト系が適用されていれば解除
+              if (isOrderedList) document.execCommand('insertOrderedList', false, null);
+              if (isUnorderedList) document.execCommand('insertUnorderedList', false, null);
+              
+              // チェックボックスリストの場合は選択範囲を包む親ULを特定して削除
+              if (isCheckboxList && selection && selection.rangeCount > 0) {
+                let node = selection.anchorNode;
+                if (node.nodeType === 3) node = node.parentNode;
+                while (node && node !== document.body) {
+                  if (node.nodeName === 'UL' && node.classList.contains('checklist')) {
+          const range = selection.getRangeAt(0);
+                    const content = range.extractContents();
+                    node.parentNode.replaceChild(content, node);
+                    break;
+                  }
+                  node = node.parentNode;
+                }
+              }
+              
+              // 引用を適用
+              document.execCommand('formatBlock', false, '<blockquote>');
+            }
+          } catch (e) {
+            console.error('引用適用エラー:', e);
+          }
+          return true;
+        })();
+      `;
+      richText.current.commandDOM(script);
+      
+      // 操作後にフォーマット状態を更新
+      setTimeout(() => checkFormatState(), 50);
+    }
+  };
+  
+  // カスタム順序付きリストハンドラー
+  const handleCustomOrderedList = () => {
+    if (richText.current) {
+      console.log('WebViewEditor: 順序付きリスト カスタムアクション実行');
+      const script = `
+        (function() {
+          try {
+            // 現在のフォーマット状態を取得
+            const formatBlock = document.queryCommandValue('formatBlock').toLowerCase();
+            const isOrderedList = document.queryCommandState('insertOrderedList');
+            const isUnorderedList = document.queryCommandState('insertUnorderedList');
+            
+            // チェックボックスリストの確認
+            const selection = window.getSelection();
+            let isCheckboxList = false;
+            let checklistNode = null;
+            
+            if (selection && selection.rangeCount > 0) {
+              let node = selection.anchorNode;
+              if (node.nodeType === 3) node = node.parentNode;
+              while (node && node !== document.body) {
+                if (node.nodeName === 'UL' && node.classList.contains('checklist')) {
+                  isCheckboxList = true;
+                  checklistNode = node;
+                  break;
+                }
+                node = node.parentNode;
+              }
+            }
+            
+            // 排他的処理
+            if (isOrderedList) {
+              // 既に順序付きリストが適用されていれば解除（トグル動作）
+              document.execCommand('insertOrderedList', false, null);
+            } else {
+              // 他のリスト系が適用されていれば解除
+              if (isUnorderedList) document.execCommand('insertUnorderedList', false, null);
+              
+              // チェックボックスリストの場合は完全に解除
+              if (isCheckboxList && checklistNode) {
+                // リスト全体をフラグメントに変換
+                try {
+                  const fragment = document.createDocumentFragment();
+                  const liItems = checklistNode.querySelectorAll('li');
+                  
+                  // 各リスト項目をP要素に変換
+                  Array.from(liItems).forEach(item => {
+                    const p = document.createElement('p');
+                    // チェックボックスを削除
+                    const checkbox = item.querySelector('.todo-checkbox');
+                    if (checkbox) checkbox.remove();
+                    
+                    // 内容をコピー
+                    while (item.firstChild) {
+                      p.appendChild(item.firstChild);
+                    }
+                    fragment.appendChild(p);
+                  });
+                  
+                  // リストノードを置き換え
+                  checklistNode.parentNode.replaceChild(fragment, checklistNode);
+                  
+                  // 新しい選択範囲を設定
+                  if (fragment.firstChild) {
+                    const range = document.createRange();
+                    range.selectNodeContents(fragment.firstChild);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                  }
+                  
+                  console.log('チェックリストから順序付きリストへの変換: チェックリスト解除完了');
+                } catch (e) {
+                  console.error('チェックリストから順序付きリストへの変換エラー:', e);
+                  // フォールバック：選択範囲を使った変換
+                  try {
+                    const range = selection.getRangeAt(0);
+                    const content = range.extractContents();
+                    const paragraph = document.createElement('p');
+                    paragraph.appendChild(content);
+                    checklistNode.parentNode.replaceChild(paragraph, checklistNode);
+                  } catch (e2) {
+                    console.error('チェックリスト変換フォールバックエラー:', e2);
+                    // 最終フォールバック - 元のコードに戻す
+                    if (checklistNode && selection && selection.rangeCount > 0) {
+                      let node = selection.anchorNode;
+                      if (node.nodeType === 3) node = node.parentNode;
+                      while (node && node !== document.body) {
+                        if (node.nodeName === 'UL' && node.classList.contains('checklist')) {
+                          const range = selection.getRangeAt(0);
+                          const content = range.extractContents();
+                          node.parentNode.replaceChild(content, node);
+                          break;
+                        }
+                        node = node.parentNode;
+                      }
+                    }
+                  }
+                }
+              }
+              
+              // 見出し系が適用されていれば段落に戻す
+              if (['h1', 'h2', 'h3', 'blockquote'].includes(formatBlock)) {
+                document.execCommand('formatBlock', false, '<p>');
+              }
+              
+              // 順序付きリストを適用
+              document.execCommand('insertOrderedList', false, null);
+            }
+          } catch (e) {
+            console.error('順序付きリスト適用エラー:', e);
+          }
+          return true;
+        })();
+      `;
+      richText.current.commandDOM(script);
+      
+      // 操作後にフォーマット状態を更新
+      setTimeout(() => checkFormatState(), 50);
+    }
+  };
+  
+  // カスタム箇条書きリストハンドラー
+  const handleCustomBulletsList = () => {
+    if (richText.current) {
+      console.log('WebViewEditor: 箇条書きリスト カスタムアクション実行');
+      const script = `
+        (function() {
+          try {
+            // 現在のフォーマット状態を取得
+            const formatBlock = document.queryCommandValue('formatBlock').toLowerCase();
+            const isOrderedList = document.queryCommandState('insertOrderedList');
+            const isUnorderedList = document.queryCommandState('insertUnorderedList');
+            
+            // チェックボックスリストの確認
+            const selection = window.getSelection();
+            let isCheckboxList = false;
+            let checklistNode = null;
+            
+            if (selection && selection.rangeCount > 0) {
+              let node = selection.anchorNode;
+              if (node.nodeType === 3) node = node.parentNode;
+              while (node && node !== document.body) {
+                if (node.nodeName === 'UL' && node.classList.contains('checklist')) {
+                  isCheckboxList = true;
+                  checklistNode = node;
+                  break;
+                }
+                node = node.parentNode;
+              }
+            }
+            
+            // 排他的処理
+            if (isUnorderedList) {
+              // 既に箇条書きリストが適用されていれば解除（トグル動作）
+              document.execCommand('insertUnorderedList', false, null);
+            } else {
+              // 他のリスト系が適用されていれば解除
+              if (isOrderedList) document.execCommand('insertOrderedList', false, null);
+              
+              // チェックボックスリストの場合は完全に解除
+              if (isCheckboxList && checklistNode) {
+                // リスト全体をフラグメントに変換
+                try {
+                  const fragment = document.createDocumentFragment();
+                  const liItems = checklistNode.querySelectorAll('li');
+                  
+                  // 各リスト項目をP要素に変換
+                  Array.from(liItems).forEach(item => {
+                    const p = document.createElement('p');
+                    // チェックボックスを削除
+                    const checkbox = item.querySelector('.todo-checkbox');
+                    if (checkbox) checkbox.remove();
+                    
+                    // 内容をコピー
+                    while (item.firstChild) {
+                      p.appendChild(item.firstChild);
+                    }
+                    fragment.appendChild(p);
+                  });
+                  
+                  // リストノードを置き換え
+                  checklistNode.parentNode.replaceChild(fragment, checklistNode);
+                  
+                  // 新しい選択範囲を設定
+                  if (fragment.firstChild) {
+                    const range = document.createRange();
+                    range.selectNodeContents(fragment.firstChild);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                  }
+                  
+                  console.log('チェックリストから箇条書きリストへの変換: チェックリスト解除完了');
+                } catch (e) {
+                  console.error('チェックリストから箇条書きリストへの変換エラー:', e);
+                  // フォールバック：選択範囲を使った変換
+                  try {
+                    const range = selection.getRangeAt(0);
+                    const content = range.extractContents();
+                    const paragraph = document.createElement('p');
+                    paragraph.appendChild(content);
+                    checklistNode.parentNode.replaceChild(paragraph, checklistNode);
+                  } catch (e2) {
+                    console.error('チェックリスト変換フォールバックエラー:', e2);
+                    // 最終フォールバック - 元のコードに戻す
+                    if (checklistNode && selection && selection.rangeCount > 0) {
+                      let node = selection.anchorNode;
+                      if (node.nodeType === 3) node = node.parentNode;
+                      while (node && node !== document.body) {
+                        if (node.nodeName === 'UL' && node.classList.contains('checklist')) {
+                          const range = selection.getRangeAt(0);
+                          const content = range.extractContents();
+                          node.parentNode.replaceChild(content, node);
+                          break;
+                        }
+                        node = node.parentNode;
+                      }
+                    }
+                  }
+                }
+              }
+              
+              // 見出し系が適用されていれば段落に戻す
+              if (['h1', 'h2', 'h3', 'blockquote'].includes(formatBlock)) {
+                document.execCommand('formatBlock', false, '<p>');
+              }
+              
+              // 箇条書きリストを適用
+              document.execCommand('insertUnorderedList', false, null);
+            }
+          } catch (e) {
+            console.error('箇条書きリスト適用エラー:', e);
+          }
+          return true;
+        })();
+      `;
+      richText.current.commandDOM(script);
+      
+      // 操作後にフォーマット状態を更新
+      setTimeout(() => checkFormatState(), 50);
+    }
+  };
+  
+  // カスタムチェックリストハンドラー
+  const handleCustomCheckboxList = () => {
+    if (richText.current) {
+      const script = `
+        (function() {
+          try {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return true;
+            let node = selection.anchorNode;
+            if (node.nodeType === 3) node = node.parentNode;
+
+            // 1. 選択範囲内のh1/h2/h3/blockquoteをpに変換
+            let range = selection.getRangeAt(0);
+            let commonAncestor = range.commonAncestorContainer;
+            if (commonAncestor.nodeType === 3) commonAncestor = commonAncestor.parentNode;
+            const headings = commonAncestor.querySelectorAll ? commonAncestor.querySelectorAll('h1, h2, h3, blockquote') : [];
+            headings.forEach(h => {
+              const p = document.createElement('p');
+              while (h.firstChild) p.appendChild(h.firstChild);
+              h.parentNode.replaceChild(p, h);
+            });
+
+            // 2. 既存のチェックリストなら解除
+            let checklistNode = null;
+            let temp = node;
+            while (temp && temp !== document.body) {
+              if (temp.nodeName === 'UL' && temp.classList.contains('checklist')) {
+                checklistNode = temp;
+                break;
+              }
+              temp = temp.parentNode;
+            }
+            if (checklistNode) {
+              // チェックリスト解除
+              const fragment = document.createDocumentFragment();
+              const liItems = checklistNode.querySelectorAll('li');
+              liItems.forEach(item => {
+                // チェックボックス除去
+                const cb = item.querySelector('.todo-checkbox');
+                if (cb) cb.remove();
+                const p = document.createElement('p');
+                while (item.firstChild) p.appendChild(item.firstChild);
+                fragment.appendChild(p);
+              });
+              checklistNode.parentNode.replaceChild(fragment, checklistNode);
+              return true;
+            }
+
+            // 3. 他のリスト系が適用されていれば解除
+            if (document.queryCommandState('insertOrderedList')) document.execCommand('insertOrderedList', false, null);
+            if (document.queryCommandState('insertUnorderedList')) document.execCommand('insertUnorderedList', false, null);
+
+            // 4. チェックリストを適用
+            document.execCommand('insertUnorderedList', false, null);
+            setTimeout(function() {
+              let node = selection.anchorNode;
+              if (node.nodeType === 3) node = node.parentNode;
+              while (node && node !== document.body) {
+                if (node.nodeName === 'UL') {
+                  node.classList.add('checklist');
+                  const items = node.querySelectorAll('li');
+                  items.forEach(item => {
+                    // 既存のチェックボックスを除去
+                    const old = item.querySelector('.todo-checkbox');
+                    if (old) old.remove();
+                    // チェックボックス追加
+                    const checkbox = document.createElement('span');
+                    checkbox.className = 'todo-checkbox';
+                    checkbox.contentEditable = 'false';
+                    checkbox.innerHTML = '☐ ';
+                    checkbox.addEventListener('click', function() {
+                      this.innerHTML = (this.innerHTML === '☐ ') ? '☑ ' : '☐ ';
+                    });
+                    if (item.firstChild) {
+                      item.insertBefore(checkbox, item.firstChild);
+                    } else {
+                      item.appendChild(checkbox);
+                    }
+                  });
+                  break;
+                }
+                node = node.parentNode;
+              }
+            }, 10);
+          } catch (e) {
+            console.error('チェックリスト適用エラー:', e);
+          }
+          return true;
+        })();
+      `;
+      richText.current.commandDOM(script);
+      setTimeout(() => checkFormatState(), 100);
+    }
+  };
+
+  // 見出し系ハンドラー共通ロジック
+  function makeHeadingScript(tag: string) {
+    return `
+      (function() {
+        try {
+          const selection = window.getSelection();
+          if (!selection || selection.rangeCount === 0) return true;
+          let node = selection.anchorNode;
+          if (node.nodeType === 3) node = node.parentNode;
+
+          // 1. チェックリスト内ならli > .todo-checkboxを除去しliの中身をpに変換
+          let checklistNode = null;
+          let temp = node;
+          while (temp && temp !== document.body) {
+            if (temp.nodeName === 'UL' && temp.classList.contains('checklist')) {
+              checklistNode = temp;
+              break;
+            }
+            temp = temp.parentNode;
+          }
+          if (checklistNode) {
+            const liItems = checklistNode.querySelectorAll('li');
+            liItems.forEach(item => {
+              const cb = item.querySelector('.todo-checkbox');
+              if (cb) cb.remove();
+              const p = document.createElement('p');
+              while (item.firstChild) p.appendChild(item.firstChild);
+              item.parentNode.replaceChild(p, item);
+            });
+            // チェックリストUL自体もpに変換
+            const fragment = document.createDocumentFragment();
+            while (checklistNode.firstChild) fragment.appendChild(checklistNode.firstChild);
+            const p = document.createElement('p');
+            while (fragment.firstChild) p.appendChild(fragment.firstChild);
+            checklistNode.parentNode.replaceChild(p, checklistNode);
+            node = p;
+          }
+
+          // 2. 他のリスト系が適用されていれば解除
+          if (document.queryCommandState('insertOrderedList')) document.execCommand('insertOrderedList', false, null);
+          if (document.queryCommandState('insertUnorderedList')) document.execCommand('insertUnorderedList', false, null);
+
+          // 3. トグル動作
+          const formatBlock = document.queryCommandValue('formatBlock').toLowerCase();
+          if (formatBlock === '${tag}') {
+            document.execCommand('formatBlock', false, '<p>');
+          } else {
+            document.execCommand('formatBlock', false, '<${tag}>');
+          }
+        } catch (e) {
+          console.error('${tag}適用エラー:', e);
+        }
+        return true;
+      })();
+    `;
+  }
+
+  const editorActions = [
+    actions.heading1, actions.heading2, actions.heading3, actions.blockquote,
+    actions.setBold, actions.setItalic, actions.setUnderline, actions.setStrikethrough,
+    'highlight', 
+    actions.insertOrderedList, actions.insertBulletsList, actions.checkboxList,
+    actions.insertLink,
+  ];
+
   const customIconMap = {
     [actions.setBold]: ({ tintColor }: { tintColor?: string }) => <Bold size={20} color={tintColor || colors.text} />,
     [actions.setItalic]: ({ tintColor }: { tintColor?: string }) => <Italic size={20} color={tintColor || colors.text} />,
     [actions.setUnderline]: ({ tintColor }: { tintColor?: string }) => <Underline size={20} color={tintColor || colors.text} />,
     [actions.setStrikethrough]: ({ tintColor }: { tintColor?: string }) => <Strikethrough size={20} color={tintColor || colors.text} />,
-    [actions.insertOrderedList]: ({ tintColor }: { tintColor?: string }) => <ListOrdered size={20} color={tintColor || colors.text} />,
-    [actions.insertBulletsList]: ({ tintColor }: { tintColor?: string }) => <List size={20} color={tintColor || colors.text} />,
     [actions.heading1]: ({ tintColor }: { tintColor?: string }) => <Heading1 size={20} color={tintColor || colors.text} />,
     [actions.heading2]: ({ tintColor }: { tintColor?: string }) => <Heading2 size={20} color={tintColor || colors.text} />,
     [actions.heading3]: ({ tintColor }: { tintColor?: string }) => <Heading3 size={20} color={tintColor || colors.text} />,
+    [actions.blockquote]: ({ tintColor }: { tintColor?: string }) => <Quote size={20} color={tintColor || colors.text} />,
+    [actions.insertOrderedList]: ({ tintColor }: { tintColor?: string }) => <ListOrdered size={20} color={tintColor || colors.text} />,
+    [actions.insertBulletsList]: ({ tintColor }: { tintColor?: string }) => <List size={20} color={tintColor || colors.text} />,
+    [actions.checkboxList]: ({ tintColor }: { tintColor?: string }) => <ListChecks size={20} color={tintColor || colors.text} />,
     [actions.insertLink]: ({ tintColor }: { tintColor?: string }) => <Link size={20} color={tintColor || colors.text} />,
     [actions.insertImage]: ({ tintColor }: { tintColor?: string }) => <Image size={20} color={tintColor || colors.text} />,
-    [actions.blockquote]: ({ tintColor }: { tintColor?: string }) => <Quote size={20} color={tintColor || colors.text} />,
-    [actions.checkboxList]: ({ tintColor }: { tintColor?: string }) => <ListChecks size={20} color={tintColor || colors.text} />,
     ['highlight']: ({ tintColor }: { tintColor?: string }) => <Highlighter size={20} color={tintColor || colors.text} />,
     ['undo']: ({ tintColor }: { tintColor?: string }) => (
       <RotateCcw size={20} color={canUndo ? (tintColor || colors.text) : colors.gray} opacity={canUndo ? 1 : 0.5} />
@@ -302,17 +895,9 @@ const WebViewEditor = forwardRef<{
     highlight: handleHighlight,
     undo: handleUndo,
     redo: handleRedo,
+    [actions.checkboxList]: handleCustomCheckboxList
   };
   
-  const editorActions = [
-    'undo', 'redo', // Undo/Redoボタンを先頭に追加
-    actions.heading1, actions.heading2, actions.heading3, actions.blockquote,
-    actions.setBold, actions.setItalic, actions.setUnderline, actions.setStrikethrough,
-    'highlight', 
-    actions.insertOrderedList, actions.insertBulletsList, actions.checkboxList,
-    actions.insertLink,
-  ];
-
   const handleEditorInitialized = () => {
     console.log('WebViewEditor: RichEditor initialized, isDarkMode:', calculatedIsDarkMode);
     if (richText.current) {
@@ -323,6 +908,408 @@ const WebViewEditor = forwardRef<{
          console.log('WebViewEditor: 初期コンテンツをセット:', content.substring(0,100));
          richText.current.setContentHTML(content);
       }
+      
+      // カスタムスタイルを追加（チェックボックスリスト用）
+      const initializeCustomStyles = `
+        (function() {
+          try {
+            // チェックボックスリスト用のスタイルを追加
+            if (!document.getElementById('custom-editor-styles')) {
+              const style = document.createElement('style');
+              style.id = 'custom-editor-styles';
+              style.textContent = \`
+                ul.checklist {
+                  list-style-type: none;
+                  padding-left: 0.5em;
+                }
+                ul.checklist li {
+                  position: relative;
+                  padding-left: 1.5em;
+                  margin-bottom: 0.5em;
+                }
+                .todo-checkbox {
+                  cursor: pointer;
+                  user-select: none;
+                  margin-right: 0.5em;
+                  font-size: 1.2em;
+                }
+              \`;
+              document.head.appendChild(style);
+              console.log("WebViewEditor: カスタムスタイルを初期化しました");
+            }
+          } catch (e) {
+            console.error("WebViewEditor: カスタムスタイル初期化エラー:", e);
+          }
+          return true;
+        })();
+      `;
+      richText.current.commandDOM(initializeCustomStyles);
+      
+      // デフォルトのフォーマット動作をオーバーライドするための初期化スクリプト
+      const overrideDefaultFormattingScript = `
+        (function() {
+          try {
+            // オリジナルのexecCommandをバックアップ
+            if (!document.originalExecCommand) {
+              document.originalExecCommand = document.execCommand;
+              
+              // チェックボックスリスト操作のユーティリティ関数を定義
+              window.editorFunctions = {
+                // チェックボックスリストを作成する
+                createCheckboxList: function() {
+                  const selection = window.getSelection();
+                  if (!selection || selection.rangeCount === 0) return;
+                  
+                  // いったん段落に戻してから処理を始める
+                  document.originalExecCommand('formatBlock', false, '<p>');
+                  
+                  // まず通常のリストを作成
+                  document.originalExecCommand('insertUnorderedList', false, null);
+                  
+                  // 次にチェックボックス用のクラスを追加
+                  let node = selection.anchorNode;
+                  if (node && node.nodeType === 3) node = node.parentNode;
+                  
+                  while (node && node !== document.body) {
+                    if (node.nodeName === 'UL') {
+                      node.classList.add('checklist');
+                      
+                      // リスト内の各項目にチェックボックスを追加
+                      const items = node.querySelectorAll('li');
+                      for (let i = 0; i < items.length; i++) {
+                        const item = items[i];
+                        // 既にチェックボックスが含まれていなければ追加
+                        if (!item.querySelector('.todo-checkbox')) {
+                          const checkbox = document.createElement('span');
+                          checkbox.className = 'todo-checkbox';
+                          checkbox.contentEditable = 'false';
+                          checkbox.innerHTML = '☐ ';
+                          checkbox.addEventListener('click', function() {
+                            if (this.innerHTML === '☐ ') {
+                              this.innerHTML = '☑ ';
+                            } else {
+                              this.innerHTML = '☐ ';
+                            }
+                          });
+                          
+                          // 既存のテキストの前にチェックボックスを挿入
+                          if (item.firstChild) {
+                            item.insertBefore(checkbox, item.firstChild);
+                          } else {
+                            item.appendChild(checkbox);
+                          }
+                        }
+                      }
+                      console.log('createCheckboxList: チェックボックスリスト作成完了');
+                      break;
+                    }
+                    node = node.parentNode;
+                  }
+                },
+                
+                // チェックボックスリストを検出する
+                isCheckboxListApplied: function() {
+                  const selection = window.getSelection();
+                  if (!selection || selection.rangeCount === 0) return null;
+                  
+                  let node = selection.anchorNode;
+                  if (node && node.nodeType === 3) node = node.parentNode;
+                  
+                  while (node && node !== document.body) {
+                    if (node.nodeName === 'UL' && node.classList.contains('checklist')) {
+                      return node; // チェックボックスリストのノードを返す
+                    }
+                    node = node.parentNode;
+                  }
+                  
+                  return null; // 適用されていない
+                },
+                
+                // リスト項目が空かチェック
+                isListItemEmpty: function(item) {
+                  // チェックボックスを除外して内容をチェック
+                  const checkbox = item.querySelector('.todo-checkbox');
+                  if (checkbox) checkbox.remove();
+                  
+                  // テキスト内容をトリミング
+                  const textContent = item.textContent.trim();
+                  
+                  // チェックボックスを再度追加
+                  if (checkbox && item.firstChild) {
+                    item.insertBefore(checkbox, item.firstChild);
+                  } else if (checkbox) {
+                    item.appendChild(checkbox);
+                  }
+                  
+                  return textContent === '';
+                },
+                
+                // 改行後の処理 - 空の項目をチェックして適切に処理
+                handleEmptyListItem: function(event) {
+                  if (event.key === 'Enter') {
+                    const selection = window.getSelection();
+                    if (!selection || selection.rangeCount === 0) return;
+                    
+                    let node = selection.anchorNode;
+                    if (node.nodeType === 3) node = node.parentNode;
+                    
+                    // リスト項目内にいるか確認
+                    let listItem = null;
+                    while (node && node !== document.body) {
+                      if (node.nodeName === 'LI') {
+                        listItem = node;
+                        break;
+                      }
+                      node = node.parentNode;
+                    }
+                    
+                    if (listItem) {
+                      // リスト項目が空かチェック
+                      if (this.isListItemEmpty(listItem)) {
+                        // 親のULを取得
+                        const ul = listItem.parentNode;
+                        if (ul && ul.classList.contains('checklist')) {
+                          // 1つ前の項目がチェックボックスリストの最後の項目なら
+                          if (listItem === ul.lastElementChild) {
+                            // デフォルトのEnterキー処理をキャンセル
+                            event.preventDefault();
+                            
+                            // 空の項目を削除
+                            listItem.remove();
+                            
+                            // チェックリストを抜けるために段落を挿入
+                            const p = document.createElement('p');
+                            p.innerHTML = '<br>';
+                            
+                            // 現在のリストの後に段落を挿入
+                            if (ul.nextSibling) {
+                              ul.parentNode.insertBefore(p, ul.nextSibling);
+                            } else {
+                              ul.parentNode.appendChild(p);
+                            }
+                            
+                            // 選択範囲を新しい段落に移動
+                            const range = document.createRange();
+                            range.setStart(p, 0);
+                            range.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                            
+                            return true;
+                          }
+                        }
+                      }
+                    }
+                  }
+                  return false;
+                },
+                
+                // チェックボックスリストを解除する
+                removeCheckboxList: function() {
+                  const checkboxListNode = this.isCheckboxListApplied();
+                  if (!checkboxListNode) return false;
+                  
+                  const selection = window.getSelection();
+                  if (!selection || selection.rangeCount === 0) return false;
+                  
+                  try {
+                    // リスト全体をフラグメントに変換
+                    const fragment = document.createDocumentFragment();
+                    const liItems = checkboxListNode.querySelectorAll('li');
+                    
+                    // 各リスト項目をP要素に変換
+                    liItems.forEach(item => {
+                      const p = document.createElement('p');
+                      // チェックボックスを削除
+                      const checkbox = item.querySelector('.todo-checkbox');
+                      if (checkbox) checkbox.remove();
+                      
+                      // 内容をコピー
+                      while (item.firstChild) {
+                        p.appendChild(item.firstChild);
+                      }
+                      fragment.appendChild(p);
+                    });
+                    
+                    // リストノードを置き換え
+                    checkboxListNode.parentNode.replaceChild(fragment, checkboxListNode);
+                    console.log('removeCheckboxList: チェックボックスリスト全体解除完了');
+                    return true;
+                  } catch (e) {
+                    console.error('removeCheckboxList全体変換エラー:', e);
+                    
+                    // フォールバック：選択範囲のみを変換
+                    try {
+                      const range = selection.getRangeAt(0);
+                      const content = range.extractContents();
+                      const paragraph = document.createElement('p');
+                      paragraph.appendChild(content);
+                      checkboxListNode.parentNode.replaceChild(paragraph, checkboxListNode);
+                      console.log('removeCheckboxList: チェックボックスリスト解除完了');
+                      return true;
+                    } catch (e) {
+                      console.error('removeCheckboxList エラー:', e);
+                      return false;
+                    }
+                  }
+                }
+              };
+              
+              // Enterキーのイベントリスナーを追加（チェックリスト用）
+              document.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                  // チェックボックスリスト内の空の項目に対する特別処理
+                  if (window.editorFunctions.handleEmptyListItem(event)) {
+                    console.log('空のチェックボックスリスト項目で改行: 特別処理実行');
+                  }
+                }
+              });
+              
+              // execCommandをオーバーライドして排他ロジックを組み込む
+              document.execCommand = function(command, showUI, value) {
+                console.log('execCommand intercepted:', command, value);
+                
+                // カスタムチェックボックスリストコマンドの処理
+                if (command === 'checkboxList') {
+                  // 現在の状態チェック
+                  const checkboxListNode = window.editorFunctions.isCheckboxListApplied();
+                  const isCheckboxList = Boolean(checkboxListNode);
+                  const currentFormat = document.queryCommandValue('formatBlock').toLowerCase();
+                  const isOrderedList = document.queryCommandState('insertOrderedList');
+                  const isUnorderedList = document.queryCommandState('insertUnorderedList');
+                  
+                  console.log('checkboxList command:', {
+                    isCheckboxList,
+                    currentFormat,
+                    isOrderedList,
+                    isUnorderedList
+                  });
+                  
+                  // トグル動作
+                  if (isCheckboxList) {
+                    return window.editorFunctions.removeCheckboxList();
+                  }
+                  
+                  // 他のフォーマットを解除
+                  if (isOrderedList) document.originalExecCommand('insertOrderedList', false, null);
+                  if (isUnorderedList) document.originalExecCommand('insertUnorderedList', false, null);
+                  
+                  // 見出し・引用の場合、適切に段落に戻す
+                  if (['h1', 'h2', 'h3', 'blockquote'].includes(currentFormat)) {
+                    const selection = window.getSelection();
+                    if (selection && selection.rangeCount > 0) {
+                      // 現在の選択範囲を含む見出し要素を見つける
+                      let headingNode = selection.anchorNode;
+                      if (headingNode.nodeType === 3) headingNode = headingNode.parentNode;
+                      
+                      // 見出し要素に到達するまで親をたどる
+                      let foundHeading = false;
+                      while (headingNode && headingNode !== document.body) {
+                        const nodeName = headingNode.nodeName.toLowerCase();
+                        if (['h1', 'h2', 'h3', 'blockquote'].includes(nodeName)) {
+                          // 見出し要素を段落に置き換え
+                          const newParagraph = document.createElement('p');
+                          
+                          // 内容をコピー
+                          while (headingNode.firstChild) {
+                            newParagraph.appendChild(headingNode.firstChild);
+                          }
+                          
+                          headingNode.parentNode.replaceChild(newParagraph, headingNode);
+                          console.log('見出しから段落への変換完了 (execCommand)');
+                          foundHeading = true;
+                          break;
+                        }
+                        headingNode = headingNode.parentNode;
+                      }
+                      
+                      // 見出し要素が見つからなかった場合、通常の方法で変換
+                      if (!foundHeading) {
+                        document.originalExecCommand('formatBlock', false, '<p>');
+                      }
+                    } else {
+                      document.originalExecCommand('formatBlock', false, '<p>');
+                    }
+                  }
+                  
+                  // チェックボックスリストを作成
+                  window.editorFunctions.createCheckboxList();
+                  return true;
+                }
+                
+                // フォーマット関連のコマンドの場合、特別な処理を行う
+                if (command === 'formatBlock') {
+                  const formatValue = value.replace(/[<>]/g, '').toLowerCase();
+                  
+                  // 現在の状態を取得
+                  const currentFormat = document.queryCommandValue('formatBlock').toLowerCase();
+                  const isOrderedList = document.queryCommandState('insertOrderedList');
+                  const isUnorderedList = document.queryCommandState('insertUnorderedList');
+                  const checkboxListNode = window.editorFunctions.isCheckboxListApplied();
+                  const isCheckboxList = Boolean(checkboxListNode);
+                  
+                  // 見出し系を適用する場合は既存のリスト系を解除
+                  if (['h1', 'h2', 'h3', 'blockquote'].includes(formatValue)) {
+                    // リストが適用されていれば解除
+                    if (isOrderedList) document.originalExecCommand('insertOrderedList', false, null);
+                    if (isUnorderedList) document.originalExecCommand('insertUnorderedList', false, null);
+                    if (isCheckboxList) window.editorFunctions.removeCheckboxList();
+                    
+                    // トグル動作（同じフォーマットが適用されていれば解除）
+                    if (currentFormat === formatValue) {
+                      return document.originalExecCommand('formatBlock', false, '<p>');
+                    }
+                  }
+                }
+                
+                // リスト系のコマンドの場合
+                if (['insertOrderedList', 'insertUnorderedList'].includes(command)) {
+                  // 現在の状態チェック
+                  const currentFormat = document.queryCommandValue('formatBlock').toLowerCase();
+                  const isOrderedList = document.queryCommandState('insertOrderedList');
+                  const isUnorderedList = document.queryCommandState('insertUnorderedList');
+                  const checkboxListNode = window.editorFunctions.isCheckboxListApplied();
+                  const isCheckboxList = Boolean(checkboxListNode);
+                  const isTargetOrderedList = command === 'insertOrderedList';
+                  const isCurrentOrderedList = isOrderedList && isTargetOrderedList;
+                  const isCurrentUnorderedList = isUnorderedList && !isTargetOrderedList;
+                  
+                  // トグル動作（同じリストが適用されていれば解除）
+                  if ((isCurrentOrderedList) || (isCurrentUnorderedList)) {
+                    return document.originalExecCommand(command, showUI, value);
+                  }
+                  
+                  // 他のリスト系を解除
+                  if (isOrderedList && !isTargetOrderedList) {
+                    document.originalExecCommand('insertOrderedList', false, null);
+                  } else if (isUnorderedList && isTargetOrderedList) {
+                    document.originalExecCommand('insertUnorderedList', false, null);
+                  }
+                  
+                  // チェックボックスリストの解除
+                  if (isCheckboxList) {
+                    window.editorFunctions.removeCheckboxList();
+                  }
+                  
+                  // 見出し系が適用されていれば段落に戻す
+                  if (['h1', 'h2', 'h3', 'blockquote'].includes(currentFormat)) {
+                    document.originalExecCommand('formatBlock', false, '<p>');
+                  }
+                }
+                
+                // オリジナルのexecCommandを実行
+                return document.originalExecCommand(command, showUI, value);
+              };
+              
+              console.log('WebViewEditor: execCommandをオーバーライドしました');
+            }
+          } catch (e) {
+            console.error('WebViewEditor: execCommandオーバーライドエラー:', e);
+          }
+          return true;
+        })();
+      `;
+      richText.current.commandDOM(overrideDefaultFormattingScript);
       
       // 選択イベントのリスナー設定
       const script = `
@@ -340,8 +1327,8 @@ const WebViewEditor = forwardRef<{
                   isCollapsed: selection.isCollapsed,
                   rangeCount: selection.rangeCount
               }
-            }));
-          }
+      }));
+    }
         });
         
         // 履歴状態を定期的に確認
@@ -371,7 +1358,10 @@ const WebViewEditor = forwardRef<{
       initializeHighlightStyles();
       
       // 初期化時に履歴状態を確認
-      setTimeout(() => checkHistoryState(), 500);
+      setTimeout(() => {
+        checkHistoryState();
+        checkFormatState();
+      }, 500);
     }
   };
 
@@ -415,6 +1405,38 @@ const WebViewEditor = forwardRef<{
     }
   }, [canUndo, canRedo, onHistoryStateChange]);
 
+  // 標準のRichToolbarアクションをインターセプトして処理するための関数
+  const handleRichToolbarAction = useCallback((action: string, selected: boolean) => {
+    console.log(`WebViewEditor: アクション実行: ${action}, selected: ${selected}`);
+    
+    // アクションに応じてカスタム処理を実行
+    switch (action) {
+      case actions.heading1:
+        handleCustomHeadingOne();
+        return true; // アクションを処理したことを示す
+      case actions.heading2:
+        handleCustomHeadingTwo();
+        return true;
+      case actions.heading3:
+        handleCustomHeadingThree();
+        return true;
+      case actions.blockquote:
+        handleCustomBlockquote();
+        return true;
+      case actions.insertOrderedList:
+        handleCustomOrderedList();
+        return true;
+      case actions.insertBulletsList:
+        handleCustomBulletsList();
+        return true;
+      case actions.checkboxList:
+        handleCustomCheckboxList();
+        return true;
+      default:
+        return false; // 標準の処理に委ねる
+    }
+  }, []);
+  
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === "ios" ? "padding" : "height"} 
@@ -435,9 +1457,20 @@ const WebViewEditor = forwardRef<{
           iconSize={20}
           onPressAddImage={() => { console.log("WebViewEditor: onPressAddImage"); }} 
           onInsertLink={() => { console.log("WebViewEditor: onInsertLink"); }} 
+          onHeading1={handleCustomHeadingOne}
+          onHeading2={handleCustomHeadingTwo}
+          onHeading3={handleCustomHeadingThree}
+          onBlockquote={handleCustomBlockquote}
+          onOrderedList={handleCustomOrderedList}
+          onUnorderedList={handleCustomBulletsList}
+          onCheckboxList={() => {
+            console.log("WebViewEditor: onCheckboxList called");
+            handleCustomCheckboxList();
+          }}
           highlight={handleHighlight}
           undo={handleUndo}
           redo={handleRedo}
+          onAction={handleRichToolbarAction}
         />
       )}
       <RichEditor
@@ -453,26 +1486,7 @@ const WebViewEditor = forwardRef<{
         scrollEnabled={true}
         showsVerticalScrollIndicator={true}
         editorInitializedCallback={handleEditorInitialized}
-        onMessage={(event) => {
-          try {
-            const messageData = event.data; 
-            if (messageData && typeof messageData === 'string') {
-              const parsedData = JSON.parse(messageData);
-              
-              if (parsedData.type === 'selection') {
-                handleSelectionChange(parsedData);
-              } else if (parsedData.type === 'contentChange') {
-                console.log("WebViewEditor: onMessage contentChange from WebView:", parsedData.data.substring(0,100));
-              } else if (parsedData.type === 'historyState') {
-                // Undo/Redo状態の更新
-                setCanUndo(parsedData.canUndo);
-                setCanRedo(parsedData.canRedo);
-              }
-            }
-          } catch (e) {
-            console.error('WebViewEditor: メッセージ解析エラー:', e, "受信データ:", event.data); 
-          }
-        }}
+        onMessage={handleWebViewMessage}
         {...androidSpecificProps}
         {...iosSpecificProps}
       />

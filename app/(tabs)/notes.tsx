@@ -87,7 +87,7 @@ export default function NotesScreen() {
       const folder = await createFolder(t('untitled_folder', '無題のフォルダ'));
       setNewFolderId(folder.id);
       setEditingFolderName(folder.name);
-      
+    
       // フォーカスを当てるためにタイマーを使用（レンダリング完了後）
       setTimeout(() => {
         if (newFolderInputRef.current) {
@@ -288,14 +288,14 @@ export default function NotesScreen() {
                   });
                 }}
               >
-                <Pressable 
+            <Pressable 
                   style={[styles.item, { borderBottomColor: colors.border }]} 
-                  onPress={() => handleItemPress(item)}
-                >
+              onPress={() => handleItemPress(item)}
+            >
                   <XStack alignItems="center" space="$3" flex={1}>
-                    {item.type === 'folder' ? (
+                {item.type === 'folder' ? (
                       <MaterialIcons name="folder" size={24} color={colors.primary} />
-                    ) : (
+                ) : (
                       <MaterialIcons name="description" size={24} color={colors.primary} />
                     )}
                     
@@ -313,20 +313,20 @@ export default function NotesScreen() {
                     ) : (
                       <YStack flex={1}>
                         <Text fontSize="$4" color={colors.text}>
-                          {item.type === 'folder' ? item.name : item.title}
-                        </Text>
-                        <Text 
-                          fontSize="$2" 
+                    {item.type === 'folder' ? item.name : item.title}
+                  </Text>
+                  <Text 
+                    fontSize="$2" 
                           color={colors.secondaryText}
-                        >
+                  >
                           {item.updated_at
                             ? new Date(item.updated_at).toLocaleDateString()
                             : ''}
-                        </Text>
-                      </YStack>
+                  </Text>
+                </YStack>
                     )}
-                  </XStack>
-                </Pressable>
+              </XStack>
+            </Pressable>
               </Swipeable>
             );
           }}

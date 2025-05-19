@@ -9,6 +9,7 @@
   - SecureStore: 安全な小規模データ保存
   - AsyncStorage: 一般的な永続化
   - FileSystem: ファイル操作、モデル保存
+- **リッチテキストエディタ (ノート機能)**: TipTap (ProseMirrorベース、WebView経由)
 
 ## バックエンド
 - **Supabase**:
