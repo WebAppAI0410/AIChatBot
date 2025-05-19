@@ -5,7 +5,7 @@ import { XStack, YStack, Text, Button, ScrollView, Input } from 'tamagui';
 import { ArrowLeft, Star, Tag, Plus, X, Undo, Redo } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useNoteStore } from '../store/noteStore';
-import WebViewEditor from '../components/note/WebViewEditor';
+import TipTapEditor from '../components/note/TipTapEditor';
 import NoteAIAssist from '../components/note/NoteAIAssist';
 import { Tag as TagType } from '../services/sqlite';
 import { useColors } from '../constants/colors';
@@ -22,7 +22,7 @@ export default function NoteScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   
-  // WebViewEditorへの参照を作成
+  // TipTapEditorへの参照を作成
   const editorRef = useRef<any>(null);
   
   const { 
@@ -441,15 +441,11 @@ export default function NoteScreen() {
             </XStack>
           </View>
           
-          <WebViewEditor
+          <TipTapEditor
             ref={editorRef}
             content={content}
             onContentChange={handleContentChange}
-            onTextSelection={handleTextSelection}
-            isDarkMode={isDark}
-            themeColors={colors}
             autoFocus={isNewNote}
-            placeholder="ここに内容を入力してください"
           />
         </ScrollView>
       </KeyboardAvoidingView>
