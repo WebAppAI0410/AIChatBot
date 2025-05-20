@@ -9,7 +9,6 @@ import WebViewEditor from '../components/note/WebViewEditor';
 import NoteAIAssist from '../components/note/NoteAIAssist';
 import { Tag as TagType } from '../services/sqlite';
 import { useColors } from '../constants/colors';
-import { useTheme } from '../ui/ThemeProvider';
 import { useColorScheme } from 'react-native';
 
 export default function NoteScreen() {
@@ -18,7 +17,6 @@ export default function NoteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isNewNote = id === 'new';
   const colors = useColors();
-  const { theme } = useTheme();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   
@@ -33,9 +31,7 @@ export default function NoteScreen() {
   // ノートの状態
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
   const [showAiAssist, setShowAiAssist] = useState(false);
-  const [selectedText, setSelectedText] = useState('');
   const [noteTags, setNoteTags] = useState<TagType[]>([]);
   const [showTagInput, setShowTagInput] = useState(false);
   const [newTagName, setNewTagName] = useState('');
@@ -134,11 +130,6 @@ export default function NoteScreen() {
     }
   }, [id, isNewNote, noteId, updateNote]);
 
-  // テキスト選択ハンドラ
-  const handleTextSelection = useCallback((text: string) => {
-    setSelectedText(text);
-    setShowAiAssist(true);
-  }, []);
 
   // AIアシストトグル
   const toggleAiAssist = useCallback(() => {
@@ -149,14 +140,12 @@ export default function NoteScreen() {
   }, [showAiAssist]);
 
   // テキスト編集適用
-  const handleApplyEdit = useCallback((editedText: string) => {
-    // 実際のWebViewエディタへの編集適用は、より複雑な実装が必要
-    console.log('テキスト編集を適用:', editedText);
-    // この例では簡易的な実装
-    const newContent = content.replace(selectedText, editedText);
-    handleContentChange(newContent);
-    setSelectedText('');
-  }, [content, selectedText, handleContentChange]);
+  const handleApplyEdit = useCallback(
+    (editedText: string) => {
+      handleContentChange(editedText);
+    },
+    [handleContentChange]
+  );
 
   // Undo処理の実行
   const handleUndo = useCallback(() => {
@@ -445,11 +434,7 @@ export default function NoteScreen() {
             ref={editorRef}
             content={content}
             onContentChange={handleContentChange}
-            onTextSelection={handleTextSelection}
-            isDarkMode={isDark}
             themeColors={colors}
-            autoFocus={isNewNote}
-            placeholder="ここに内容を入力してください"
           />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -458,7 +443,6 @@ export default function NoteScreen() {
       {showAiAssist && (
         <View style={styles.aiAssistContainer}>
           <NoteAIAssist
-            selectedText={selectedText}
             onClose={toggleAiAssist}
             onApplyEdit={handleApplyEdit}
             noteId={isNewNote && noteId ? noteId : id}
