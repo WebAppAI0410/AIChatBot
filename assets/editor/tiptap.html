@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://unpkg.com/@tiptap/core@2.1.0/dist/tiptap.umd.js"></script>
+  <script src="https://unpkg.com/@tiptap/starter-kit@2.1.0/dist/tiptap-starter-kit.umd.js"></script>
+  <style>
+    body { margin: 0; padding: 0 16px; font-family: sans-serif; }
+    #editor { min-height: 300px; }
+  </style>
+</head>
+<body>
+  <div id="editor"></div>
+
+<script>
+  const { Editor } = window.tiptap;
+  const { StarterKit } = window.tiptapStarterKit;
+
+  const editor = new Editor({
+    element: document.querySelector('#editor'),
+    extensions: [StarterKit],
+    content: '',
+    onUpdate: ({ editor }) => {
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'contentChanged',
+        content: editor.getHTML()
+      }));
+    },
+  });
+
+  function handleMessage(event) {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === 'setContent') {
+        editor.commands.setContent(data.content || '');
+      } else if (data.type === 'init') {
+        editor.commands.setContent(data.content || '');
+        if (data.autoFocus) editor.commands.focus('end');
+      } else if (data.type === 'updateTheme') {
+        document.body.style.backgroundColor = data.colors?.background || '#fff';
+        document.body.style.color = data.colors?.text || '#000';
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  window.addEventListener('message', (e) => handleMessage(e));
+  document.addEventListener('message', (e) => handleMessage(e));
+
+  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'editorReady' }));
+</script>
+</body>
+</html>
