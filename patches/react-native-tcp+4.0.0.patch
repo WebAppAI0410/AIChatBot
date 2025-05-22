@@ -1,0 +1,33 @@
+diff --git a/node_modules/react-native-tcp/android/build.gradle b/node_modules/react-native-tcp/android/build.gradle
+index c582eb7..1e587c0 100644
+--- a/node_modules/react-native-tcp/android/build.gradle
++++ b/node_modules/react-native-tcp/android/build.gradle
+@@ -4,11 +4,12 @@ def safeExtGet(prop, fallback) {
+ 
+ buildscript {
+     repositories {
+-        jcenter()
++        google()
++        mavenCentral()
+     }
+ 
+     dependencies {
+-        classpath 'com.android.tools.build:gradle:1.2.3'
++        classpath 'com.android.tools.build:gradle:7.0.4'
+     }
+ }
+ 
+@@ -40,10 +41,11 @@ android {
+ }
+ 
+ repositories {
++    google()
+     mavenCentral()
+ }
+ 
+ dependencies {
+-    compile 'com.facebook.react:react-native:+'
+-    compile 'com.koushikdutta.async:androidasync:2.1.6'
++    implementation 'com.facebook.react:react-native:+'
++    implementation 'com.koushikdutta.async:androidasync:2.1.6'
+ }

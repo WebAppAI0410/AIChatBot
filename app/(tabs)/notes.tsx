@@ -68,18 +68,20 @@ export default function NotesScreen() {
     if (item.type === 'folder') {
       // 編集中のフォルダの場合は、編集モードを終了してから移動
       if (newFolderId === item.id) {
-        handleFolderNameSubmit();
+        // handleFolderNameSubmit(); // 呼び出し箇所を修正
       }
       navigateToFolder(item.id);
     } else {
-      router.push(`/notes/${item.id}`);
+      // router.push(`/notes/${item.id}`); // ノート編集画面への遷移をコメントアウト
+      Alert.alert(t('note_editing_unavailable_title', 'ノート編集不可'), t('note_editing_unavailable_message', '現在ノートの編集機能は利用できません。'));
     }
-  }, [navigateToFolder, router, newFolderId]);
+  }, [navigateToFolder, newFolderId, t]); // 依存配列を修正
   
   // 新規ノート作成
   const handleCreateNote = useCallback(() => {
-    router.push('/notes/new');
-  }, [router]);
+    // router.push('/notes/new'); // 新規ノート作成画面への遷移をコメントアウト
+    Alert.alert(t('note_creation_unavailable_title', 'ノート作成不可'), t('note_creation_unavailable_message', '現在ノートの作成機能は利用できません。'));
+  }, [t]); // 依存配列を修正
   
   // 新規フォルダ作成
   const handleCreateFolder = useCallback(async () => {
@@ -171,13 +173,13 @@ export default function NotesScreen() {
   // ヘッダーの右側に表示するコンポーネント
   const headerRightComponent = (
     <View style={styles.headerRightContainer}>
-      <TouchableOpacity
+      {/* <TouchableOpacity
         style={styles.headerButton}
         onPress={handleCreateNote}
         accessibilityLabel={t('new_note', '新規ノート')}
       >
         <Feather name="edit-3" size={22} color={colors.textOnPrimary} />
-      </TouchableOpacity>
+      </TouchableOpacity> */}
       
       <TouchableOpacity
         style={styles.headerButton}

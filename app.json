@@ -29,6 +29,9 @@
     "plugins": [
       "expo-router"
     ],
-    "scheme": "aichatbot"
+    "scheme": "aichatbot",
+    "developmentClient": {
+      "silentLaunch": false
+    }
   }
 }
