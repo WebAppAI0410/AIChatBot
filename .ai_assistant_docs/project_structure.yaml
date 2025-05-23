@@ -34,7 +34,7 @@ project_structure:
     sub_directories:
       note: "ノート機能専用（エディタ、AIアシスト、タグ管理、差分表示など）"
     key_components:
-      - note/WebViewEditor.tsx: "**TipTap (WebViewベース)** のWYSIWYGエディタ（Markdownサポート、タップ編集・自動保存、テキスト選択アクションバブル、**AI校正モード連携基盤**）"
+      - note/TenTapEditor.tsx: "**TenTap (@10play/tentap-editor)** のWYSIWYGエディタ（Markdownサポート、タップ編集・自動保存、テキスト選択アクションバブル、**AI校正モード連携基盤**、React Nativeネイティブコンポーネント）"
       - note/NoteAIAssist.tsx: "AIアシスト（質問/編集モード切替、チャットUI、**AI校正モード制御**）"
       - note/PartialEditAIAssist.tsx: "テキスト部分選択AIアシスト（選択範囲の編集・整形に特化）"
       - note/TagSelector.tsx: "タグ管理・一括編集・タグ名変更"
@@ -43,7 +43,7 @@ project_structure:
   assets:
     description: "アセットファイル"
     key_directories:
-      - editor: "**TipTapエディタ用のWebView内HTML/CSS/JSリソース（テキスト選択アクションバブル、AI校正モード連携のためのカスタムスクリプト含む）**"
+      - editor: "**（TenTapエディタ使用により不要）**"
   
   supabase:
     description: "バックエンド機能実装（Edge Functions）"

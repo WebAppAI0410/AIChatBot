@@ -39,7 +39,7 @@
 ## ノート機能
 - `app/(tabs)/notes.tsx`: ノート一覧（フォルダ階層、右下FAB、AIアシストドロワー）
 - `app/notes/[id].tsx`: ノート編集（Apple純正ノート風UI/UX、タップ編集・自動保存、AIアシスト[質問/編集/部分モード切替]）
-- `components/note/WebViewEditor.tsx`: **TipTap (WebViewベース)** のWYSIWYGエディタ（Markdownサポート、タップ編集・自動保存、テキスト選択アクションバブル、AI校正モード連携）
+- `components/note/TenTapEditor.tsx`: **TenTap (@10play/tentap-editor)** のWYSIWYGエディタ（Markdownサポート、タップ編集・自動保存、テキスト選択アクションバブル、AI校正モード連携）
 - `components/note/NoteAIAssist.tsx`: AIアシスト（質問/編集モード切替、チャットUI、**AI校正モード制御**）
 - `components/note/PartialEditAIAssist.tsx`: 部分編集AIアシスト（選択テキスト編集特化）
 - `components/note/TagSelector.tsx`: タグ管理・一括編集・タグ名変更

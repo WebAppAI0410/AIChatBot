@@ -28,7 +28,10 @@ export default function NotesScreen() {
   const [isListView, setIsListView] = useState(true);
   const [newFolderId, setNewFolderId] = useState<string | null>(null);
   const [editingFolderName, setEditingFolderName] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const newFolderInputRef = useRef<TextInput>(null);
+  const searchInputRef = useRef<TextInput>(null);
   const swipeableRefs = useRef<{[key: string]: Swipeable | null}>({});
   
   // 初期化
@@ -38,20 +41,57 @@ export default function NotesScreen() {
   
   // 現在のフォルダ名を取得
   const currentFolderName = useCallback(() => {
+    if (showSearch) return '検索';
     if (!currentFolder) return t('notes_list', 'ノート一覧');
     const folder = folders.find(f => f.id === currentFolder);
     return folder ? folder.name : t('notes_list', 'ノート一覧');
-  }, [currentFolder, folders, t]);
+  }, [currentFolder, folders, showSearch, t]);
+  
+  // 検索フィルタリング
+  const filterItems = useCallback((items: any[]) => {
+    if (!searchQuery.trim()) return items;
+    
+    const query = searchQuery.toLowerCase();
+    return items.filter(item => {
+      if (item.type === 'folder') {
+        return item.name.toLowerCase().includes(query);
+      } else {
+        // ノートの場合は、タイトルと内容両方を検索
+        const titleMatch = item.title.toLowerCase().includes(query);
+        const contentMatch = item.content.toLowerCase().includes(query);
+        return titleMatch || contentMatch;
+      }
+    });
+  }, [searchQuery]);
   
   // 現在のフォルダのアイテム（フォルダとノート）を取得
   const items = useCallback(() => {
-    const folderItems = folders
-      .filter(f => f.parent_id === currentFolder)
-      .map(f => ({ ...f, type: 'folder' as const }));
-      
-    const noteItems = notes
-      .filter(n => n.folder_id === currentFolder)
-      .map(n => ({ ...n, type: 'note' as const }));
+    let folderItems = [];
+    let noteItems = [];
+    
+    if (showSearch && searchQuery.trim()) {
+      // 検索モードの場合、全階層から検索
+      folderItems = folders
+        .filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
+        .map(f => ({ ...f, type: 'folder' as const }));
+        
+      noteItems = notes
+        .filter(n => {
+          const titleMatch = n.title.toLowerCase().includes(searchQuery.toLowerCase());
+          const contentMatch = n.content.toLowerCase().includes(searchQuery.toLowerCase());
+          return titleMatch || contentMatch;
+        })
+        .map(n => ({ ...n, type: 'note' as const }));
+    } else {
+      // 通常モードの場合、現在のフォルダのみ表示
+      folderItems = folders
+        .filter(f => f.parent_id === currentFolder)
+        .map(f => ({ ...f, type: 'folder' as const }));
+        
+      noteItems = notes
+        .filter(n => n.folder_id === currentFolder)
+        .map(n => ({ ...n, type: 'note' as const }));
+    }
     
     // フォルダを先に、次に名前でソート
     return [...folderItems, ...noteItems].sort((a, b) => {
@@ -61,7 +101,22 @@ export default function NotesScreen() {
       const bName = b.type === 'folder' ? b.name : b.title;
       return aName.localeCompare(bName);
     });
-  }, [folders, notes, currentFolder]);
+  }, [folders, notes, currentFolder, showSearch, searchQuery]);
+
+  // 検索モードの切り替え
+  const toggleSearch = useCallback(() => {
+    if (showSearch) {
+      setShowSearch(false);
+      setSearchQuery('');
+    } else {
+      setShowSearch(true);
+      setTimeout(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+        }
+      }, 100);
+    }
+  }, [showSearch]);
   
   // アイテムタップ処理
   const handleItemPress = useCallback((item: { type: 'folder' | 'note', id: string, name?: string, title?: string }) => {
@@ -70,11 +125,16 @@ export default function NotesScreen() {
       if (newFolderId === item.id) {
         handleFolderNameSubmit();
       }
+      // 検索モードの場合は検索を終了してからフォルダに移動
+      if (showSearch) {
+        setShowSearch(false);
+        setSearchQuery('');
+      }
       navigateToFolder(item.id);
     } else {
       router.push(`/notes/${item.id}`);
     }
-  }, [navigateToFolder, router, newFolderId]);
+  }, [navigateToFolder, router, newFolderId, showSearch]);
   
   // 新規ノート作成
   const handleCreateNote = useCallback(() => {
@@ -145,11 +205,17 @@ export default function NotesScreen() {
   
   // 親フォルダへ戻る
   const handleBack = useCallback(() => {
+    if (showSearch) {
+      setShowSearch(false);
+      setSearchQuery('');
+      return;
+    }
+    
     if (!currentFolder) return;
     
     const parentFolder = folders.find(f => f.id === currentFolder)?.parent_id || null;
     navigateToFolder(parentFolder);
-  }, [currentFolder, folders, navigateToFolder]);
+  }, [currentFolder, folders, navigateToFolder, showSearch]);
   
   // 削除スワイプアクションのレンダリング
   const renderRightActions = useCallback((item: { type: 'folder' | 'note', id: string }) => {
@@ -171,40 +237,52 @@ export default function NotesScreen() {
   // ヘッダーの右側に表示するコンポーネント
   const headerRightComponent = (
     <View style={styles.headerRightContainer}>
-      <TouchableOpacity
-        style={styles.headerButton}
-        onPress={handleCreateNote}
-        accessibilityLabel={t('new_note', '新規ノート')}
-      >
-        <Feather name="edit-3" size={22} color={colors.textOnPrimary} />
-      </TouchableOpacity>
+      {!showSearch && (
+        <>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={handleCreateNote}
+            accessibilityLabel={t('new_note', '新規ノート')}
+          >
+            <Feather name="edit-3" size={22} color={colors.textOnPrimary} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={handleCreateFolder}
+            accessibilityLabel={t('new_folder', '新規フォルダ')}
+          >
+            <View>
+              <MaterialIcons name="folder" size={22} color={colors.textOnPrimary} />
+              <View style={styles.folderPlusIcon}>
+                <Feather name="plus" size={12} color={colors.textOnPrimary} />
+              </View>
+            </View>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => setIsListView(!isListView)}
+            accessibilityLabel={isListView ? t('grid_view', 'グリッド表示') : t('list_view', 'リスト表示')}
+          >
+            {isListView 
+              ? <MaterialIcons name="grid-view" size={22} color={colors.textOnPrimary} />
+              : <MaterialIcons name="list" size={22} color={colors.textOnPrimary} />
+            }
+          </TouchableOpacity>
+        </>
+      )}
       
       <TouchableOpacity
         style={styles.headerButton}
-        onPress={handleCreateFolder}
-        accessibilityLabel={t('new_folder', '新規フォルダ')}
+        onPress={toggleSearch}
+        accessibilityLabel={showSearch ? '検索を閉じる' : '検索'}
       >
-        <View>
-          <MaterialIcons name="folder" size={22} color={colors.textOnPrimary} />
-          <View style={styles.folderPlusIcon}>
-            <Feather name="plus" size={12} color={colors.textOnPrimary} />
-          </View>
-        </View>
-      </TouchableOpacity>
-      
-      <TouchableOpacity
-        style={styles.headerButton}
-        onPress={() => setIsListView(!isListView)}
-        accessibilityLabel={isListView ? t('grid_view', 'グリッド表示') : t('list_view', 'リスト表示')}
-      >
-        {isListView 
-          ? <MaterialIcons name="grid-view" size={22} color={colors.textOnPrimary} />
-          : <MaterialIcons name="list" size={22} color={colors.textOnPrimary} />
-        }
+        <Feather name="search" size={22} color={colors.textOnPrimary} />
       </TouchableOpacity>
     </View>
   );
-  
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen
@@ -216,7 +294,7 @@ export default function NotesScreen() {
       {/* カスタムスタイルでヘッダーを中央配置 */}
       <View style={[styles.headerContainer, { backgroundColor: colors.primary }]}>
         <View style={styles.headerLeftPlaceholder}>
-          {!!currentFolder && (
+          {(!!currentFolder || showSearch) && (
             <TouchableOpacity
               style={styles.backButton}
               onPress={handleBack}
@@ -228,9 +306,21 @@ export default function NotesScreen() {
         </View>
         
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle} color={colors.textOnPrimary}>
-            {currentFolderName()}
-          </Text>
+          {showSearch ? (
+            <TextInput
+              ref={searchInputRef}
+              style={[styles.searchInput, { color: colors.textOnPrimary }]}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="ノートを検索..."
+              placeholderTextColor={colors.textOnPrimary + '80'}
+              autoFocus
+            />
+          ) : (
+            <Text style={styles.headerTitle} color={colors.textOnPrimary}>
+              {currentFolderName()}
+            </Text>
+          )}
         </View>
         
         {headerRightComponent}
@@ -254,19 +344,26 @@ export default function NotesScreen() {
       ) : items().length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text fontSize="$4" fontWeight="600" color={colors.darkGray}>
-            {currentFolder ? t('empty_folder', 'フォルダは空です') : t('no_notes', 'ノートがありません')}
+            {showSearch && searchQuery.trim() 
+              ? '検索結果が見つかりませんでした'
+              : currentFolder 
+                ? t('empty_folder', 'フォルダは空です') 
+                : t('no_notes', 'ノートがありません')
+            }
           </Text>
-          <Button 
-            mt="$4" 
-            onPress={handleCreateNote}
-            backgroundColor={colors.primary}
-            color={colors.textOnPrimary}
-          >
-            <XStack space="$2" alignItems="center">
-              <Feather name="edit-3" size={18} color={colors.textOnPrimary} />
-              <Text color={colors.textOnPrimary}>{t('create_new', '新規作成')}</Text>
-            </XStack>
-          </Button>
+          {!showSearch && (
+            <Button 
+              mt="$4" 
+              onPress={handleCreateNote}
+              backgroundColor={colors.primary}
+              color={colors.textOnPrimary}
+            >
+              <XStack space="$2" alignItems="center">
+                <Feather name="edit-3" size={18} color={colors.textOnPrimary} />
+                <Text color={colors.textOnPrimary}>{t('create_new', '新規作成')}</Text>
+              </XStack>
+            </Button>
+          )}
         </View>
       ) : (
         <FlatList
@@ -323,6 +420,15 @@ export default function NotesScreen() {
                             ? new Date(item.updated_at).toLocaleDateString()
                             : ''}
                   </Text>
+                        {showSearch && searchQuery.trim() && item.type === 'note' && (
+                          <Text 
+                            fontSize="$2" 
+                            color={colors.secondaryText}
+                            numberOfLines={1}
+                          >
+                            {item.content.replace(/<[^>]*>/g, '').substring(0, 100)}...
+                          </Text>
+                        )}
                 </YStack>
                     )}
               </XStack>
@@ -369,6 +475,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  searchInput: {
+    width: '90%',
+    fontSize: 16,
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.5)',
     textAlign: 'center',
   },
   headerRightContainer: {

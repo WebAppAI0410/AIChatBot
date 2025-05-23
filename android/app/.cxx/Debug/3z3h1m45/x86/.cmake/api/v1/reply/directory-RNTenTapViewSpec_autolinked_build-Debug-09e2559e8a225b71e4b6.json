@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "RNTenTapViewSpec_autolinked_build",
+		"source" : "C:/Users/33916/workspace/AIChatBot/node_modules/@10play/tentap-editor/android/build/generated/source/codegen/jni"
+	}
+}

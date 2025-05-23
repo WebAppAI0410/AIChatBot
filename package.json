@@ -10,6 +10,7 @@
     "postinstall": "patch-package"
   },
   "dependencies": {
+    "@10play/tentap-editor": "^0.7.0",
     "@babel/runtime": "^7.27.1",
     "@expo/react-native-action-sheet": "^4.1.1",
     "@expo/vector-icons": "^14.1.0",
@@ -57,10 +58,11 @@
     "react-native-reanimated": "^3.17.5",
     "react-native-root-toast": "^4.0.1",
     "react-native-safe-area-context": "^5.4.0",
+    "react-native-svg": "^15.12.0",
     "react-native-tcp": "^4.0.0",
     "react-native-url-polyfill": "^2.0.0",
     "react-native-web": "^0.20.0",
-    "react-native-webview": "^13.13.5",
+    "react-native-webview": "13.13.5",
     "stream-browserify": "^3.0.0",
     "stream-http": "^3.2.0",
     "tamagui": "1.126.9",
