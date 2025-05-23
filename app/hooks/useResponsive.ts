@@ -82,10 +82,10 @@ export const useResponsive = () => {
     };
     
     const layout = {
-      singleColumn: breakpoints.sm || breakpoints.md || (breakpoints.lg && !isLandscape),
-      twoColumn: (breakpoints.lg && isLandscape) || breakpoints.xl,
+      singleColumn: breakpoints.sm || breakpoints.md,
+      twoColumn: breakpoints.lg || breakpoints.xl,
       maxContentWidth: breakpoints.lg ? 1024 : width,
-      sidebarWidth: isLandscape ? (breakpoints.xl ? 320 : '30%') : (breakpoints.lg ? '40%' : '100%'),
+      sidebarWidth: breakpoints.xl ? 320 : (width * 0.33),
       chatInputMaxHeight: breakpoints.sm ? 120 : 160,
       contentMaxWidth: breakpoints.sm ? width : breakpoints.md ? width * 0.9 : width * 0.8,
       contentPadding: breakpoints.sm ? theme.spacing.sm : 

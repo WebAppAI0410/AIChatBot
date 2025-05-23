@@ -74,10 +74,10 @@ export default function ChatsScreen() {
   
   const handleOpenChat = (chatId: string) => {
     if (layout.twoColumn) {
-      // 大画面では選択状態を更新
+      // タブレット/デスクトップでは選択状態を更新して右側に表示
       setSelectedChatId(chatId);
     } else {
-      // 小画面では画面遷移
+      // スマートフォンでは画面遷移
       router.push(`/chat/${chatId}`);
     }
   };
@@ -86,7 +86,14 @@ export default function ChatsScreen() {
     // モデルIDを指定（デフォルトモデルを使用）
     const defaultModelId = 'openai/gpt-3.5-turbo';
     const newChatId = createChat(defaultModelId);
-    router.push(`/chat/${newChatId}`);
+    
+    if (layout.twoColumn) {
+      // タブレット/デスクトップでは選択状態を更新
+      setSelectedChatId(newChatId);
+    } else {
+      // スマートフォンでは画面遷移
+      router.push(`/chat/${newChatId}`);
+    }
   };
   
   const handleDeleteConfirm = () => {
@@ -337,9 +344,12 @@ export default function ChatsScreen() {
     if (!selectedChat) {
       return (
         <View style={styles.noChatSelected}>
-          <Ionicons name="chatbubbles-outline" size={48} color={colors.lightGray} />
+          <Ionicons name="chatbubbles-outline" size={64} color={colors.lightGray} />
           <Text style={[styles.noChatSelectedText, { color: colors.secondaryText }]}>
             チャットを選択してください
+          </Text>
+          <Text style={[styles.noChatSelectedSubtext, { color: colors.gray }]}>
+            左側のリストからチャットを選んで開始
           </Text>
         </View>
       );
@@ -355,76 +365,75 @@ export default function ChatsScreen() {
               style={styles.openChatButton}
               onPress={() => router.push(`/chat/${selectedChat.id}`)}
             >
-              <Text style={{ color: colors.textOnPrimary }}>開く</Text>
-              <Ionicons name="arrow-forward" size={16} color={colors.textOnPrimary} style={{ marginLeft: 4 }} />
+              <Text style={{ color: colors.textOnPrimary }}>チャット開始</Text>
+              <Ionicons name="chatbubble-ellipses" size={16} color={colors.textOnPrimary} style={{ marginLeft: 4 }} />
             </TouchableOpacity>
           }
         />
         
         <View style={styles.chatPreviewContent}>
-          <View style={styles.chatPreviewHeader}>
-            <TouchableOpacity 
-              style={styles.chatIconLarge}
-              onPress={() => openIconEditor(selectedChat.id)}
-            >
-              {selectedChat.iconType === 'custom' && selectedChat.iconUri ? (
-                <Image 
-                  source={{ uri: selectedChat.iconUri }} 
-                  style={{ width: 40, height: 40, borderRadius: 20 }} 
-                />
-              ) : (
-                <Ionicons 
-                  name={(selectedChat.iconId as keyof typeof Ionicons.glyphMap) ?? 'chatbubbles-outline'} 
-                  size={32} 
-                  color={colors.primary} 
-                />
-              )}
-            </TouchableOpacity>
-            <View>
-              <View style={styles.previewTitleRow}>
-                <Text style={[styles.chatPreviewTitle, { color: colors.text }]}>
-                  {selectedChat.title}
-                </Text>
-                <TouchableOpacity 
-                  style={styles.editButton}
-                  onPress={() => startEditing(selectedChat.id, selectedChat.title)}
-                >
-                  <Ionicons name="pencil-outline" size={20} color={colors.gray} />
-                </TouchableOpacity>
-              </View>
-              <Text style={[styles.chatPreviewInfo, { color: colors.secondaryText }]}>
-                {selectedChat.messages.length}メッセージ · 
-                {new Date(selectedChat.updatedAt).toLocaleDateString('ja-JP')}
-              </Text>
-            </View>
-          </View>
-          
           {selectedChat.messages.length > 0 ? (
             <FlatList
-              data={selectedChat.messages.slice(-5)}
+              data={selectedChat.messages}
               keyExtractor={(_, index) => `preview-${index}`}
               renderItem={({ item }) => (
                 <View style={[
-                  styles.previewMessage,
-                  { 
-                    backgroundColor: item.role === 'user' ? `${colors.primary}20` : colors.card,
-                    alignSelf: item.role === 'user' ? 'flex-end' : 'flex-start'
-                  }
+                  styles.previewMessageContainer,
+                  { justifyContent: item.role === 'user' ? 'flex-end' : 'flex-start' }
                 ]}>
-                  <Text style={{ color: colors.text }}>
-                    {item.content.length > 150 
-                      ? item.content.substring(0, 150) + '...' 
-                      : item.content}
-                  </Text>
+                  <View style={[
+                    styles.previewMessage,
+                    { 
+                      backgroundColor: item.role === 'user' ? colors.primary : colors.card,
+                      maxWidth: '85%',
+                      alignSelf: item.role === 'user' ? 'flex-end' : 'flex-start'
+                    }
+                  ]}>
+                    <Text style={{ 
+                      color: item.role === 'user' ? colors.textOnPrimary : colors.text,
+                      fontSize: 15,
+                      lineHeight: 22
+                    }}>
+                      {item.content}
+                    </Text>
+                  </View>
                 </View>
               )}
               contentContainerStyle={styles.previewMessageList}
+              showsVerticalScrollIndicator={false}
             />
           ) : (
             <View style={styles.emptyPreviewContainer}>
-              <Text style={{ color: colors.secondaryText }}>
-                まだメッセージがありません
-              </Text>
+              <View style={styles.emptyPreviewContent}>
+                <View style={styles.chatIconLarge}>
+                  {selectedChat.iconType === 'custom' && selectedChat.iconUri ? (
+                    <Image 
+                      source={{ uri: selectedChat.iconUri }} 
+                      style={{ width: 48, height: 48, borderRadius: 24 }} 
+                    />
+                  ) : (
+                    <Ionicons 
+                      name={(selectedChat.iconId as keyof typeof Ionicons.glyphMap) ?? 'chatbubbles-outline'} 
+                      size={40} 
+                      color={colors.primary} 
+                    />
+                  )}
+                </View>
+                <Text style={[styles.emptyPreviewTitle, { color: colors.text }]}>
+                  {selectedChat.title}
+                </Text>
+                <Text style={[styles.emptyPreviewSubtitle, { color: colors.secondaryText }]}>
+                  このチャットではまだ会話が始まっていません
+                </Text>
+                <TouchableOpacity
+                  style={[styles.startChatButton, { backgroundColor: colors.primary }]}
+                  onPress={() => router.push(`/chat/${selectedChat.id}`)}
+                >
+                  <Text style={{ color: colors.textOnPrimary, fontWeight: '600' }}>
+                    会話を開始
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -569,14 +578,21 @@ export default function ChatsScreen() {
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: colors.background,
+      padding: 32,
     },
     noChatSelectedText: {
-      marginTop: 12,
-      fontSize: 16,
+      marginTop: 16,
+      fontSize: 18,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    noChatSelectedSubtext: {
+      marginTop: 8,
+      fontSize: 14,
+      textAlign: 'center',
     },
     chatPreviewContent: {
       flex: 1,
-      padding: 16,
       backgroundColor: colors.background,
     },
     chatPreviewHeader: {
@@ -588,13 +604,13 @@ export default function ChatsScreen() {
       borderRadius: 12,
     },
     chatIconLarge: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 64,
+      height: 64,
+      borderRadius: 32,
       backgroundColor: `${colors.primary}20`,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: 16,
+      marginBottom: 16,
     },
     previewTitleRow: {
       flexDirection: 'row',
@@ -609,18 +625,54 @@ export default function ChatsScreen() {
       fontSize: 14,
     },
     previewMessageList: {
-      padding: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    previewMessageContainer: {
+      flexDirection: 'row',
+      marginBottom: 12,
     },
     previewMessage: {
-      padding: 12,
-      borderRadius: 12,
-      maxWidth: '80%',
-      marginBottom: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 18,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
     },
     emptyPreviewContainer: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
+      padding: 32,
+    },
+    emptyPreviewContent: {
+      alignItems: 'center',
+      maxWidth: 300,
+    },
+    emptyPreviewTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      textAlign: 'center',
+      marginBottom: 8,
+    },
+    emptyPreviewSubtitle: {
+      fontSize: 16,
+      textAlign: 'center',
+      marginBottom: 24,
+      lineHeight: 22,
+    },
+    startChatButton: {
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 24,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 3,
     },
     openChatButton: {
       flexDirection: 'row',

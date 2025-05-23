@@ -1,13 +1,17 @@
-import React, { forwardRef, useImperativeHandle, useEffect, useState, useCallback } from 'react';
-import { StyleSheet, View, Platform, SafeAreaView, KeyboardAvoidingView } from 'react-native';
+import React, { forwardRef, useImperativeHandle, useEffect, useState, useCallback, useRef } from 'react';
+import { StyleSheet, View, Platform, SafeAreaView, KeyboardAvoidingView, TouchableOpacity, Text, useWindowDimensions } from 'react-native';
 import { 
   RichText, 
   Toolbar, 
   useEditorBridge, 
   TenTapStartKit, 
   CoreBridge,
-  PlaceholderBridge
+  PlaceholderBridge,
+  useBridgeState,
+  DEFAULT_TOOLBAR_ITEMS,
+  type ToolbarItem
 } from '@10play/tentap-editor';
+import { useColors } from '../../constants/colors';
 
 export type TenTapEditorProps = {
   content: string;
@@ -35,6 +39,57 @@ const TenTapEditor = forwardRef<{
     themeColors,
     onTextSelection,
   } = props;
+
+  const colors = useColors();
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
+
+  // 動的スタイルを生成
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    editor: {
+      flex: 1,
+      paddingHorizontal: 0,
+    },
+    keyboardAvoidingView: {
+      position: 'absolute',
+      width: '100%',
+      bottom: 0,
+    },
+    headingToolbar: {
+      paddingVertical: isTablet ? 12 : 8,
+      paddingHorizontal: isTablet ? 16 : 12,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+    },
+    standardToolbar: {
+      paddingVertical: isTablet ? 8 : 4,
+      paddingHorizontal: isTablet ? 12 : 8,
+      borderTopWidth: 1,
+    },
+    headingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: isTablet ? 8 : 4,
+      justifyContent: 'space-between',
+    },
+    headingButton: {
+      paddingHorizontal: isTablet ? 12 : 6,
+      paddingVertical: isTablet ? 12 : 8,
+      borderRadius: isTablet ? 8 : 6,
+      borderWidth: 1,
+      alignItems: 'center',
+      flex: 1,
+      marginHorizontal: isTablet ? 2 : 1,
+      minHeight: isTablet ? 44 : 36,
+    },
+    headingButtonText: {
+      textAlign: 'center',
+      flexShrink: 1,
+    },
+  });
 
   // ダークモード対応のカスタムCSS
   const customCSS = `
@@ -226,6 +281,10 @@ const TenTapEditor = forwardRef<{
     },
   };
 
+  // コンテンツ更新の制御用
+  const [isUpdatingFromExternal, setIsUpdatingFromExternal] = useState(false);
+  const lastInternalContent = useRef(content);
+  
   // TenTapエディタブリッジを初期化
   const editor = useEditorBridge({
     bridgeExtensions: [
@@ -242,13 +301,127 @@ const TenTapEditor = forwardRef<{
     editable: !readOnly,
     theme: customTheme,
     onChange: () => {
+      // 外部からの更新中は onChange を無視
+      if (isUpdatingFromExternal) {
+        return;
+      }
+      
       editor.getHTML().then((html) => {
-        if (html !== content) {
+        if (html !== lastInternalContent.current) {
+          lastInternalContent.current = html;
           onContentChange(html);
         }
       });
     },
   });
+
+  // エディタの状態を取得
+  const editorState = useBridgeState(editor);
+
+  // Undo/RedoとHeading（Aa）ボタンを除外したカスタムツールバーアイテム
+  const customToolbarItems: ToolbarItem[] = DEFAULT_TOOLBAR_ITEMS.filter(
+    (item, index) => {
+      // 最後の2つ（Undo/Redo）と見出し選択（Heading）を除外
+      return index < DEFAULT_TOOLBAR_ITEMS.length - 2 && index !== 4; // インデックス4が見出し選択
+    }
+  );
+
+  // カスタムツールバーボタン（見出し用）
+  const HeadingToolbarButton = ({ 
+    title, 
+    active, 
+    onPress, 
+    fontSize, 
+    fontWeight 
+  }: { 
+    title: string; 
+    active: boolean; 
+    onPress: () => void;
+    fontSize: number;
+    fontWeight: string;
+  }) => (
+    <TouchableOpacity
+      style={[
+        styles.headingButton,
+        { 
+          backgroundColor: active ? colors.primary : 'transparent',
+          borderColor: colors.border
+        }
+      ]}
+      onPress={onPress}
+    >
+      <Text 
+        style={[
+          styles.headingButtonText,
+          { 
+            color: active ? colors.textOnPrimary : (isDarkMode ? '#c9d1d9' : '#24292f'),
+            fontSize,
+            fontWeight: fontWeight as any,
+          }
+        ]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
+        {title}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  // 見出しボタンのハンドラ
+  const handleHeading = useCallback((level: number) => {
+    if (editor && editor.toggleHeading) {
+      editor.toggleHeading(level as 1 | 2 | 3 | 4 | 5 | 6);
+    }
+  }, [editor]);
+
+  // 段落（プレーンテキスト）ボタンのハンドラ
+  const handleParagraph = useCallback(() => {
+    if (editor && editor.setParagraph) {
+      editor.setParagraph();
+    }
+  }, [editor]);
+
+  // 見出し選択ツールバーコンポーネント
+  const HeadingToolbar = () => {
+    return (
+      <View style={[styles.headingToolbar, { 
+        backgroundColor: isDarkMode ? '#161b22' : '#f8f9fa',
+        borderTopColor: isDarkMode ? '#30363d' : '#d0d7de',
+        borderBottomColor: isDarkMode ? '#30363d' : '#d0d7de'
+      }]}>
+        <View style={styles.headingRow}>
+          <HeadingToolbarButton
+            title="本文"
+            fontSize={14}
+            fontWeight="400"
+            active={!editorState?.headingLevel}
+            onPress={handleParagraph}
+          />
+          <HeadingToolbarButton
+            title="大見出し"
+            fontSize={18}
+            fontWeight="600"
+            active={editorState?.headingLevel === 1}
+            onPress={() => handleHeading(1)}
+          />
+          <HeadingToolbarButton
+            title="中見出し"
+            fontSize={16}
+            fontWeight="600"
+            active={editorState?.headingLevel === 2}
+            onPress={() => handleHeading(2)}
+          />
+          <HeadingToolbarButton
+            title="小見出し"
+            fontSize={14}
+            fontWeight="600"
+            active={editorState?.headingLevel === 3}
+            onPress={() => handleHeading(3)}
+          />
+        </View>
+      </View>
+    );
+  };
 
   // 親コンポーネントから参照できるようにする
   useImperativeHandle(ref, () => ({
@@ -263,11 +436,18 @@ const TenTapEditor = forwardRef<{
 
   // コンテンツが外部から変更された場合の同期
   useEffect(() => {
-    if (content && editor) {
+    if (content && editor && content !== lastInternalContent.current) {
+      setIsUpdatingFromExternal(true);
+      
       editor.getHTML().then((currentHTML) => {
         if (currentHTML !== content) {
           editor.setContent(content);
+          lastInternalContent.current = content;
         }
+        // 短い遅延後に外部更新フラグをリセット
+        setTimeout(() => {
+          setIsUpdatingFromExternal(false);
+        }, 100);
       });
     }
   }, [content, editor]);
@@ -279,41 +459,31 @@ const TenTapEditor = forwardRef<{
         style={[styles.editor, { backgroundColor: isDarkMode ? '#0d1117' : '#ffffff' }]} 
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={[styles.keyboardAvoidingView, { 
-          backgroundColor: isDarkMode ? '#21262d' : '#f6f8fa',
-          borderTopColor: isDarkMode ? '#30363d' : '#d0d7de'
-        }]}
-      >
-        <View style={[styles.toolbar, { backgroundColor: isDarkMode ? '#21262d' : '#f6f8fa' }]}>
-          <Toolbar editor={editor} />
-        </View>
-      </KeyboardAvoidingView>
+      {!readOnly && (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoidingView}
+        >
+          {/* 見出し選択ツールバー */}
+          <HeadingToolbar />
+          
+          {/* 標準ツールバー */}
+          <View style={[styles.standardToolbar, { 
+            backgroundColor: isDarkMode ? '#21262d' : '#f6f8fa',
+            borderTopColor: isDarkMode ? '#30363d' : '#d0d7de'
+          }]}>
+            <Toolbar 
+              editor={editor} 
+              items={customToolbarItems}
+              shouldHideDisabledToolbarItems={true}
+            />
+          </View>
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 });
 
 TenTapEditor.displayName = 'TenTapEditor';
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  editor: {
-    flex: 1,
-    paddingHorizontal: 0,
-  },
-  keyboardAvoidingView: {
-    position: 'absolute',
-    width: '100%',
-    bottom: 0,
-    borderTopWidth: 1,
-  },
-  toolbar: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-});
 
 export default TenTapEditor; 

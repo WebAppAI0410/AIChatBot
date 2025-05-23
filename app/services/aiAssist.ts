@@ -23,6 +23,8 @@ class AIAssistService {
    */
   private async makeRequest(prompt: string, model: string, maxTokens: number = 1000): Promise<AIAssistResponse> {
     try {
+      console.log(`[AIAssist] 使用モデル: ${model}`); // デバッグログ
+      
       const response = await fetch(this.baseUrl, {
         method: 'POST',
         headers: {
@@ -95,10 +97,8 @@ class AIAssistService {
   /**
    * テキスト校正
    */
-  async correctText(text: string, customPrompt?: string): Promise<AIAssistResponse> {
-    // TODO: 実際のユーザープランを取得する
-    const userPlan = 'free'; // プレースホルダー
-    const model = this.getModelForPlan(userPlan);
+  async correctText(text: string, customPrompt?: string, modelId?: string): Promise<AIAssistResponse> {
+    const model = modelId || this.getModelForPlan('free');
     
     const prompt = customPrompt || `以下のテキストを自然で読みやすい日本語に校正してください。文法の間違い、表現の改善、敬語の適切な使用などを修正し、より良い文章にしてください。元の意味は変えずに、文章の流れと読みやすさを向上させてください。
 
@@ -113,9 +113,8 @@ ${text}
   /**
    * テキスト要約
    */
-  async summarizeText(text: string): Promise<AIAssistResponse> {
-    const userPlan = 'free'; // プレースホルダー
-    const model = this.getModelForPlan(userPlan);
+  async summarizeText(text: string, modelId?: string): Promise<AIAssistResponse> {
+    const model = modelId || this.getModelForPlan('free');
     
     const prompt = `以下のテキストを簡潔に要約してください。重要なポイントを3-5個の箇条書きでまとめ、読者が内容の全体像を素早く理解できるようにしてください。
 
@@ -130,9 +129,8 @@ ${text}
   /**
    * テキスト翻訳
    */
-  async translateText(text: string, targetLanguage: string = 'English'): Promise<AIAssistResponse> {
-    const userPlan = 'free'; // プレースホルダー
-    const model = this.getModelForPlan(userPlan);
+  async translateText(text: string, targetLanguage: string = 'English', modelId?: string): Promise<AIAssistResponse> {
+    const model = modelId || this.getModelForPlan('free');
     
     const prompt = `以下のテキストを${targetLanguage}に翻訳してください。自然で流暢な翻訳を心がけ、文脈に応じて適切な表現を使用してください。
 
@@ -147,9 +145,8 @@ ${text}
   /**
    * テキスト改善
    */
-  async improveText(text: string): Promise<AIAssistResponse> {
-    const userPlan = 'free'; // プレースホルダー
-    const model = this.getModelForPlan(userPlan);
+  async improveText(text: string, modelId?: string): Promise<AIAssistResponse> {
+    const model = modelId || this.getModelForPlan('free');
     
     const prompt = `以下のテキストを改善してください。より魅力的で説得力があり、読みやすい文章にしてください。専門用語の説明を追加したり、具体例を入れたり、論理的な流れを改善したりして、全体的な文章のクオリティを向上させてください。
 
@@ -164,9 +161,8 @@ ${text}
   /**
    * テキスト拡張
    */
-  async expandText(text: string): Promise<AIAssistResponse> {
-    const userPlan = 'free'; // プレースホルダー
-    const model = this.getModelForPlan(userPlan);
+  async expandText(text: string, modelId?: string): Promise<AIAssistResponse> {
+    const model = modelId || this.getModelForPlan('free');
     
     const prompt = `以下の短いテキストを詳細に拡張してください。背景情報、具体例、詳しい説明を追加して、より包括的で情報豊富な内容にしてください。元の意図を保ちながら、読者にとってより価値のある内容に拡張してください。
 
@@ -181,9 +177,9 @@ ${text}
   /**
    * カスタムプロンプトでのテキスト処理
    */
-  async processWithCustomPrompt(text: string, customPrompt: string): Promise<AIAssistResponse> {
-    const userPlan = 'free'; // プレースホルダー
-    const model = this.getModelForPlan(userPlan);
+  async processWithCustomPrompt(text: string, customPrompt: string, modelId?: string): Promise<AIAssistResponse> {
+    // モデルIDが指定されている場合はそれを使用、そうでなければプランベースのデフォルト
+    const model = modelId || this.getModelForPlan('free');
     
     const prompt = `${customPrompt}
 
@@ -196,18 +192,18 @@ ${text}`;
   /**
    * 一般的なAIアシスト処理
    */
-  async processText(request: AIAssistRequest): Promise<AIAssistResponse> {
+  async processText(request: AIAssistRequest & { modelId?: string }): Promise<AIAssistResponse> {
     switch (request.action) {
       case 'correct':
-        return this.correctText(request.text, request.customPrompt);
+        return this.correctText(request.text, request.customPrompt, request.modelId);
       case 'summarize':
-        return this.summarizeText(request.text);
+        return this.summarizeText(request.text, request.modelId);
       case 'translate':
-        return this.translateText(request.text, request.targetLanguage);
+        return this.translateText(request.text, request.targetLanguage, request.modelId);
       case 'improve':
-        return this.improveText(request.text);
+        return this.improveText(request.text, request.modelId);
       case 'expand':
-        return this.expandText(request.text);
+        return this.expandText(request.text, request.modelId);
       default:
         return {
           success: false,

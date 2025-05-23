@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, Alert, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, TouchableOpacity, Alert, ActivityIndicator, useWindowDimensions, PanResponder } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { XStack, YStack, Text, Button, ScrollView, Input } from 'tamagui';
-import { ArrowLeft, Star, Undo, Redo, Search, MessageSquare, X, ChevronDown } from 'lucide-react-native';
+import { ArrowLeft, Star, Undo, Redo, Search, MessageSquare, X, ChevronDown, MoreHorizontal } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useNoteStore } from '../store/noteStore';
 import TenTapEditor from '../components/note/TenTapEditor';
@@ -30,6 +30,8 @@ export default function NoteScreen() {
   // Store からプランとローカルモデル状態を取得
   const plan = useStore(state => state.plan);
   const localModelStatus = useStore(state => state.localModelStatus);
+  const aiChatSplitRatio = useStore(state => state.aiChatSplitRatio);
+  const setAiChatSplitRatio = useStore(state => state.setAiChatSplitRatio);
   
   // TenTapエディタへの参照を作成
   const editorRef = useRef<any>(null);
@@ -61,8 +63,23 @@ export default function NoteScreen() {
   
   // レスポンシブデザイン: 画面幅に基づいてレイアウトを決定
   const isTablet = width >= 768;
-  const chatWidth = isTablet ? width * 0.4 : width * 0.5; // タブレットなら40%、スマホなら50%
-  const editorWidth = isTablet ? width * 0.6 : width * 0.5;
+  
+  // タブレット: 分割画面（エディタ左半分、AIチャット右半分）、モバイル: 全画面切り替え
+  const shouldUseSplitView = isTablet && aiChatMode;
+  
+  // タブレットでは固定で左50%をエディタ、右50%をAIチャットに
+  const tabletEditorRatio = 0.5;
+  const tabletChatRatio = 0.5;
+  
+  const chatWidth = shouldUseSplitView ? width * tabletChatRatio : width;
+  const editorWidth = shouldUseSplitView ? width * tabletEditorRatio - 10 : width; // 10px分の余白を考慮
+  
+  // 分割ハンドルのドラッグ処理（現在は使用しない - 固定50/50分割）
+  const [isDragging, setIsDragging] = useState(false);
+  const [tempRatio, setTempRatio] = useState(aiChatSplitRatio);
+  
+  // ドラッグ中は一時的な比率を使用し、ドラッグ終了時に確定
+  const currentRatio = isDragging ? tempRatio : aiChatSplitRatio;
 
   // 初期データロード
   useEffect(() => {
@@ -107,6 +124,10 @@ export default function NoteScreen() {
     }
   }, [createNote, currentFolder]);
 
+  // 自動保存のタイマーとAI編集状態
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [isAIEditing, setIsAIEditing] = useState(false);
+  
   // 内容の変更ハンドラ
   const handleContentChange = useCallback((newContent: string) => {
     setContent(newContent);
@@ -118,19 +139,39 @@ export default function NoteScreen() {
       setTitle(extractedTitle);
     }
     
-    // 自動保存
-    if (isNewNote && noteId) {
-      updateNote(noteId, { 
-        content: newContent,
-        title: h1Match ? h1Match[1].replace(/<[^>]*>/g, '') : title
-      });
-    } else if (!isNewNote) {
-      updateNote(id, { 
-        content: newContent,
-        title: h1Match ? h1Match[1].replace(/<[^>]*>/g, '') : title
-      });
+    // AI編集中は自動保存を停止
+    if (isAIEditing) {
+      return;
     }
-  }, [id, isNewNote, noteId, updateNote, title]);
+    
+    // デバウンスした自動保存（500ms後）
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    
+    saveTimerRef.current = setTimeout(() => {
+      if (isNewNote && noteId) {
+        updateNote(noteId, { 
+          content: newContent,
+          title: h1Match ? h1Match[1].replace(/<[^>]*>/g, '') : title
+        });
+      } else if (!isNewNote) {
+        updateNote(id, { 
+          content: newContent,
+          title: h1Match ? h1Match[1].replace(/<[^>]*>/g, '') : title
+        });
+      }
+    }, 500);
+  }, [id, isNewNote, noteId, updateNote, title, isAIEditing]);
+
+  // コンポーネントのクリーンアップ
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, []);
 
   // テキスト選択ハンドラ
   const handleTextSelection = useCallback((text: string) => {
@@ -207,6 +248,52 @@ export default function NoteScreen() {
     setShowDiffViewer(true);
   }, [content]);
 
+  // AIチャットからの直接的な変更適用
+  const handleApplyAIChanges = useCallback((newContent: string) => {
+    console.log('[NoteScreen] handleApplyAIChanges が呼ばれました');
+    console.log('[NoteScreen] 新しいコンテンツ:', newContent);
+    handleContentChange(newContent);
+  }, [handleContentChange]);
+
+  // AIチャットからの自動編集処理（編集モード用）
+  const handleAutoEdit = useCallback((newContent: string, explanation: string) => {
+    console.log('[NoteScreen] handleAutoEdit が呼ばれました');
+    console.log('[NoteScreen] 編集説明:', explanation);
+    console.log('[NoteScreen] 新しいコンテンツ:', newContent);
+    
+    // AI編集状態を開始
+    setIsAIEditing(true);
+    
+    // 自動保存タイマーをクリア（AI編集中は自動保存を停止）
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+    
+    // 一時的にコンテンツを変更（差分表示用）
+    handleContentChange(newContent);
+    
+    // 差分表示のための変更データを作成
+    const changes = [{
+      id: `auto_edit_${Date.now()}`,
+      original: content,
+      suggested: newContent,
+      type: 'modification' as const,
+      startIndex: 0,
+      endIndex: content.length,
+      status: 'pending' as const,
+    }];
+    
+    setDiffChanges(changes);
+    setShowDiffViewer(true);
+  }, [content, handleContentChange]);
+
+  // 最後の変更を取り消し
+  const handleUndoLastChange = useCallback(() => {
+    if (editorRef.current?.undo) {
+      editorRef.current.undo();
+    }
+  }, []);
+
   // 差分変更の承認
   const handleAcceptChange = useCallback((changeId: string) => {
     setDiffChanges(prev => prev.map(change => 
@@ -221,6 +308,9 @@ export default function NoteScreen() {
       const newContent = content.replace(change.original, change.suggested);
       handleContentChange(newContent);
     }
+    
+    // AI編集状態を終了
+    setIsAIEditing(false);
   }, [diffChanges, content, handleContentChange]);
 
   // 差分変更の拒否
@@ -230,6 +320,9 @@ export default function NoteScreen() {
         ? { ...change, status: 'rejected' as const }
         : change
     ));
+    
+    // AI編集状態を終了
+    setIsAIEditing(false);
   }, []);
 
   // すべての変更を承認
@@ -251,6 +344,9 @@ export default function NoteScreen() {
     ));
     
     handleContentChange(newContent);
+    
+    // AI編集状態を終了
+    setIsAIEditing(false);
   }, [diffChanges, content, handleContentChange]);
 
   // すべての変更を拒否
@@ -260,6 +356,9 @@ export default function NoteScreen() {
         ? { ...change, status: 'rejected' as const }
         : change
     ));
+    
+    // AI編集状態を終了
+    setIsAIEditing(false);
   }, []);
 
   // AIアシスト処理（従来のドロワー形式）
@@ -278,12 +377,13 @@ export default function NoteScreen() {
       let response: AIAssistResponse;
 
       if (action === 'custom' && customPrompt.trim()) {
-        response = await aiAssistService.processWithCustomPrompt(targetText, customPrompt);
+        response = await aiAssistService.processWithCustomPrompt(targetText, customPrompt, selectedModelId);
       } else {
         response = await aiAssistService.processText({
           text: targetText,
           action: action === 'custom' ? 'improve' : action,
-          targetLanguage: action === 'translate' ? 'English' : undefined
+          targetLanguage: action === 'translate' ? 'English' : undefined,
+          modelId: selectedModelId
         });
       }
 
@@ -346,6 +446,41 @@ export default function NoteScreen() {
         </Text>
         <ChevronDown size={16} color={colors.textOnPrimary} />
       </TouchableOpacity>
+    );
+  };
+
+  // 分割ハンドルコンポーネント
+  const SplitHandle = () => {
+    const [startRatio, setStartRatio] = useState(aiChatSplitRatio);
+    
+    const panResponder = PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        setIsDragging(true);
+        setStartRatio(aiChatSplitRatio);
+        setTempRatio(aiChatSplitRatio);
+      },
+      onPanResponderMove: (event, gestureState) => {
+        // ドラッグ中は一時的な比率のみ更新（エディタ幅は変更しない）
+        const deltaRatio = gestureState.dx / width;
+        const newRatio = Math.max(0.25, Math.min(0.75, startRatio + deltaRatio));
+        setTempRatio(newRatio);
+      },
+      onPanResponderRelease: () => {
+        // ドラッグ終了時に実際の比率を更新
+        setAiChatSplitRatio(tempRatio);
+        setIsDragging(false);
+      },
+    });
+
+    return (
+      <View 
+        style={[styles.splitHandle, { backgroundColor: isDragging ? colors.lightGray : 'transparent' }]}
+        {...panResponder.panHandlers}
+      >
+        <View style={[styles.splitHandleIndicator, { backgroundColor: colors.border }]} />
+      </View>
     );
   };
 
@@ -468,11 +603,38 @@ export default function NoteScreen() {
     },
     editorContainer: {
       flex: 1,
+      backgroundColor: colors.background,
     },
     chatContainer: {
-      width: chatWidth,
-      borderLeftWidth: 1,
+      backgroundColor: colors.card,
+      borderLeftWidth: shouldUseSplitView ? 1 : 0,
       borderLeftColor: colors.border,
+      borderTopLeftRadius: shouldUseSplitView ? 0 : 16,
+      elevation: shouldUseSplitView ? 0 : 5,
+      shadowColor: '#000',
+      shadowOffset: { width: shouldUseSplitView ? 0 : -2, height: 0 },
+      shadowOpacity: shouldUseSplitView ? 0 : 0.15,
+      shadowRadius: shouldUseSplitView ? 0 : 5,
+    },
+    fixedSeparator: {
+      width: 1,
+      backgroundColor: colors.border,
+      minHeight: '100%',
+    },
+    splitHandle: {
+      width: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+      cursor: 'col-resize',
+      paddingVertical: 10,
+    },
+    splitHandleIndicator: {
+      width: 4,
+      height: 60,
+      borderRadius: 2,
+      justifyContent: 'center',
+      alignItems: 'center',
+      opacity: 0.8,
     },
     diffViewerContainer: {
       position: 'absolute',
@@ -585,29 +747,43 @@ export default function NoteScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* メインコンテンツエリア: チャットモード時は分割画面 */}
-        <View style={aiChatMode ? styles.splitContainer : { flex: 1 }}>
-          {/* エディタ部分 */}
-          <View style={aiChatMode ? { width: editorWidth } : styles.editorContainer}>
-            <TenTapEditor
-              ref={editorRef}
-              content={content}
-              onContentChange={handleContentChange}
-              onTextSelection={handleTextSelection}
-              isDarkMode={isDark}
-              themeColors={colors}
-              autoFocus={isNewNote}
-              placeholder="ここに内容を入力してください"
-            />
-          </View>
+        {/* メインコンテンツエリア: タブレットは分割画面、モバイルは全画面切り替え */}
+        <View style={shouldUseSplitView ? styles.splitContainer : { flex: 1 }}>
+          {/* エディタ部分（モバイルでAIチャット表示中は非表示） */}
+          {(!aiChatMode || shouldUseSplitView) && (
+            <View style={shouldUseSplitView ? [styles.editorContainer, { width: editorWidth }] : styles.editorContainer}>
+              <TenTapEditor
+                ref={editorRef}
+                content={content}
+                onContentChange={handleContentChange}
+                onTextSelection={handleTextSelection}
+                isDarkMode={isDark}
+                themeColors={colors}
+                autoFocus={isNewNote}
+                placeholder="ここに内容を入力してください"
+                key={`editor-${shouldUseSplitView ? 'split' : 'full'}`}
+              />
+            </View>
+          )}
+          
+          {/* タブレット用セパレーター（固定） */}
+          {shouldUseSplitView && (
+            <View style={styles.fixedSeparator} />
+          )}
           
           {/* AI校正チャット画面 */}
           {aiChatMode && (
-            <View style={styles.chatContainer}>
+            <View style={[
+              styles.chatContainer, 
+              shouldUseSplitView ? { width: chatWidth } : { flex: 1 }
+            ]}>
               <AIAssistChat
                 visible={aiChatMode}
                 noteContent={content}
                 onSuggestChanges={handleSuggestChanges}
+                onApplyChanges={handleApplyAIChanges}
+                onUndoLastChange={handleUndoLastChange}
+                onAutoEdit={handleAutoEdit}
                 selectedModelId={selectedModelId}
               />
             </View>
@@ -617,7 +793,13 @@ export default function NoteScreen() {
       
       {/* 差分表示ビューア */}
       {showDiffViewer && (
-        <View style={styles.diffViewerContainer}>
+        <View style={[
+          styles.diffViewerContainer,
+          {
+            right: shouldUseSplitView ? chatWidth : 0,
+            left: 0,
+          }
+        ]}>
           <DiffViewer
             changes={diffChanges}
             onAcceptChange={handleAcceptChange}

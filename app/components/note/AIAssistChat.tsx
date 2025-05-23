@@ -11,17 +11,21 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { Text, XStack, YStack, Button } from 'tamagui';
-import { Send } from 'lucide-react-native';
+import { Send, Undo, Check } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useColors } from '../../constants/colors';
 import { useColorScheme } from 'react-native';
 import { aiAssistService } from '../../services/aiAssist';
 import ChatBubble from '../ChatBubble';
+import { Message } from '../../store/chatStore';
 
 export interface AIAssistChatProps {
   visible: boolean;
   noteContent: string;
   onSuggestChanges: (changes: Array<{original: string, suggested: string}>) => void;
+  onApplyChanges?: (newContent: string) => void;
+  onUndoLastChange?: () => void;
+  onAutoEdit?: (newContent: string, explanation: string) => void;
   selectedModelId: string;
 }
 
@@ -30,12 +34,22 @@ interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: number;
+  isProcessing?: boolean;
+  hasChanges?: boolean;
+  originalContent?: string;
+  suggestedContent?: string;
+  isEditMode?: boolean;
+  editExplanation?: string;
+  isApplied?: boolean;
 }
 
 const AIAssistChat: React.FC<AIAssistChatProps> = ({
   visible,
   noteContent,
   onSuggestChanges,
+  onApplyChanges,
+  onUndoLastChange,
+  onAutoEdit,
   selectedModelId,
 }) => {
   const { t } = useTranslation();
@@ -47,6 +61,8 @@ const AIAssistChat: React.FC<AIAssistChatProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [lastAppliedContent, setLastAppliedContent] = useState<string | null>(null);
+  const [chatMode, setChatMode] = useState<'question' | 'edit'>('question'); // モード管理
   
   const flatListRef = useRef<FlatList>(null);
   
@@ -56,7 +72,7 @@ const AIAssistChat: React.FC<AIAssistChatProps> = ({
       const systemMessage: ChatMessage = {
         id: 'system-welcome',
         role: 'system',
-        content: 'ノートの内容について質問したり、修正提案を受けることができます。具体的な修正提案を行う場合は、「変更を提案」ボタンで差分形式で表示できます。',
+        content: '【質問モード】: ノートについて質問できます\n【編集モード】: AIがノートを自動編集し、差分で表示します',
         timestamp: Date.now(),
       };
       setMessages([systemMessage]);
@@ -78,73 +94,133 @@ const AIAssistChat: React.FC<AIAssistChatProps> = ({
     setInputText('');
     setIsLoading(true);
     
+    // 処理中メッセージを表示
+    const processingMessage: ChatMessage = {
+      id: `processing_${Date.now()}`,
+      role: 'assistant',
+      content: '処理中...',
+      timestamp: Date.now(),
+      isProcessing: true,
+    };
+    
+    setMessages(prev => [...prev, processingMessage]);
+    
     try {
-      // ノートコンテンツをコンテキストとして含める
-      const contextPrompt = noteContent 
-        ? `以下はユーザーが編集中のノートの内容です：\n\n${noteContent}\n\n---\n\nユーザーからの質問: ${userMessage.content}`
-        : userMessage.content;
-      
-      const response = await aiAssistService.processWithCustomPrompt(
-        contextPrompt,
-        'ノートの校正・改善アシスタントとして応答してください。具体的な修正提案を行う場合は、元のテキストと修正後のテキストを明確に示してください。'
-      );
-      
-      if (response.success && response.result) {
-        const assistantMessage: ChatMessage = {
-          id: `msg_${Date.now() + 1}`,
-          role: 'assistant',
-          content: response.result,
-          timestamp: Date.now(),
-        };
+      if (chatMode === 'question') {
+        // 質問モード: 質問に答えるだけ
+        const contextPrompt = noteContent 
+          ? `以下はユーザーが編集中のノートの内容です：\n\n${noteContent}\n\n---\n\nユーザーからの質問: ${userMessage.content}`
+          : userMessage.content;
         
-        setMessages(prev => [...prev, assistantMessage]);
+        const response = await aiAssistService.processWithCustomPrompt(
+          contextPrompt,
+          'ノートの内容について質問に答えてください。ノートの編集は行わず、質問にのみ回答してください。',
+          selectedModelId
+        );
+        
+        // 処理中メッセージを削除
+        setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
+        
+        if (response.success && response.result) {
+          const assistantMessage: ChatMessage = {
+            id: `msg_${Date.now() + 1}`,
+            role: 'assistant',
+            content: response.result,
+            timestamp: Date.now(),
+            isEditMode: false,
+          };
+          
+          setMessages(prev => [...prev, assistantMessage]);
+        } else {
+          Alert.alert('エラー', response.error || 'AI応答の取得に失敗しました');
+        }
       } else {
-        Alert.alert('エラー', response.error || 'AI応答の取得に失敗しました');
+        // 編集モード: ノートを自動編集
+        const editPrompt = noteContent 
+          ? `以下のノート内容を、ユーザーの要求に基づいて編集してください：\n\n現在のノート内容：\n${noteContent}\n\n編集要求：${userMessage.content}\n\n編集されたノート内容のみを返してください。説明や前置きは不要です。`
+          : `以下の要求に基づいてノートを作成してください：\n\n${userMessage.content}`;
+        
+        const editResponse = await aiAssistService.processWithCustomPrompt(
+          editPrompt,
+          '指示に従ってノートを編集し、編集後の完全なノート内容のみを返してください。',
+          selectedModelId
+        );
+        
+        if (editResponse.success && editResponse.result) {
+          // 編集内容の説明を取得
+          const explanationResponse = await aiAssistService.processWithCustomPrompt(
+            `元のノート：\n${noteContent}\n\n編集後のノート：\n${editResponse.result}`,
+            'ノートにどのような変更を加えたかを簡潔に説明してください。',
+            selectedModelId
+          );
+          
+          const explanation = explanationResponse.success && explanationResponse.result 
+            ? explanationResponse.result 
+            : '編集を行いました';
+          
+          // 自動編集を実行
+          if (onAutoEdit) {
+            onAutoEdit(editResponse.result.trim(), explanation);
+          }
+          
+          // 処理中メッセージを削除
+          setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
+          
+          const assistantMessage: ChatMessage = {
+            id: `msg_${Date.now() + 1}`,
+            role: 'assistant',
+            content: explanation,
+            timestamp: Date.now(),
+            isEditMode: true,
+            editExplanation: explanation,
+            suggestedContent: editResponse.result.trim(),
+            originalContent: noteContent,
+            isApplied: false,
+          };
+          
+          setMessages(prev => [...prev, assistantMessage]);
+        } else {
+          Alert.alert('エラー', editResponse.error || '編集に失敗しました');
+        }
       }
     } catch (error) {
       console.error('AI Chat Error:', error);
       Alert.alert('エラー', 'AIとの通信中にエラーが発生しました');
+      // 処理中メッセージを削除
+      setMessages(prev => prev.filter(msg => msg.id !== processingMessage.id));
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, isLoading, noteContent]);
+  }, [inputText, isLoading, noteContent, chatMode, selectedModelId, onAutoEdit]);
   
-  // 変更提案ハンドラ
-  const handleSuggestChanges = useCallback((content: string) => {
-    // AI応答から修正提案を抽出する簡易的なロジック
-    // 実際にはより高度なテキスト解析が必要
-    const suggestions = extractSuggestions(content, noteContent);
-    if (suggestions.length > 0) {
-      onSuggestChanges(suggestions);
-    } else {
-      Alert.alert('変更提案', 'このメッセージから具体的な変更提案を抽出できませんでした。');
-    }
-  }, [noteContent, onSuggestChanges]);
-
-  // AI応答から変更提案を抽出する関数
-  const extractSuggestions = (aiResponse: string, originalContent: string): Array<{original: string, suggested: string}> => {
-    const suggestions: Array<{original: string, suggested: string}> = [];
-    
-    // 簡易的な抽出ロジック
-    // "「...」を「...」に変更" のパターンを探す
-    const changePattern = /「(.+?)」を「(.+?)」に/g;
-    let match;
-    
-    while ((match = changePattern.exec(aiResponse)) !== null) {
-      const original = match[1];
-      const suggested = match[2];
+  // 編集の適用（編集モード用）
+  const handleApplyEdit = useCallback((message: ChatMessage) => {
+    if (message.suggestedContent && onApplyChanges) {
+      onApplyChanges(message.suggestedContent);
       
-      // 元のコンテンツに存在するかチェック
-      if (originalContent.includes(original)) {
-        suggestions.push({ original, suggested });
-      }
+      // 適用済みのメッセージを更新
+      setMessages(prev => prev.map(msg => 
+        msg.id === message.id 
+          ? { ...msg, isApplied: true }
+          : msg
+      ));
     }
-    
-    // より高度な抽出ロジックを追加可能
-    // 例: マークダウン形式での差分表示の解析など
-    
-    return suggestions;
-  };
+  }, [onApplyChanges]);
+
+  // 編集の取り消し（編集モード用）
+  const handleUndoEdit = useCallback((message: ChatMessage) => {
+    if (message.originalContent && onApplyChanges) {
+      onApplyChanges(message.originalContent);
+      
+      // 取り消し済みのメッセージを更新
+      setMessages(prev => prev.map(msg => 
+        msg.id === message.id 
+          ? { ...msg, isApplied: false }
+          : msg
+      ));
+    }
+  }, [onApplyChanges]);
+
   
   // メッセージをレンダリング
   const renderMessage = ({ item }: { item: ChatMessage }) => {
@@ -160,22 +236,48 @@ const AIAssistChat: React.FC<AIAssistChatProps> = ({
     
     return (
       <View style={styles.messageContainer}>
-        <ChatBubble message={item} />
-        {item.role === 'assistant' && (
-          <TouchableOpacity
-            style={[styles.suggestButton, { backgroundColor: colors.primary }]}
-            onPress={() => handleSuggestChanges(item.content)}
-          >
-            <Text style={[styles.suggestButtonText, { color: colors.textOnPrimary }]}>
-              変更を提案
-            </Text>
-          </TouchableOpacity>
+        <ChatBubble 
+          message={{
+            id: item.id,
+            role: item.role as 'user' | 'assistant',
+            content: item.content,
+            timestamp: item.timestamp,
+          } as Message}
+        />
+        
+        {/* 編集モードでのアクションボタン */}
+        {item.role === 'assistant' && item.isEditMode && !item.isProcessing && (
+          <View style={styles.messageActions}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.undoButton]}
+              onPress={() => handleUndoEdit(item)}
+              disabled={item.isApplied === false}
+            >
+              <Undo size={16} color="#dc2626" />
+              <Text style={[styles.actionButtonText, { color: '#dc2626' }]}>
+                取り消し
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.actionButton, styles.applyButton]}
+              onPress={() => handleApplyEdit(item)}
+              disabled={item.isApplied === true}
+            >
+              <Check size={16} color="#16a34a" />
+              <Text style={[styles.actionButtonText, { color: '#16a34a' }]}>
+                {item.isApplied ? '適用済み' : '適用'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     );
   };
   
   if (!visible) return null;
+  
+  console.log('[AIAssistChat] レンダリング中 - 現在のモード:', chatMode);
   
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -200,6 +302,52 @@ const AIAssistChat: React.FC<AIAssistChatProps> = ({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={[styles.inputContainer, { backgroundColor: colors.card }]}
       >
+        <View style={styles.modeButtonContainer}>
+          <TouchableOpacity
+            style={[
+              styles.modeButton,
+              { 
+                borderColor: chatMode === 'question' ? colors.primary : colors.border,
+                backgroundColor: chatMode === 'question' ? colors.primary : colors.card,
+                borderWidth: 2,
+              }
+            ]}
+            onPress={() => {
+              console.log('[AIAssistChat] 質問モードに切り替え');
+              setChatMode('question');
+            }}
+          >
+            <Text style={[
+              styles.modeButtonText,
+              { color: chatMode === 'question' ? colors.textOnPrimary : colors.text }
+            ]}>
+              質問
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.modeButton,
+              { 
+                borderColor: chatMode === 'edit' ? colors.primary : colors.border,
+                backgroundColor: chatMode === 'edit' ? colors.primary : colors.card,
+                borderWidth: 2,
+              }
+            ]}
+            onPress={() => {
+              console.log('[AIAssistChat] 編集モードに切り替え');
+              setChatMode('edit');
+            }}
+          >
+            <Text style={[
+              styles.modeButtonText,
+              { color: chatMode === 'edit' ? colors.textOnPrimary : colors.text }
+            ]}>
+              編集
+            </Text>
+          </TouchableOpacity>
+        </View>
+        
         <XStack space="$2" alignItems="flex-end" padding="$3">
           <View style={styles.inputWrapper}>
             <TextInput
@@ -210,7 +358,7 @@ const AIAssistChat: React.FC<AIAssistChatProps> = ({
               }]}
               value={inputText}
               onChangeText={setInputText}
-              placeholder="AIアシスタントに質問..."
+              placeholder={chatMode === 'question' ? "ノートについて質問..." : "編集指示を入力..."}
               placeholderTextColor={colors.secondaryText}
               multiline
               maxLength={2000}
@@ -263,21 +411,61 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
   },
-  suggestButton: {
-    alignSelf: 'flex-start',
+  messageActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    marginTop: 8,
+    marginLeft: 16,
+    gap: 12,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 16,
-    marginTop: 8,
-    marginLeft: 16,
+    borderWidth: 1,
+    gap: 6,
   },
-  suggestButtonText: {
+  applyButton: {
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+    borderColor: '#16a34a',
+  },
+  undoButton: {
+    backgroundColor: 'rgba(220, 38, 38, 0.1)',
+    borderColor: '#dc2626',
+  },
+  actionButtonText: {
     fontSize: 14,
     fontWeight: '600',
   },
   inputContainer: {
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  modeButtonContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+  },
+  modeButtonActive: {
+    // アクティブ時のスタイルは動的に適用
+  },
+  modeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   inputWrapper: {
     flex: 1,
