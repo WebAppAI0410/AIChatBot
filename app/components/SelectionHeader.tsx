@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useColors } from '../constants/colors';
+import useColors from '../constants/colors';
 
 interface SelectionHeaderProps {
   selectedCount: number;

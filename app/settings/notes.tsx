@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useColors } from '../constants/colors';
+import useColors from '../constants/colors';
 import Header from '../components/Header';
 
 export default function NotesSettingsScreen() {

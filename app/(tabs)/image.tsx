@@ -339,34 +339,34 @@ export default function ImageScreen() {
           title="画像ギャラリー"
           showBack={false}
           rightComponent={
-            <View style={{ flexDirection: 'row' }}>
-              {/* 表示切替ボタン */}
-              <TouchableOpacity
+          <View style={{ flexDirection: 'row' }}>
+            {/* 表示切替ボタン */}
+            <TouchableOpacity
                 style={[styles.headerButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
-                onPress={toggleViewMode}
-              >
-                <Ionicons 
-                  name={isGridView ? "list-outline" : "grid-outline"} 
-                  size={20} 
+              onPress={toggleViewMode}
+            >
+              <Ionicons 
+                name={isGridView ? "list-outline" : "grid-outline"} 
+                size={20} 
                   color={colors.textOnPrimary} 
-                />
-              </TouchableOpacity>
+              />
+            </TouchableOpacity>
 
-              {/* フィルターボタン */}
-              <TouchableOpacity
+            {/* フィルターボタン */}
+            <TouchableOpacity
                 style={[styles.headerButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)', marginLeft: 8 }]}
-                onPress={() => setShowFilterModal(true)}
-              >
-                <Ionicons 
-                  name="filter-outline" 
-                  size={20} 
+              onPress={() => setShowFilterModal(true)}
+            >
+              <Ionicons 
+                name="filter-outline" 
+                size={20} 
                   color={currentFilter !== 'all' ? colors.textOnPrimary : colors.textOnPrimary} 
-                />
-                {currentFilter !== 'all' && (
-                  <View style={styles.filterActiveDot} />
-                )}
-              </TouchableOpacity>
-            </View>
+              />
+              {currentFilter !== 'all' && (
+                <View style={styles.filterActiveDot} />
+              )}
+            </TouchableOpacity>
+          </View>
           }
         />
         

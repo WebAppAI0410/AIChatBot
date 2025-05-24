@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useColors } from '../constants/colors';
+import useColors from '../constants/colors';
 
 interface BreadcrumbItem {
   id: string | null;

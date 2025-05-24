@@ -20,12 +20,79 @@ import LocalModelInstallModal from '../components/LocalModelInstallModal';
 import Header from '../components/Header';
 import theme from '../ui/theme';
 
-const SUGGESTIONS = [
-  'AIについて教えてください',
-  '面白い話を聞かせて',
-  'プログラミングの勉強方法は？',
-  '今日のニュースを要約して',
-  '英語の勉強のコツは？',
+const FEATURED_CATEGORIES = [
+  {
+    id: 'creative',
+    title: '創作・クリエイティブ',
+    icon: '🎨',
+    color: '#FF6B6B',
+    suggestions: [
+      '小説のあらすじを考えて',
+      'キャッチコピーを作って',
+      'ロゴのアイデアを提案して',
+      'プレゼン資料の構成を考えて'
+    ]
+  },
+  {
+    id: 'learning',
+    title: '学習・勉強',
+    icon: '📚',
+    color: '#4ECDC4',
+    suggestions: [
+      'プログラミングの基礎を教えて',
+      '英語の勉強法を教えて',
+      '歴史の出来事を分かりやすく説明して',
+      '数学の問題を解いて'
+    ]
+  },
+  {
+    id: 'business',
+    title: 'ビジネス・仕事',
+    icon: '💼',
+    color: '#45B7D1',
+    suggestions: [
+      'ビジネスプランを考えて',
+      'メールの下書きを作って',
+      '会議の議事録をまとめて',
+      'マーケティング戦略を提案して'
+    ]
+  },
+  {
+    id: 'daily',
+    title: '日常・生活',
+    icon: '🏠',
+    color: '#96CEB4',
+    suggestions: [
+      '料理のレシピを教えて',
+      '今日の天気について聞かせて',
+      '健康的な生活習慣を教えて',
+      '旅行の計画を立てて'
+    ]
+  },
+  {
+    id: 'tech',
+    title: 'テクノロジー・IT',
+    icon: '💻',
+    color: '#FFEAA7',
+    suggestions: [
+      'AIの最新動向を教えて',
+      'アプリ開発のアドバイスを',
+      'セキュリティ対策について',
+      'クラウドサービスを比較して'
+    ]
+  },
+  {
+    id: 'entertainment',
+    title: 'エンタメ・趣味',
+    icon: '🎮',
+    color: '#DDA0DD',
+    suggestions: [
+      '面白い映画を推薦して',
+      'ゲームの攻略法を教えて',
+      '音楽の歴史について',
+      '新しい趣味を提案して'
+    ]
+  }
 ];
 
 // Define styles outside component scope with factory function
@@ -35,31 +102,81 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     backgroundColor: colors.background,
     paddingTop: 0,
   },
-  suggestionsContainer: {
+  contentContainer: {
     flex: 1,
     padding: 16,
   },
-  suggestionsTitle: {
-    fontSize: 18,
+  welcomeSection: {
+    alignItems: 'center',
+    marginBottom: 32,
+    paddingTop: 20,
+  },
+  welcomeEmoji: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  welcomeTitle: {
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 12,
+    color: colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    color: colors.secondaryText,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  categoriesTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 20,
     color: colors.text,
   },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 24,
-  },
-  chip: {
-    backgroundColor: colors.lightGray,
+  categoryCard: {
+    backgroundColor: colors.card,
     borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    margin: 4,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  chipText: {
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  categoryIcon: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  categoryTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    flex: 1,
+  },
+  categoryExpand: {
+    padding: 4,
+  },
+  suggestionsList: {
+    gap: 8,
+  },
+  suggestionChip: {
+    backgroundColor: colors.lightGray,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  suggestionText: {
     fontSize: 14,
     color: colors.text,
+    lineHeight: 20,
   },
   localModelBanner: {
     flexDirection: 'row',
@@ -129,6 +246,7 @@ export default function NewChatScreen() {
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   
   const [input, setInput] = useState('');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const createChat = useStore(state => state.createChat);
   const addMessage = useStore(state => state.addMessage);
   const localModelStatus = useStore(state => state.localModelStatus);
@@ -152,6 +270,66 @@ export default function NewChatScreen() {
     });
     
     router.push(`/chat/${chatId}`);
+  };
+
+  const toggleCategory = (categoryId: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(categoryId)) {
+      newExpanded.delete(categoryId);
+    } else {
+      newExpanded.add(categoryId);
+    }
+    setExpandedCategories(newExpanded);
+  };
+
+  const renderCategoryCard = (category: typeof FEATURED_CATEGORIES[0]) => {
+    const isExpanded = expandedCategories.has(category.id);
+    const visibleSuggestions = isExpanded ? category.suggestions : category.suggestions.slice(0, 2);
+
+    return (
+      <View key={category.id} style={styles.categoryCard}>
+        <TouchableOpacity
+          style={styles.categoryHeader}
+          onPress={() => toggleCategory(category.id)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.categoryIcon}>{category.icon}</Text>
+          <Text style={styles.categoryTitle}>{category.title}</Text>
+          <View style={styles.categoryExpand}>
+            <Ionicons 
+              name={isExpanded ? "chevron-up" : "chevron-down"} 
+              size={20} 
+              color={colors.secondaryText} 
+            />
+          </View>
+        </TouchableOpacity>
+        
+        <View style={styles.suggestionsList}>
+          {visibleSuggestions.map((suggestion, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.suggestionChip}
+              onPress={() => handleSendMessage(suggestion)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.suggestionText}>{suggestion}</Text>
+            </TouchableOpacity>
+          ))}
+          
+          {!isExpanded && category.suggestions.length > 2 && (
+            <TouchableOpacity
+              style={[styles.suggestionChip, { backgroundColor: `${category.color}20` }]}
+              onPress={() => toggleCategory(category.id)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.suggestionText, { color: category.color, fontWeight: '500' }]}>
+                他 {category.suggestions.length - 2} 件を表示
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
   };
 
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -240,25 +418,27 @@ export default function NewChatScreen() {
       >
         <ScrollView 
           ref={scrollViewRef}
-          style={styles.suggestionsContainer}
+          style={styles.contentContainer}
           contentContainerStyle={{ 
             paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : 20 
           }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.suggestionsTitle}>おすすめの質問</Text>
-          <View style={styles.chipContainer}>
-            {SUGGESTIONS.map((suggestion, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.chip}
-                onPress={() => handleSendMessage(suggestion)}
-              >
-                <Text style={styles.chipText}>{suggestion}</Text>
-              </TouchableOpacity>
-            ))}
+          {/* ウェルカムセクション */}
+          <View style={styles.welcomeSection}>
+            <Text style={styles.welcomeEmoji}>🤖</Text>
+            <Text style={styles.welcomeTitle}>AI チャットボットへようこそ</Text>
+            <Text style={styles.welcomeSubtitle}>
+              何でもお気軽にお聞きください。{'\n'}
+              カテゴリから選ぶか、下のテキストボックスに直接入力してください。
+            </Text>
           </View>
+
+          {/* カテゴリセクション */}
+          <Text style={styles.categoriesTitle}>💡 おすすめのカテゴリ</Text>
+          {FEATURED_CATEGORIES.map(renderCategoryCard)}
         </ScrollView>
         
         <View style={[styles.inputContainer, keyboardHeight > 0 && { paddingBottom: Platform.OS === 'ios' ? 8 : 0 }]}>

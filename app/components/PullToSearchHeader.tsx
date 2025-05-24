@@ -9,7 +9,7 @@ import {
   Text
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useColors } from '../constants/colors';
+import useColors from '../constants/colors';
 
 interface PullToSearchHeaderProps {
   onSearch: (query: string) => void;

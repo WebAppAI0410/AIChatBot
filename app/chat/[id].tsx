@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -43,6 +43,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { showCentralToast } from '../components/CentralToast';
 import BalloonActionMenu, { BalloonAction } from '../components/BalloonActionMenu';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function ChatScreen() {
   const { id, image_mode } = useLocalSearchParams<{ id: string; image_mode?: string }>();
@@ -73,38 +74,48 @@ export default function ChatScreen() {
   const [selectedTextContent, setSelectedTextContent] = useState('');
   const [selectedText, setSelectedText] = useState('');
   
+  // マルチモーダル機能の状態
+  const [enabledFeatures, setEnabledFeatures] = useState<Set<string>>(new Set());
+  const [showFeatureOptions, setShowFeatureOptions] = useState(false);
+  
   const colors = useColors();
-  const chats = useStore(state => state.chats);
   const addMessage = useStore(state => state.addMessage);
   const addImageMessage = useStore(state => state.addImageMessage);
   const replaceMessage = useStore(state => state.replaceMessage);
   const markChatAsRead = useStore(state => state.markChatAsRead);
   const updateChatTitle = useStore(state => state.updateChatTitle);
   const updateChatModel = useStore(state => state.updateChatModel);
-  const localModelStatus = useStore(state => state.localModelStatus);
-  const plan = useStore(state => state.plan);
   const selectMessage = useStore(state => state.selectMessage);
   const clearSelectedMessage = useStore(state => state.clearSelectedMessage);
   const selectedMessageId = useStore(state => state.selectedMessageId);
+  const localModelStatus = useStore(state => state.localModelStatus);
+  const plan = useStore(state => state.plan);
   
-  const chat = chats.find(c => c.id === id);
+  // Use a stable selector for the specific chat to avoid re-renders
+  const chat = useStore(useCallback((state) => 
+    state.chats.find(c => c.id === id), [id]
+  ));
+  
+  // 設定値（settingsストアにないため、デフォルト値を使用）
+  const currentModelId = chat?.modelId || 'openai/gpt-4o-mini'; // デフォルトモデル
+  const currentModel = MODELS.find(m => m.id === currentModelId);
+  const isVisionSupported = !!(currentModel?.features?.vision); // Vision対応チェック
+  
   const flatListRef = useRef<FlatList>(null);
   const imageGenPanelRef = useRef<ImageGenerationPanelHandle>(null);
   
   useEffect(() => {
-    if (chat) {
-      if (__DEV__) {
-        console.log('====== CHAT STATE ======');
-        console.log('Chat ID:', chat.id);
-        console.log('Messages:', chat.messages.length);
-        if (chat.messages.length > 0) {
-          const lastMsg = chat.messages[chat.messages.length - 1];
-          console.log('Last message:', lastMsg.role, lastMsg.content.substring(0, 30));
-        }
-        console.log('=======================');
+    if (chat && __DEV__) {
+      console.log('====== CHAT STATE ======');
+      console.log('Chat ID:', chat.id);
+      console.log('Messages:', chat.messages.length);
+      if (chat.messages.length > 0) {
+        const lastMsg = chat.messages[chat.messages.length - 1];
+        console.log('Last message:', lastMsg.role, lastMsg.content.substring(0, 30));
       }
+      console.log('=======================');
     }
-  }, [chat?.messages.length]);
+  }, [chat?.id]); // Only depend on chat ID, not messages
   
   useEffect(() => {
     if (chat) {
@@ -112,59 +123,9 @@ export default function ChatScreen() {
     }
   }, [chat?.id, markChatAsRead]);
   
-  useEffect(() => {
-    if (isLoading || !chat) return;
-      
-    // 最新のユーザーメッセージと応答状態を確認
-    const messages = chat.messages;
-    const userMessages = messages.filter(m => m.role === 'user');
-    
-    if (userMessages.length === 0) return;
-    
-    // 最後のユーザーメッセージに対する応答があるか確認
-    const lastUserMessageIndex = messages.lastIndexOf(userMessages[userMessages.length - 1]);
-    const hasAssistantResponseAfterLastUser = messages
-      .slice(lastUserMessageIndex + 1)
-      .some(m => m.role === 'assistant');
-    
-    // 最後のユーザーメッセージに対する応答がない場合のみAPIリクエスト
-    if (!hasAssistantResponseAfterLastUser) {
-      console.log('新しいユーザーメッセージに対する応答を生成します');
-      
-      const lastUserMessage = userMessages[userMessages.length - 1];
-          
-      const apiMessages: ApiChatMessage[] = chat.messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-      
-      (async () => {
-        setIsLoading(true);
-        try {
-          const responseContent = await fetchChatCompletion(
-            apiMessages,
-            chat.modelId
-          );
-          
-          addMessage(chat.id, {
-            role: 'assistant',
-            content: responseContent,
-          });
-          
-          // 反転FlatListでは自動的に最新メッセージが表示されるのでスクロール不要
-        } catch (error) {
-          console.error('Error in auto API request:', error);
-          
-          addMessage(chat.id, {
-            role: 'assistant',
-            content: 'エラーが発生しました。もう一度お試しください。',
-          });
-        } finally {
-          setIsLoading(false);
-        }
-      })();
-    }
-  }, [chat?.id, chat?.messages, isLoading, addMessage]);
+  // Auto-response logic is disabled to prevent infinite loops
+  // This was causing the "Maximum update depth exceeded" error
+  // TODO: Implement proper auto-response logic if needed
   
   // ギャラリーから移行した場合、画像生成モードを自動的に有効化
   useEffect(() => {
@@ -173,126 +134,268 @@ export default function ChatScreen() {
     }
   }, [id, image_mode]);
   
+  const currentChatSettings = {
+    temperature: 0.7,
+    maxTokens: 1000,
+    maxHistoryLength: 10,
+    openRouterProxyUrl: '/api/chat', // プロキシURL
+  };
+
   const handleSend = async () => {
-    if (!chat) return;
-    
-    // 画像モードがアクティブの場合
-    if (showImageOptions && imageGenPanelRef.current) {
-      if (!imageGenPanelRef.current.canGenerate()) {
-        // 画像生成条件を満たしていない場合
-        Alert.alert('エラー', 'プロンプトを入力するか、クォータが十分にあるか確認してください。');
+    if (!chat || !currentModelId) {
+        showToast('チャット情報またはモデルIDが見つかりません。');
+        return;
+    }
+    const trimmedInput = input.trim();
+    const MAX_HISTORY_LENGTH = currentChatSettings.maxHistoryLength;
+
+    // OpenRouter機能パラメータを構築
+    const buildOpenRouterParams = () => {
+      const params: any = {
+        model: currentModelId,
+        temperature: currentChatSettings.temperature,
+        max_tokens: currentChatSettings.maxTokens,
+        stream: true,
+      };
+
+      // 推論機能が有効な場合
+      if (enabledFeatures.has('reasoning') && currentModel?.features?.reasoning) {
+        params.reasoning = { effort: 'high' };
+      }
+
+      // Web検索機能が有効な場合
+      if (enabledFeatures.has('search') && currentModel?.features?.search) {
+        params.web_search = true;
+      }
+
+      return params;
+    };
+
+    if (selectedImage) {
+      if (!isVisionSupported) {
+        showToast('現在選択中のモデルは画像入力に対応していません。');
+        setSelectedImage(null);
         return;
       }
-      
-      // プロンプトをローカル変数に保存
-      const imagePrompt = input.trim();
-      
-      // プロンプトをユーザーメッセージとして即時追加
-      addMessage(chat.id, {
-        content: imagePrompt || '画像を生成してください',
-        role: 'user'
-      });
+      setIsLoading(true);
 
-      // 入力欄をクリア
-      setInput('');
-      
-      // "生成中..."メッセージをアシスタントから一時的に表示し、生成後に画像で置き換えるためにIDを保存
-      const pendingMessageId = generateUuid();
-      addMessage(chat.id, {
-        id: pendingMessageId,
-        content: '画像を生成中...',
-        role: 'assistant'
-      });
-      
-      // 画像生成開始
-      setIsGenerating(true);
-      
-      // 反転FlatListでは自動的に最新メッセージが表示されるのでスクロール不要
-      
-      // 画像生成を実行（画像パネルから）
+      const userMessageContentForApi = [
+        { type: 'text', text: trimmedInput || ' ' },
+        { type: 'image_url', image_url: { url: selectedImage } }
+      ];
+
+      const displayMessage = {
+        id: generateUuid(),
+        role: 'user' as const,
+        content: trimmedInput || '画像を送信しました',
+        imageUrl: selectedImage,
+      };
+      addMessage(chat.id, displayMessage);
+
+      const history = chat.messages
+        .filter((msg: Message) => msg.role === 'user' || msg.role === 'assistant')
+        .slice(-MAX_HISTORY_LENGTH)
+        .map((msg: Message) => {
+          let contentForApi: string | object[];
+          if (Array.isArray(msg.content)) {
+            contentForApi = msg.content;
+          } else if (msg.imageUrl && msg.role === 'user') {
+            contentForApi = [
+              { type: 'text', text: (typeof msg.content === 'string' && msg.content !== '画像を送信しました') ? msg.content : ' ' }, 
+              { type: 'image_url', image_url: { url: msg.imageUrl } }
+            ];
+          } else if (typeof msg.content === 'string') {
+            contentForApi = msg.content;
+          } else {
+            console.warn('Unknown message content format in history:', msg);
+            contentForApi = ' ';
+          }
+          return { role: msg.role, content: contentForApi };
+        });
+
+      const messagesForApi = [...history, { role: 'user', content: userMessageContentForApi }];
+      const requestParams = { ...buildOpenRouterParams(), messages: messagesForApi };
+
       try {
-        const success = await imageGenPanelRef.current.generateImage();
-        if (!success) {
-          setIsGenerating(false);
-          // "生成中..."メッセージを失敗メッセージに置き換え
-          replaceMessage(chat.id, pendingMessageId, {
-            content: '画像生成に失敗しました。もう一度お試しください。',
-            role: 'assistant'
+        const response = await fetch(currentChatSettings.openRouterProxyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestParams),
+        });
+
+        if (!response.ok || !response.body) {
+          const errorText = await response.text();
+          addMessage(chat.id, {
+            role: 'assistant',
+            content: `APIエラー: ${response.status} ${errorText || '不明なエラー'}`,
+          });
+          setIsLoading(false);
+          setSelectedImage(null);
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let assistantResponseId = generateUuid();
+        let assistantContent = '';
+        
+        addMessage(chat.id, {
+          id: assistantResponseId,
+          role: 'assistant',
+          content: '', 
+        });
+
+        let streamEndedByDone = false;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            streamEndedByDone = true;
+            break;
+          }
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n').filter(line => line.trim() !== '');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const jsonStr = line.substring(6);
+              if (jsonStr === '[DONE]') {
+                streamEndedByDone = true;
+                break; 
+              }
+              try {
+                const parsed = JSON.parse(jsonStr);
+                if (parsed.choices && parsed.choices[0]?.delta?.content) {
+                  assistantContent += parsed.choices[0].delta.content;
+                  replaceMessage(chat.id, assistantResponseId, {
+                    role: 'assistant',
+                    content: assistantContent,
+                  });
+                }
+              } catch (e) {
+                console.error('ストリームデータのパースエラー:', e, jsonStr);
+              }
+            }
+          }
+          if (streamEndedByDone) break;
+        }
+        
+        if (assistantContent.trim() === '') {
+          replaceMessage(chat.id, assistantResponseId, {
+            role: 'assistant',
+            content: streamEndedByDone ? 'AIからの応答がありませんでした。' : 'AIとの接続が途中で切れました。',
           });
         }
-      } catch (e) {
-        console.error('Image generation failed:', e);
-        setIsGenerating(false);
-        // "生成中..."メッセージを失敗メッセージに置き換え
-        replaceMessage(chat.id, pendingMessageId, {
-          content: '画像生成中にエラーが発生しました。もう一度お試しください。',
-          role: 'assistant'
-        });
-      }
-      return;
-    }
-    
-    // 通常のテキストメッセージ送信（画像モードではない場合）
-    if (!input.trim()) return;
-    
-    const trimmedInput = input.trim();
-    setInput('');
-    
-    addMessage(chat.id, {
-      role: 'user',
-      content: trimmedInput,
-    });
-    
-    // 反転FlatListでは自動的に最新メッセージが表示されるのでスクロール不要
-    
-    setIsLoading(true);
-    
-    try {
-      if (__DEV__) console.log('Sending message to API with model:', chat.modelId);
-      
-      const apiMessages: ApiChatMessage[] = [
-        ...chat.messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-        })),
-        {
-        role: 'user',
-          content: trimmedInput,
-        }
-      ];
-      
-      if (__DEV__) console.log('Sending API request with model:', chat.modelId);
-      
-      const responseContent = await fetchChatCompletion(
-          apiMessages,
-          chat.modelId
-        );
-        
-      if (__DEV__) console.log('Received API response:', responseContent.substring(0, 50) + '...');
-        
-      // エラーメッセージまたは正常な応答をアシスタントメッセージとして追加
+
+      } catch (error: any) {
+        console.error('メッセージ送信エラー(画像付き):', error);
         addMessage(chat.id, {
           role: 'assistant',
-          content: responseContent,
+          content: `エラーが発生しました: ${error.message || 'Unknown error'}`,
         });
-      
-      // 最初のメッセージならチャットタイトルを更新
-      if (chat.messages.filter(m => m.role === 'user').length === 1) {
-        const title = trimmedInput.slice(0, 30) + (trimmedInput.length > 30 ? '...' : '');
-        updateChatTitle(chat.id, title);
       }
-      
-    } catch (error) {
-      console.error('Error sending message:', error);
-      
-      addMessage(chat.id, {
-        role: 'assistant',
-        content: '通信エラーが発生しました。ネットワーク接続を確認して、もう一度お試しください。',
-      });
-    } finally {
+
+      setInput('');
+      setSelectedImage(null);
       setIsLoading(false);
+
+    } else if (trimmedInput) { // テキストのみの場合
+      setIsLoading(true);
+      const userMessage = {
+        id: generateUuid(),
+        role: 'user' as const,
+        content: trimmedInput,
+      };
+      addMessage(chat.id, userMessage);
+
+      const history = chat.messages
+        .filter((msg: Message) => msg.role === 'user' || msg.role === 'assistant')
+        .slice(-MAX_HISTORY_LENGTH)
+        .map((msg: Message) => ({
+          role: msg.role,
+          content: msg.content
+        }));
       
-      // 反転FlatListでは自動的に最新メッセージが表示されるのでスクロール不要
+      const messagesForApi = [...history, { role: 'user', content: trimmedInput }];
+      const requestParams = { ...buildOpenRouterParams(), messages: messagesForApi };
+
+      try {
+        const response = await fetch(currentChatSettings.openRouterProxyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestParams),
+        });
+
+        if (!response.ok || !response.body) {
+          const errorText = await response.text();
+           addMessage(chat.id, {
+            role: 'assistant',
+            content: `APIエラー: ${response.status} ${errorText || '不明なエラー'}`,
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let assistantResponseId = generateUuid();
+        let assistantContent = '';
+        
+        addMessage(chat.id, {
+          id: assistantResponseId,
+          role: 'assistant',
+          content: '', 
+        });
+
+        let streamEndedByDone = false;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            streamEndedByDone = true;
+            break;
+          }
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n').filter(line => line.trim() !== '');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const jsonStr = line.substring(6);
+              if (jsonStr === '[DONE]') {
+                streamEndedByDone = true;
+                break;
+              }
+              try {
+                const parsed = JSON.parse(jsonStr);
+                if (parsed.choices && parsed.choices[0]?.delta?.content) {
+                  assistantContent += parsed.choices[0].delta.content;
+                  replaceMessage(chat.id, assistantResponseId, {
+                    role: 'assistant',
+                    content: assistantContent,
+                  });
+                }
+              } catch (e) {
+                console.error('ストリームデータのパースエラー:', e, jsonStr);
+              }
+            }
+          }
+          if (streamEndedByDone) break;
+        }
+        
+        if (assistantContent.trim() === '') {
+          replaceMessage(chat.id, assistantResponseId, {
+            role: 'assistant',
+            content: streamEndedByDone ? 'AIからの応答がありませんでした。' : 'AIとの接続が途中で切れました。',
+          });
+        }
+
+      } catch (error: any) {
+        console.error('メッセージ送信エラー:', error);
+        addMessage(chat.id, {
+          role: 'assistant',
+          content: `エラー: ${error.message || 'Unknown error'}`,
+        });
+      }
+      setIsLoading(false);
     }
   };
 
@@ -464,39 +567,66 @@ export default function ChatScreen() {
       color: colors.text,
     },
     inputContainer: {
-      flexDirection: 'row',
-      padding: 8,
-      alignItems: 'flex-end',
-      backgroundColor: colors.card,
+      padding: 12,
+      paddingBottom: Platform.OS === 'ios' ? 8 : 12,
+      backgroundColor: colors.background,
       borderTopWidth: 1,
-      borderTopColor: colors.lightGray,
+      borderTopColor: colors.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 8,
+    },
+    inputTopRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 8,
+    },
+    inputButtonsContainer: {
+      flexDirection: 'column',
+      gap: 6,
+      marginRight: 8,
+    },
+    inputButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.2,
+      shadowRadius: 2,
+      elevation: 2,
     },
     input: {
       flex: 1,
       maxHeight: 120,
-      minHeight: 40,
-      padding: 12,
-      backgroundColor: colors.card,
-      borderRadius: 20,
-      marginRight: 8,
+      minHeight: 44,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: colors.lightGray,
+      borderRadius: 22,
       color: colors.text,
+      fontSize: 16,
+      lineHeight: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     sendButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       backgroundColor: colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
-    },
-    imageButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.primary,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 8,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 4,
     },
     loadingButton: {
       backgroundColor: colors.primary,
@@ -654,6 +784,70 @@ export default function ChatScreen() {
       fontSize: 16,
       fontWeight: '600',
     },
+    featureOptionsContainer: {
+      backgroundColor: colors.background,
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      marginTop: 8,
+    },
+    featureOptionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    featureOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      backgroundColor: colors.lightGray,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    featureOptionActive: {
+      backgroundColor: colors.primary + '20',
+      borderColor: colors.primary,
+    },
+    featureOptionText: {
+      fontSize: 12,
+      color: colors.text,
+      marginLeft: 4,
+      fontWeight: '500',
+    },
+    featureOptionTextActive: {
+      color: colors.primary,
+    },
+    selectedImageContainer: {
+      backgroundColor: colors.card,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    selectedImagePreview: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      position: 'relative',
+    },
+    selectedImageThumbnail: {
+      width: 60,
+      height: 60,
+      borderRadius: 8,
+      marginRight: 12,
+    },
+    removeImageButton: {
+      position: 'absolute',
+      top: -8,
+      right: -8,
+      backgroundColor: colors.background,
+      borderRadius: 10,
+    },
+    selectedImageText: {
+      fontSize: 14,
+      color: colors.text,
+      fontWeight: '500',
+    },
   }), [colors, theme.safeArea.top]);
   
   const renderMessage = ({ item }: { item: Message }) => {
@@ -687,16 +881,15 @@ export default function ChatScreen() {
     );
   }
   
-  const currentModel = MODELS.find(model => model.id === chat.modelId) || MODELS[0];
-  
   const ModelSelectButton = () => {
+    const modelToDisplay = currentModel || MODELS[0]; // undefinedチェック
     return (
       <TouchableOpacity
         style={styles.modelButton}
         onPress={handleModelSelect}
       >
         <Text style={styles.modelButtonText} numberOfLines={1} ellipsizeMode="tail">
-          {currentModel.name}
+          {modelToDisplay.name}
         </Text>
         <Ionicons name="chevron-down" size={16} color={colors.textOnPrimary} />
       </TouchableOpacity>
@@ -928,6 +1121,147 @@ export default function ChatScreen() {
     setShowPartialCopyModal(false);
     setSelectedText('');
   };
+  
+  // マルチモーダル機能の切り替え
+  const toggleFeature = (feature: string) => {
+    const newFeatures = new Set(enabledFeatures);
+    if (newFeatures.has(feature)) {
+      newFeatures.delete(feature);
+    } else {
+      newFeatures.add(feature);
+    }
+    setEnabledFeatures(newFeatures);
+  };
+  
+  // 現在のモデルの利用可能機能を取得
+  const getAvailableFeatures = () => {
+    if (!chat) return {};
+    const currentModel = MODELS.find(model => model.id === chat.modelId);
+    return currentModel?.features || {};
+  };
+
+  // マルチモーダル機能オプションのレンダリング
+  const renderFeatureOptions = () => {
+    const availableFeatures = getAvailableFeatures();
+    const hasAnyFeatures = Object.values(availableFeatures).some(Boolean);
+    
+    // 画像認識機能も常に表示
+    const showImageVision = !!(currentModel?.features?.vision);
+    
+    if (!hasAnyFeatures && !showImageVision) return null;
+
+    // 型安全なfeatureIconsとfeatureLabels
+    const featureIcons: Record<string, string> = {
+      search: 'search',
+      reasoning: 'bulb',
+      vision: 'camera',
+      audio: 'mic',
+      documents: 'document-text'
+    };
+
+    const featureLabels: Record<string, string> = {
+      search: 'Web検索',
+      reasoning: '推論モード',
+      vision: '画像認識',
+      audio: '音声認識',
+      documents: 'ドキュメント'
+    };
+
+    return (
+      <View style={styles.featureOptionsContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.featureOptionsRow}>
+            {/* 画像認識機能（Vision対応モデルの場合） */}
+            {showImageVision && (
+              <TouchableOpacity
+                style={[styles.featureOption]}
+                onPress={pickImage}
+                activeOpacity={0.7}
+              >
+                <Ionicons 
+                  name="camera" 
+                  size={14} 
+                  color={colors.text} 
+                />
+                <Text style={styles.featureOptionText}>
+                  画像認識
+                </Text>
+              </TouchableOpacity>
+            )}
+            
+            {Object.entries(availableFeatures).map(([feature, isAvailable]) => {
+              if (!isAvailable || feature === 'vision') return null; // visionは除外（画像認識は別途処理）
+              
+              const isActive = enabledFeatures.has(feature);
+              
+              return (
+                <TouchableOpacity
+                  key={feature}
+                  style={[
+                    styles.featureOption,
+                    isActive && styles.featureOptionActive
+                  ]}
+                  onPress={() => toggleFeature(feature)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name={(featureIcons[feature as keyof typeof featureIcons] || 'help') as any} 
+                    size={14} 
+                    color={isActive ? colors.primary : colors.text} 
+                  />
+                  <Text style={[
+                    styles.featureOptionText,
+                    isActive && styles.featureOptionTextActive
+                  ]}>
+                    {featureLabels[feature as keyof typeof featureLabels] || feature}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </View>
+    );
+  };
+
+  // 画像選択処理
+  const pickImage = async () => {
+    // chatとcurrentModelの存在を再確認
+    if (!chat || !currentModel) {
+      showToast('チャットまたはモデル情報が見つかりません。');
+      return;
+    }
+    if (!currentModel.features?.vision) { // 安全なアクセスに変更
+      showToast('このモデルは画像入力に対応していません。');
+      return;
+    }
+    // No permissions request is necessary for launching the image library
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.7, // 品質を少し下げることでBase64文字列のサイズを抑える
+      base64: true, // Base64で画像データを取得
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      if (result.assets[0].base64) {
+        // Base64文字列が大きすぎる場合の警告（例: 5MB以上など）
+        const fileSizeMB = result.assets[0].base64.length * 0.75 / (1024 * 1024); // 概算
+        if (fileSizeMB > 4.5) { // OpenRouterの画像入力上限は5MB程度
+          showToast('画像サイズが大きすぎます。5MB未満の画像を選択してください。');
+          setSelectedImage(null);
+          return;
+        }
+        setSelectedImage(`data:image/jpeg;base64,${result.assets[0].base64}`);
+        showToast('画像が選択されました。説明文を入力して送信してください。');
+        setInput(''); // 画像選択後はテキスト入力をクリアする（UI/UXによる）
+      } else {
+        setSelectedImage(result.assets[0].uri); // Base64が取得できない場合はURIを保持（送信時の処理が必要）
+         showToast('画像が選択されました。(Base64取得失敗)');
+      }
+    }
+  };
 
   return (
     <MessageActionsProvider>
@@ -949,7 +1283,7 @@ export default function ChatScreen() {
         <KeyboardAvoidingView 
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           {chat && (
             <>
@@ -985,50 +1319,83 @@ export default function ChatScreen() {
             
               <View>
                 <View style={styles.inputContainer}>
-                  <TouchableOpacity 
-                    style={[
-                      styles.imageButton,
-                      showImageOptions ? { backgroundColor: colors.accentBlue } : undefined
-                    ]}
-                    onPress={handleToggleImageOptions}
-                  >
-                    <Ionicons 
-                      name="image-outline" 
-                      size={24} 
-                      color="#fff" 
+                  {/* 上段：入力欄・画像生成・送信ボタン */}
+                  <View style={styles.inputTopRow}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={
+                        selectedImage ? "画像の説明を入力 (任意)" 
+                        : showImageOptions ? "画像生成プロンプトを入力..." 
+                        : "メッセージを入力"
+                      }
+                      placeholderTextColor={colors.gray}
+                      value={input}
+                      onChangeText={setInput}
+                      multiline
                     />
-                  </TouchableOpacity>
-
-                  <TextInput
-                    style={styles.input}
-                    placeholder={showImageOptions ? "画像の説明を入力..." : "メッセージを入力"}
-                    placeholderTextColor={colors.gray}
-                    value={input}
-                    onChangeText={setInput}
-                    multiline
-                  />
-                  <TouchableOpacity 
-                    style={[
-                      styles.sendButton,
-                      showImageOptions && isGenerating && { opacity: 0.5 }
-                    ]} 
-                    onPress={handleSend}
-                    disabled={
-                      (showImageOptions && isGenerating) || 
-                      (!showImageOptions && (!input.trim() || isLoading))
-                    }
-                  >
-                    {isLoading || isGenerating ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
+                    
+                    <TouchableOpacity 
+                      style={[
+                        styles.inputButton,
+                        showImageOptions ? { backgroundColor: colors.accentBlue } : undefined
+                      ]}
+                      onPress={handleToggleImageOptions}
+                    >
                       <Ionicons 
-                        name={showImageOptions ? "image" : "send"} 
+                        name="image-outline" 
                         size={20} 
                         color="#fff" 
                       />
-                    )}
-                  </TouchableOpacity>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={[
+                        styles.sendButton,
+                        (showImageOptions && isGenerating && { opacity: 0.5 }) ||
+                        (selectedImage && isLoading && {opacity: 0.5 }) // 画像送信中も非活性
+                      ]} 
+                      onPress={handleSend}
+                      disabled={
+                        (showImageOptions && isGenerating) || 
+                        (!showImageOptions && !selectedImage && (!input.trim() || isLoading)) ||
+                        (!!selectedImage && isLoading) // selectedImageの存在をbooleanにキャスト
+                      }
+                    >
+                      {isLoading || isGenerating ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <Ionicons 
+                          name={showImageOptions ? "image" : (selectedImage ? "send-outline" : "send")}
+                          size={20} 
+                          color="#fff" 
+                        />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {/* 下段：マルチモーダル機能オプション */}
+                  {renderFeatureOptions()}
                 </View>
+                
+                {/* 選択された画像のプレビュー */}
+                {selectedImage && (
+                  <View style={styles.selectedImageContainer}>
+                    <View style={styles.selectedImagePreview}>
+                      <Image 
+                        source={{ uri: selectedImage }} 
+                        style={styles.selectedImageThumbnail}
+                        contentFit="cover"
+                      />
+                      <TouchableOpacity 
+                        style={styles.removeImageButton}
+                        onPress={() => setSelectedImage(null)}
+                      >
+                        <Ionicons name="close-circle" size={20} color={colors.error} />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.selectedImageText}>画像が選択されました</Text>
+                  </View>
+                )}
                 
                 {/* 画像生成オプション - 入力欄の下に配置 */}
                 {showImageOptions && (
@@ -1127,8 +1494,8 @@ export default function ChatScreen() {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                justifyContent: 'center',
-                alignItems: 'center',
+      justifyContent: 'center',
+      alignItems: 'center',
                 // zIndex は Modal 内部での重なりなので、大きな値は不要な場合が多い
                 // ただし、他のモーダル内要素との兼ね合いで調整が必要な場合がある
               }}>

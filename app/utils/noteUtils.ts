@@ -26,7 +26,19 @@ export function extractTitleFromContent(content: string): string {
     return '無題のノート';
   }
 
-  // HTMLを行に分割
+  // H1タグから直接タイトルを抽出
+  const h1Match = content.match(/<h1[^>]*>(.*?)<\/h1>/);
+  if (h1Match && h1Match[1]) {
+    const h1Content = stripHtmlTags(h1Match[1]).trim();
+    if (h1Content.length > 0) {
+      // 最大50文字でタイトルを切り詰め
+      return h1Content.length > 50 
+        ? h1Content.substring(0, 50) + '...' 
+        : h1Content;
+    }
+  }
+
+  // H1が空の場合、他の行からタイトルを抽出
   const lines = content.split(/[\r\n]+/);
   
   for (const line of lines) {

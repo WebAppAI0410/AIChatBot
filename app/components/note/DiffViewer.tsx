@@ -3,7 +3,7 @@ import { View, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-
 import { Text, YStack, XStack } from 'tamagui';
 import { Check, X, RotateCcw, Clock } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
-import { useColors } from '../../constants/colors';
+import useColors from '../../constants/colors';
 import { useColorScheme } from 'react-native';
 
 export interface DiffChange {

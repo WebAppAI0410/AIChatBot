@@ -10,6 +10,13 @@ export type ModelType = {
   dailyLimit?: number;  // For models with daily usage limits
   provider?: string;
   isAuto?: boolean;
+  features?: {
+    search?: boolean;       // Web検索機能
+    reasoning?: boolean;    // 推論モード
+    vision?: boolean;       // 画像認識
+    audio?: boolean;        // 音声認識
+    documents?: boolean;    // ドキュメント処理
+  };
 };
 
 export const MODEL_TIERS = {
@@ -28,7 +35,13 @@ export const MODELS: ModelType[] = [
     tier: 0,
     planTier: 'free',
     provider: 'openrouter',
-    isAuto: true
+    isAuto: true,
+    features: {
+      vision: true,
+      search: true,
+      reasoning: true,
+      documents: true
+    }
   },
   
   // Tier 0 (無料) モデル
@@ -40,7 +53,13 @@ export const MODELS: ModelType[] = [
     isPremium: false,
     tier: 0,
     planTier: 'free',
-    provider: 'google'
+    provider: 'google',
+    features: {
+      search: true,
+      reasoning: true,
+      vision: true,
+      documents: true
+    }
   },
   {
     id: 'google/gemini-2.0-flash-exp:free',
@@ -50,7 +69,10 @@ export const MODELS: ModelType[] = [
     isPremium: false,
     tier: 0,
     planTier: 'free',
-    provider: 'google'
+    provider: 'google',
+    features: {
+      vision: true
+    }
   },
   {
     id: 'deepseek/deepseek-r1-zero:free',
@@ -84,7 +106,10 @@ export const MODELS: ModelType[] = [
     tier: 1,
     planTier: 'free',
     provider: 'openai',
-    dailyLimit: 2
+    dailyLimit: 2,
+    features: {
+      vision: true
+    }
   },
   {
     id: 'openai/gpt-4.1-mini',
@@ -118,58 +143,23 @@ export const MODELS: ModelType[] = [
     planTier: 'free',
     provider: 'deepseek'
   },
-  {
-    id: 'deepseek/deepseek-r1',
-    name: 'DeepSeek R1',
-    description: 'Advanced reasoning model',
-    contextLength: 32000,
-    isPremium: false,
-    tier: 1,
-    planTier: 'free',
-    provider: 'deepseek'
-  },
+    {    id: 'deepseek/deepseek-r1',    name: 'DeepSeek R1',    description: 'Advanced reasoning model',    contextLength: 32000,    isPremium: false,    tier: 1,    planTier: 'free',    provider: 'deepseek',    features: {      reasoning: true    }  },
   {
     id: 'google/gemini-2.5-flash-preview',
     name: 'Gemini 2.5 Flash Preview',
     description: 'Fast Google model with preview access',
-    contextLength: 32000,
+    contextLength: 1000000,
     isPremium: false,
     tier: 1,
     planTier: 'free',
-    provider: 'google'
+    provider: 'google',
+    features: {
+      vision: true
+    }
   },
   
   // Tier 1 (Liteプラン以上)
-  {
-    id: 'openai/o4-mini',
-    name: 'o4-mini',
-    description: 'Compact reasoning model optimized for fast, cost-efficient performance',
-    contextLength: 200000,
-    isPremium: true,
-    tier: 1,
-    planTier: 'lite',
-    provider: 'openai'
-  },
-  {
-    id: 'openai/o4-mini-high',
-    name: 'o4-mini-high',
-    description: 'o4-mini with reasoning_effort set to high',
-    contextLength: 200000,
-    isPremium: true,
-    tier: 1,
-    planTier: 'lite',
-    provider: 'openai'
-  },
-  {
-    id: 'openai/o3',
-    name: 'o3',
-    description: 'Well-rounded model for math, science, coding, and visual reasoning',
-    contextLength: 200000,
-    isPremium: true,
-    tier: 1,
-    planTier: 'lite',
-    provider: 'openai'
-  },
+    {    id: 'openai/o4-mini',    name: 'o4-mini',    description: 'Compact reasoning model optimized for fast, cost-efficient performance',    contextLength: 200000,    isPremium: true,    tier: 1,    planTier: 'lite',    provider: 'openai',    features: {      vision: true,      reasoning: true    }  },  {    id: 'openai/o4-mini-high',    name: 'o4-mini-high',    description: 'o4-mini with reasoning_effort set to high',    contextLength: 200000,    isPremium: true,    tier: 1,    planTier: 'lite',    provider: 'openai',    features: {      vision: true,      reasoning: true    }  },  {    id: 'openai/o3',    name: 'o3',    description: 'Well-rounded model for math, science, coding, and visual reasoning',    contextLength: 200000,    isPremium: true,    tier: 1,    planTier: 'lite',    provider: 'openai',    features: {      vision: true,      reasoning: true    }  },
   {
     id: 'google/gemini-2.5-pro-preview',
     name: 'Gemini 2.5 Pro Preview',
@@ -178,7 +168,13 @@ export const MODELS: ModelType[] = [
     isPremium: true,
     tier: 1,
     planTier: 'lite',
-    provider: 'google'
+    provider: 'google',
+    features: {
+      vision: true,
+      search: true,
+      reasoning: true,
+      documents: true
+    }
   },
   
   // Tier 2 (Premium)
@@ -191,7 +187,14 @@ export const MODELS: ModelType[] = [
     tier: 2,
     planTier: 'free',
     provider: 'openai',
-    dailyLimit: 1
+    dailyLimit: 1,
+    features: {
+      search: true,
+      reasoning: true,
+      vision: true,
+      audio: true,
+      documents: true
+    }
   },
   {
     id: 'openai/gpt-4.1',
@@ -202,7 +205,10 @@ export const MODELS: ModelType[] = [
     tier: 2,
     planTier: 'free',
     provider: 'openai',
-    dailyLimit: 1
+    dailyLimit: 1,
+    features: {
+      vision: true
+    }
   },
   {
     id: 'openai/gpt-4.5-preview',
@@ -212,7 +218,10 @@ export const MODELS: ModelType[] = [
     isPremium: true,
     tier: 2,
     planTier: 'premium',
-    provider: 'openai'
+    provider: 'openai',
+    features: {
+      vision: true
+    }
   },
   {
     id: 'anthropic/claude-3.7-sonnet',
@@ -222,18 +231,12 @@ export const MODELS: ModelType[] = [
     isPremium: true,
     tier: 2,
     planTier: 'premium',
-    provider: 'anthropic'
+    provider: 'anthropic',
+    features: {
+      vision: true
+    }
   },
-  {
-    id: 'anthropic/claude-3.7-sonnet:thinking',
-    name: 'Claude 3.7 Sonnet Thinking',
-    description: 'Claude model with extended step-by-step reasoning',
-    contextLength: 200000,
-    isPremium: true,
-    tier: 2,
-    planTier: 'premium',
-    provider: 'anthropic'
-  }
+    {    id: 'anthropic/claude-3.7-sonnet:thinking',    name: 'Claude 3.7 Sonnet Thinking',    description: 'Claude model with extended step-by-step reasoning',    contextLength: 200000,    isPremium: true,    tier: 2,    planTier: 'premium',    provider: 'anthropic',    features: {      reasoning: true,      vision: true    }  }
 ];
 
 export const IMAGE_MODELS = {

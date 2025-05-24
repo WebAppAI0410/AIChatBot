@@ -8,7 +8,7 @@ import { useNoteStore } from '../store/noteStore';
 import TenTapEditor from '../components/note/TenTapEditor';
 import AIAssistChat from '../components/note/AIAssistChat';
 import DiffViewer, { DiffChange } from '../components/note/DiffViewer';
-import { useColors } from '../constants/colors';
+import useColors from '../constants/colors';
 import { useTheme } from '../ui/ThemeProvider';
 import { useColorScheme } from 'react-native';
 import { aiAssistService, AIAssistResponse } from '../services/aiAssist';
@@ -82,34 +82,51 @@ export default function NoteScreen() {
   // ドラッグ中は一時的な比率を使用し、ドラッグ終了時に確定
   const currentRatio = isDragging ? tempRatio : aiChatSplitRatio;
 
-  // 初期データロード
+  // 初期データロード - 安定化改良版
   useEffect(() => {
     if (isNewNote) {
-      // 新規ノートの場合、H1タイトルを設定
-      setTitle('無題のノート');
-      setContent('<h1>無題のノート</h1><p></p>');
-      createNewNote();
+      // 新規ノートの場合の安定初期化
+      setTitle('');
+      setContent('<h1></h1>');
+      
+      // 新規ノート作成を非同期で実行
+      const initNewNote = async () => {
+        try {
+          await createNewNote();
+        } catch (error) {
+          console.error('新規ノート作成エラー:', error);
+        }
+      };
+      
+      initNewNote();
       return;
     }
     
+    // 既存ノートのロード
     const note = getNoteById(id);
     if (note) {
-      setTitle(note.title);
-      setContent(note.content || '<p>ここに内容を入力してください</p>');
+      setTitle(note.title || '');
+      setContent(note.content || '<h1></h1>');
     } else {
       // ノートが見つからない場合は一覧に戻る
       router.replace('/notes');
     }
-  }, [id, isNewNote, getNoteById]);
+  }, [id, isNewNote, getNoteById, router]);
 
-  // 新規ノートの作成
+  // 新規ノートの作成 - 安定化改良版
   const createNewNote = useCallback(async () => {
+    // 既にノートIDが設定されている場合は重複作成を防ぐ
+    if (noteId) {
+      return;
+    }
+    
     try {
       const newNoteId = await createNote({
-        title: '無題のノート',
-        content: '<h1>無題のノート</h1><p></p>',
+        title: '',
+        content: '<h1></h1>',
         folder_id: currentFolder
       });
+      
       setNoteId(newNoteId);
       
       // URLを新しいノートIDに更新
@@ -122,22 +139,30 @@ export default function NoteScreen() {
       }
     } catch (error) {
       console.error('新規ノート作成エラー:', error);
+      throw error;
     }
-  }, [createNote, currentFolder]);
+  }, [createNote, currentFolder, noteId]);
 
   // 自動保存のタイマーとAI編集状態
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isAIEditing, setIsAIEditing] = useState(false);
   
-  // 内容の変更ハンドラ
+  // 内容の変更ハンドラ - 安定化改良版
   const handleContentChange = useCallback((newContent: string) => {
+    // 空のコンテンツや無効なコンテンツをスキップ
+    if (!newContent || newContent.trim() === '' || newContent === '<h1></h1>') {
+      return;
+    }
+    
     setContent(newContent);
     
     // タイトルをH1から抽出
     const h1Match = newContent.match(/<h1[^>]*>(.*?)<\/h1>/);
     if (h1Match && h1Match[1]) {
-      const extractedTitle = h1Match[1].replace(/<[^>]*>/g, ''); // HTMLタグを除去
+      const extractedTitle = h1Match[1].replace(/<[^>]*>/g, '').trim();
       setTitle(extractedTitle);
+    } else {
+      setTitle('');
     }
     
     // AI編集中は自動保存を停止
@@ -145,25 +170,37 @@ export default function NoteScreen() {
       return;
     }
     
-    // デバウンスした自動保存（500ms後）
+    // 既存のタイマーをクリア
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
     }
     
+    // デバウンスした自動保存（800ms後に延長）
     saveTimerRef.current = setTimeout(() => {
-      if (isNewNote && noteId) {
-        updateNote(noteId, { 
-          content: newContent,
-          title: h1Match ? h1Match[1].replace(/<[^>]*>/g, '') : title
-        });
-      } else if (!isNewNote) {
-        updateNote(id, { 
-          content: newContent,
-          title: h1Match ? h1Match[1].replace(/<[^>]*>/g, '') : title
-        });
+      const finalTitle = h1Match && h1Match[1] 
+        ? h1Match[1].replace(/<[^>]*>/g, '').trim() 
+        : '';
+        
+      try {
+        if (isNewNote && noteId) {
+          updateNote(noteId, { 
+            content: newContent,
+            title: finalTitle
+          });
+        } else if (!isNewNote && id) {
+          updateNote(id, { 
+            content: newContent,
+            title: finalTitle
+          });
+        }
+      } catch (error) {
+        console.error('自動保存エラー:', error);
+      } finally {
+        saveTimerRef.current = null;
       }
-    }, 500);
-  }, [id, isNewNote, noteId, updateNote, title, isAIEditing]);
+    }, 800);
+  }, [id, isNewNote, noteId, updateNote, isAIEditing]);
 
   // コンポーネントのクリーンアップ
   useEffect(() => {
@@ -199,6 +236,8 @@ export default function NoteScreen() {
     if (aiChatMode) {
       setShowAiAssist(false);
       setShowDiffViewer(false);
+      setIsAIEditing(false);  // AI編集状態もリセット
+      setDiffChanges([]);     // 差分変更もクリア
     }
   }, [aiChatMode]);
 
@@ -249,12 +288,33 @@ export default function NoteScreen() {
     setShowDiffViewer(true);
   }, [content]);
 
-  // AIチャットからの直接的な変更適用
+  // AIチャットからの直接的な変更適用 - 安定化改良版
   const handleApplyAIChanges = useCallback((newContent: string) => {
     console.log('[NoteScreen] handleApplyAIChanges が呼ばれました');
     console.log('[NoteScreen] 新しいコンテンツ:', newContent);
-    handleContentChange(newContent);
-  }, [handleContentChange]);
+    
+    // 空のコンテンツは無視
+    if (!newContent || newContent.trim() === '') {
+      return;
+    }
+    
+    setContent(newContent);
+    
+    // AI編集フラグを一時的に設定して自動保存を防ぐ
+    setIsAIEditing(true);
+    
+    // タイトルをH1から抽出
+    const h1Match = newContent.match(/<h1[^>]*>(.*?)<\/h1>/);
+    const extractedTitle = h1Match && h1Match[1] 
+      ? h1Match[1].replace(/<[^>]*>/g, '').trim() 
+      : '';
+    setTitle(extractedTitle);
+    
+    // 少し遅延してAI編集フラグをリセット
+    setTimeout(() => {
+      setIsAIEditing(false);
+    }, 500);
+  }, []);
 
   // AIチャットからの自動編集処理（編集モード用）
   const handleAutoEdit = useCallback((newContent: string, explanation: string) => {
@@ -626,7 +686,6 @@ export default function NoteScreen() {
       width: 20,
       justifyContent: 'center',
       alignItems: 'center',
-      cursor: 'col-resize',
       paddingVertical: 10,
     },
     splitHandleIndicator: {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { useColors } from '../../constants/colors';
+import useColors from '../../constants/colors';
 
 interface CodeBlockProps {
   code: string;

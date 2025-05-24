@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { useColors } from '../../constants/colors';
+import useColors from '../../constants/colors';
 
 interface MathRendererProps {
   latex: string;

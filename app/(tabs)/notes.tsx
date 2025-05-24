@@ -7,7 +7,7 @@ import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useNoteStore } from '../store/noteStore';
 import Header from '../components/Header';
-import { useColors } from '../constants/colors';
+import useColors from '../constants/colors';
 import { useTheme } from '../ui/ThemeProvider';
 import { Swipeable } from 'react-native-gesture-handler';
 import SelectionHeader from '../components/SelectionHeader';
@@ -259,24 +259,28 @@ export default function NotesScreen() {
   
   // ノート選択切り替え
   const toggleNoteSelection = useCallback((noteId: string) => {
-    const newSelection = new Set(selectedNoteIds);
-    if (newSelection.has(noteId)) {
-      newSelection.delete(noteId);
-    } else {
-      newSelection.add(noteId);
-    }
-    setSelectedNoteIds(newSelection);
-  }, [selectedNoteIds]);
+    setSelectedNoteIds(prevSelected => {
+      const newSelection = new Set(prevSelected);
+      if (newSelection.has(noteId)) {
+        newSelection.delete(noteId);
+      } else {
+        newSelection.add(noteId);
+      }
+      return newSelection;
+    });
+  }, []);
   
   // 全選択/全解除
   const toggleSelectAllNotes = useCallback(() => {
-    const visibleNotes = displayItems().filter(item => item.type === 'note');
-    if (selectedNoteIds.size === visibleNotes.length) {
-      setSelectedNoteIds(new Set());
-    } else {
-      setSelectedNoteIds(new Set(visibleNotes.map(note => note.id)));
-    }
-  }, [displayItems, selectedNoteIds.size]);
+    setSelectedNoteIds(prevSelected => {
+      const visibleNotes = displayItems().filter(item => item.type === 'note');
+      if (prevSelected.size === visibleNotes.length && visibleNotes.length > 0) {
+        return new Set(); // 全解除
+      } else {
+        return new Set(visibleNotes.map(note => note.id)); // 全選択
+      }
+    });
+  }, [displayItems]);
   
   // 選択したノートを一括削除
   const handleBulkDeleteNotes = useCallback(() => {

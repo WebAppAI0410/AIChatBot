@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Dimensions } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { useColors } from '../constants/colors';
+import useColors from '../constants/colors';
 import { extractTitleFromContent, extractPreviewFromContent, getDetailedDateString, getRelativeTimeString } from '../utils/noteUtils';
 
 const { width } = Dimensions.get('window');

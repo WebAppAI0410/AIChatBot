@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperat
 import { StyleSheet, View, Platform, KeyboardAvoidingView, useColorScheme } from 'react-native';
 import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
 import { useTheme } from '../../ui/ThemeProvider';
-import { useColors } from '../../constants/colors';
+import useColors from '../../constants/colors';
 import { useStore } from '../../store';
 import { Bold, Italic, Underline, Strikethrough, List, ListOrdered, Heading1, Heading2, Heading3, Quote, Link, Image, ListChecks, Highlighter, RotateCcw, RotateCw, Minus, Code, Calculator } from 'lucide-react-native';
       

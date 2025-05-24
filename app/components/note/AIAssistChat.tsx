@@ -13,7 +13,7 @@ import {
 import { Text, XStack, YStack, Button } from 'tamagui';
 import { Send, Undo, Check } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
-import { useColors } from '../../constants/colors';
+import useColors from '../../constants/colors';
 import { useColorScheme } from 'react-native';
 import { aiAssistService } from '../../services/aiAssist';
 import ChatBubble from '../ChatBubble';

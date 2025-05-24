@@ -240,7 +240,7 @@ export const createNoteSlice: StateCreator<
         : get().currentFolder;
         
       const note = await dbCreateNote({
-        title: noteData.title || '無題のノート',
+        title: noteData.title || '',
         content: noteData.content || '',
         folder_id
       });
@@ -471,13 +471,10 @@ export const createNoteSlice: StateCreator<
 });
 
 // 単独で使用する場合のフック - 型定義エラーを修正
-const createStandaloneNoteStore = () => 
-  create<NoteState>((set, get) => 
-    createNoteSlice(
-      set as any, 
-      get as any, 
-      {} as any
-    )
-  );
-
-export const useNoteStore = createStandaloneNoteStore(); 
+export const useNoteStore = create<NoteState>((set, get) => 
+  createNoteSlice(
+    set as any, 
+    get as any, 
+    {} as any
+  )
+); 

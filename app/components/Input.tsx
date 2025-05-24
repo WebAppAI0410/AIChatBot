@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { TextInput, View, Text, StyleSheet, TextInputProps, ViewStyle, NativeSyntheticEvent, TextInputFocusEventData, AccessibilityRole } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import theme from '../ui/theme';
-import { useColors } from '../constants/colors';
+import useColors from '../constants/colors';
 
 type InputProps = TextInputProps & {
   label?: string;

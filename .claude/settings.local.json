@@ -16,7 +16,11 @@
       "Bash(npx tsc:*)",
       "Bash(npm update:*)",
       "Bash(npm install:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(sed:*)",
+      "Bash(for:*)",
+      "Bash(do)",
+      "Bash(done)"
     ],
     "deny": []
   }

@@ -5,7 +5,7 @@ import { X, Plus, Check, Tag as TagIcon } from 'lucide-react-native';
 import { useTranslation } from 'react-i18next';
 import { useNoteStore } from '../../store/noteStore';
 import { Tag } from '../../services/sqlite';
-import { useColors } from '../../constants/colors';
+import useColors from '../../constants/colors';
 
 export type TagSelectorProps = {
   noteId: string;

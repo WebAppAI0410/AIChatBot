@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Modal, 
   View, 
@@ -6,7 +6,8 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   FlatList,
-  Pressable
+  Pressable,
+  ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
@@ -37,6 +38,30 @@ export default function ModelSelectModal({
   const incrementModelUsageCount = useStore(state => state.incrementModelUsageCount);
   const colors = useColors();
   const { theme } = useTheme();
+  
+  // プロバイダー展開状態を管理
+  const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set(['auto', 'openai'])); // デフォルトでOpenAIを展開
+  
+  // プロバイダー情報の定義（実際のロゴを使用）
+  const PROVIDER_INFO = {
+    'auto': { name: 'Auto', icon: '🤖', color: colors.primary },
+    'openai': { name: 'OpenAI', logoText: 'OAI', color: '#10A37F' },
+    'google': { name: 'Google', logoText: 'G', color: '#4285F4' },
+    'anthropic': { name: 'Anthropic', logoText: 'A', color: '#D2691E' },
+    'deepseek': { name: 'DeepSeek', logoText: 'DS', color: '#6B46C1' },
+    'local': { name: 'ローカル', icon: '💻', color: colors.accentBlue },
+  };
+  
+  // プロバイダーの展開/格納を切り替え
+  const toggleProvider = (provider: string) => {
+    const newExpanded = new Set(expandedProviders);
+    if (newExpanded.has(provider)) {
+      newExpanded.delete(provider);
+    } else {
+      newExpanded.add(provider);
+    }
+    setExpandedProviders(newExpanded);
+  };
   
   // モデルのクォータが残っているかチェック
   const isModelQuotaAvailable = (model: ModelType) => {
@@ -159,47 +184,49 @@ export default function ModelSelectModal({
     return null;
   };
   
-  const groupedModels = useMemo(() => {
-    const groups: { [key: string]: ModelType[] } = {
-      'auto': MODELS.filter(m => m.isAuto),
-      'local': MODELS.filter(m => m.isLocal),
-      'tier0': MODELS.filter(m => m.tier === 0 && !m.isAuto && !m.isLocal),
-      'tier1': MODELS.filter(m => m.tier === 1),
-      'tier2': MODELS.filter(m => m.tier === 2),
-    };
+  const groupedModelsByProvider = useMemo(() => {
+    const groups: { [key: string]: ModelType[] } = {};
+    
+    // プロバイダー別にグループ化
+    MODELS.forEach(model => {
+      const provider = model.isAuto ? 'auto' : model.isLocal ? 'local' : model.provider || 'other';
+      if (!groups[provider]) {
+        groups[provider] = [];
+      }
+      groups[provider].push(model);
+    });
+    
+    // 各プロバイダー内でtier順にソート
+    Object.keys(groups).forEach(provider => {
+      groups[provider].sort((a, b) => {
+        if (a.tier !== b.tier) return a.tier - b.tier;
+        return a.name.localeCompare(b.name);
+      });
+    });
     
     return groups;
   }, [MODELS]);
   
-  const filteredModels = useMemo(() => {
-    const autoModels = groupedModels.auto;
-    
-    const localModels = groupedModels.local;
-    
-    const freeModels = groupedModels.tier0;
-    
-    let availableModels: ModelType[] = [];
-    
-    const availableTiers = getAvailableTiers();
-    
-    if (availableTiers.includes(1)) {
-      availableModels = [...availableModels, ...groupedModels.tier1];
-    } else if (plan === 'free') {
-      const tier1Models = groupedModels.tier1.filter(m => m.planTier === 'free' && m.dailyLimit);
-      availableModels = [...availableModels, ...tier1Models];
-    }
-    
-    if (availableTiers.includes(2)) {
-      if (plan === 'premium') {
-        availableModels = [...availableModels, ...groupedModels.tier2];
-      } else {
-        const tier2Models = groupedModels.tier2.filter(m => m.planTier === 'free' && m.dailyLimit);
-        availableModels = [...availableModels, ...tier2Models];
+  // プロバイダー別にフィルタリング（利用可能性チェック）
+  const getFilteredProviderModels = (provider: string): ModelType[] => {
+    const models = groupedModelsByProvider[provider] || [];
+    return models.filter(model => {
+      const availableTiers = getAvailableTiers();
+      
+      // ローカルモデルは常に表示
+      if (model.isLocal) return true;
+      
+      // Autoモデルは常に表示
+      if (model.isAuto) return true;
+      
+      // プラン制限をチェック
+      if (model.isPremium && !availableTiers.includes(model.tier) && !model.dailyLimit) {
+        return false;
       }
-    }
-    
-    return [...autoModels, ...localModels, ...freeModels, ...availableModels];
-  }, [groupedModels, plan]);
+      
+      return true;
+    });
+  };
   
   const styles = StyleSheet.create({
     modalContainer: {
@@ -322,15 +349,100 @@ export default function ModelSelectModal({
       color: colors.error,
       marginTop: 2,
     },
+    providerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.md,
+      backgroundColor: colors.lightGray + '40',
+      marginBottom: theme.spacing.xs,
+      borderRadius: theme.radius.md,
+    },
+    providerInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    providerIcon: {
+      fontSize: 20,
+      marginRight: theme.spacing.sm,
+    },
+    providerLogo: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: theme.spacing.sm,
+    },
+    providerLogoText: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: '#FFFFFF',
+    },
+    providerName: {
+      fontSize: theme.fontSizes.md,
+      fontWeight: '600',
+      color: colors.text,
+      flex: 1,
+    },
+    providerCount: {
+      fontSize: theme.fontSizes.sm,
+      color: colors.secondaryText,
+      marginRight: theme.spacing.sm,
+    },
+    expandIcon: {
+      padding: theme.spacing.xs,
+    },
+    providerModels: {
+      paddingLeft: theme.spacing.md,
+      marginBottom: theme.spacing.sm,
+    },
   });
   
-  const renderModelItem = ({ item }: { item: ModelType }) => {
+  // プロバイダーヘッダーのレンダリング
+  const renderProviderHeader = (provider: string, models: ModelType[]) => {
+    const isExpanded = expandedProviders.has(provider);
+    const providerInfo = PROVIDER_INFO[provider] || { name: provider, icon: '📁', color: colors.text };
+    
+    return (
+      <TouchableOpacity
+        style={styles.providerHeader}
+        onPress={() => toggleProvider(provider)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.providerInfo}>
+          {providerInfo.logoText ? (
+            <View style={[styles.providerLogo, { backgroundColor: providerInfo.color }]}>
+              <Text style={styles.providerLogoText}>{providerInfo.logoText}</Text>
+            </View>
+          ) : (
+            <Text style={styles.providerIcon}>{providerInfo.icon}</Text>
+          )}
+          <Text style={styles.providerName}>{providerInfo.name}</Text>
+          <Text style={styles.providerCount}>({models.length})</Text>
+        </View>
+        <View style={styles.expandIcon}>
+          <Ionicons 
+            name={isExpanded ? "chevron-down" : "chevron-forward"} 
+            size={20} 
+            color={colors.secondaryText} 
+          />
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // モデルアイテムのレンダリング
+  const renderModelItem = (item: ModelType) => {
     const isSelected = item.id === currentModelId;
     const isDisabled = isModelDisabled(item);
     const hasReachedQuota = item.dailyLimit && (dailyModelQuotasCount[item.id] || 0) >= (item.dailyLimit || 0);
     
     return (
       <TouchableOpacity
+        key={item.id}
         style={[
           styles.modelItem,
           isSelected ? styles.selectedModelItem : undefined,
@@ -362,12 +474,6 @@ export default function ModelSelectModal({
         </View>
         
         <View style={styles.modelRight}>
-          {item.provider && !item.isLocal && !item.isAuto && (
-            <View style={styles.providerBadge}>
-              <Text style={styles.providerText}>{item.provider}</Text>
-            </View>
-          )}
-          
           {getModelTierBadge(item)}
           
           {isSelected ? (
@@ -398,12 +504,37 @@ export default function ModelSelectModal({
             </TouchableOpacity>
           </View>
           
-          <FlatList
-            data={filteredModels}
-            renderItem={renderModelItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.modelList}
-          />
+          <ScrollView style={styles.modelList} showsVerticalScrollIndicator={false}>
+            {Object.entries(groupedModelsByProvider)
+              .sort(([a], [b]) => {
+                // 順序を定義: auto, local, openai, google, anthropic, deepseek, その他
+                const order = ['auto', 'local', 'openai', 'google', 'anthropic', 'deepseek'];
+                const aIndex = order.indexOf(a);
+                const bIndex = order.indexOf(b);
+                
+                if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+                if (aIndex !== -1) return -1;
+                if (bIndex !== -1) return 1;
+                return a.localeCompare(b);
+              })
+              .map(([provider, models]) => {
+                const filteredModels = getFilteredProviderModels(provider);
+                if (filteredModels.length === 0) return null;
+                
+                const isExpanded = expandedProviders.has(provider);
+                
+                return (
+                  <View key={provider}>
+                    {renderProviderHeader(provider, filteredModels)}
+                    {isExpanded && (
+                      <View style={styles.providerModels}>
+                        {filteredModels.map(renderModelItem)}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+          </ScrollView>
         </View>
       </View>
     </Modal>

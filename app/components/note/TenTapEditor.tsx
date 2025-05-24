@@ -1,6 +1,6 @@
 import React, { forwardRef, useImperativeHandle, useEffect, useState, useCallback, useRef } from 'react';
-import { StyleSheet, View, Platform, SafeAreaView, KeyboardAvoidingView, TouchableOpacity, Text, useWindowDimensions } from 'react-native';
-import { Calculator, Minus, Code, Hash, MessageCircle } from 'lucide-react-native';
+import { StyleSheet, View, Platform, SafeAreaView, KeyboardAvoidingView, TouchableOpacity, Text, useWindowDimensions, Alert } from 'react-native';
+import { Table, Image, Highlighter, Minus } from 'lucide-react-native';
 import { 
   RichText, 
   Toolbar, 
@@ -12,7 +12,8 @@ import {
   DEFAULT_TOOLBAR_ITEMS,
   type ToolbarItem
 } from '@10play/tentap-editor';
-import { useColors } from '../../constants/colors';
+import useColors from '../../constants/colors';
+import * as ImagePicker from 'expo-image-picker';
 
 export type TenTapEditorProps = {
   content: string;
@@ -30,6 +31,8 @@ interface TenTapEditorRef {
   editor: any;
   undo: () => void;
   redo: () => void;
+  insertTable: () => void;
+  insertImage: () => void;
 }
 
 const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditorProps> = (props, ref) => {
@@ -94,22 +97,10 @@ const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditor
       textAlign: 'center',
       flexShrink: 1,
     },
-    inlineToolbar: {
-      paddingVertical: isTablet ? 8 : 6,
-      paddingHorizontal: isTablet ? 12 : 8,
-      borderTopWidth: 1,
-      borderBottomWidth: 1,
-    },
     extendedToolbar: {
       paddingVertical: isTablet ? 8 : 6,
       paddingHorizontal: isTablet ? 12 : 8,
       borderTopWidth: 1,
-    },
-    inlineRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: isTablet ? 6 : 3,
-      justifyContent: 'space-around',
     },
     extendedRow: {
       flexDirection: 'row',
@@ -399,7 +390,7 @@ const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditor
   const customTheme = {
     toolbar: {
       toolbarBody: {
-        backgroundColor: isDarkMode ? '#0d1117' : '#ffffff',
+        backgroundColor: isDarkMode ? '#21262d' : '#f6f8fa',
         borderTopColor: isDarkMode ? '#30363d' : '#d0d7de',
         borderBottomColor: isDarkMode ? '#30363d' : '#d0d7de',
       },
@@ -422,9 +413,20 @@ const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditor
     },
   };
 
-  // コンテンツ更新の制御用
+  // コンテンツ更新の制御用 - 安定化改良版
   const [isUpdatingFromExternal, setIsUpdatingFromExternal] = useState(false);
   const lastInternalContent = useRef(content);
+  const ignoreNextChange = useRef(false);
+  
+  // 新規ノート処理の簡素化
+  const isInitialized = useRef(false);
+  
+  // コンポーネントのクリーンアップ
+  useEffect(() => {
+    return () => {
+      isInitialized.current = false;
+    };
+  }, []);
   
   // TenTapエディタブリッジを初期化
   const editor = useEditorBridge({
@@ -436,54 +438,27 @@ const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditor
         showOnlyCurrent: false,
       }),
     ],
-    initialContent: content || '<p></p>',
+    initialContent: content || '<h1></h1>',
     autofocus: autoFocus,
     avoidIosKeyboard: true,
     editable: !readOnly,
     theme: customTheme,
-    onUpdate: ({ editor }) => {
-      // コンテンツ更新時にMathJax処理を実行
-      if (typeof window !== 'undefined' && window.MathJax) {
-        setTimeout(() => {
-          window.MathJax.typesetPromise().catch((err: any) => {
-            console.log('MathJax typeset error:', err);
-          });
-        }, 100);
-      }
-    },
     onChange: () => {
-      // 外部からの更新中は onChange を無視
-      if (isUpdatingFromExternal) {
-        return;
-      }
-      
-      // 新規ノートの初期選択処理中は onChange を無視
-      if (isNewNote && !newNoteSelectionDone) {
+      // 更新制御フラグをチェック
+      if (isUpdatingFromExternal || ignoreNextChange.current) {
+        ignoreNextChange.current = false;
         return;
       }
       
       editor.getHTML().then((html) => {
-        if (html !== lastInternalContent.current) {
+        // 内容が実際に変更された場合のみ通知
+        if (html !== lastInternalContent.current && html.trim() !== '') {
           lastInternalContent.current = html;
           onContentChange(html);
         }
+      }).catch((error) => {
+        console.log('エディタHTML取得エラー:', error);
       });
-    },
-    onKeyDown: (event) => {
-      // Enterキーが押された時の処理
-      if (event.key === 'Enter') {
-        // 現在の選択範囲の情報を取得
-        editor.getActiveNodeType().then((nodeType) => {
-          // 見出し要素からの改行時は段落に変換
-          if (nodeType && ['heading1', 'heading2', 'heading3', 'blockquote'].includes(nodeType)) {
-            setTimeout(() => {
-              editor.setParagraph();
-            }, 50);
-          }
-        }).catch(() => {
-          // エラーが発生した場合は何もしない
-        });
-      }
     },
   });
 
@@ -504,8 +479,9 @@ const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditor
     const nonListItems: ToolbarItem[] = [];
     
     filteredItems.forEach(item => {
-      // リスト系アクションかどうかを判断
-      if (item === 'orderedList' || item === 'bulletList' || item === 'taskList') {
+      // リスト系アクションかどうかを判断（文字列として比較）
+      const itemStr = String(item);
+      if (itemStr === 'orderedList' || itemStr === 'bulletList' || itemStr === 'taskList') {
         listItems.push(item);
       } else {
         nonListItems.push(item);
@@ -535,7 +511,7 @@ const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditor
         styles.headingButton,
         { 
           backgroundColor: active ? colors.primary : 'transparent',
-          borderColor: colors.border
+          borderColor: isDarkMode ? '#30363d' : '#d0d7de'
         }
       ]}
       onPress={onPress}
@@ -557,190 +533,181 @@ const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditor
     </TouchableOpacity>
   );
 
-  // 見出しボタンのハンドラ
+  // 見出しボタンのハンドラ（トグル無効化 - 常に指定レベルの見出しに設定）
   const handleHeading = useCallback((level: number) => {
-    if (editor && editor.toggleHeading) {
-      editor.toggleHeading(level as 1 | 2 | 3 | 4 | 5 | 6);
+    if (editor) {
+      try {
+        // 現在の見出しレベルを取得
+        const currentLevel = editorState?.headingLevel;
+        
+        if (currentLevel === level) {
+          // 同じレベルが選択されている場合は何もしない（トグルを無効化）
+          console.log('同じ見出しレベルが選択されているため、変更なし:', level);
+          return;
+        }
+        
+        console.log('見出しレベル変更:', currentLevel, '->', level);
+        
+        // 異なるレベルまたは段落から見出しに変更する場合
+        let success = false;
+        
+        // 方法1: 標準のtoggleHeading
+        try {
+          editor.toggleHeading(level as 1 | 2 | 3 | 4 | 5 | 6);
+          success = true;
+          console.log('toggleHeadingによる見出し設定成功');
+        } catch (e) {
+          console.log('toggleHeading失敗:', e);
+        }
+        
+        // 方法2: chainコマンド
+        if (!success && (editor as any).chain) {
+          try {
+            (editor as any).chain().toggleHeading({ level }).run();
+            success = true;
+            console.log('chain().toggleHeadingによる見出し設定成功');
+          } catch (e) {
+            console.log('chain toggleHeading失敗:', e);
+          }
+        }
+        
+        // 方法3: setNodeで直接指定
+        if (!success && (editor as any).chain) {
+          try {
+            (editor as any).chain().setNode('heading', { level }).run();
+            success = true;
+            console.log('setNodeによる見出し設定成功');
+          } catch (e) {
+            console.log('setNode失敗:', e);
+          }
+        }
+        
+        if (!success) {
+          console.log('すべての見出し設定方法が失敗しました');
+        } else {
+          // 成功した場合は少し遅延してから状態を確認
+          setTimeout(() => {
+            try {
+              (editor as any).updateState?.();
+            } catch (e) {
+              console.log('状態更新エラー:', e);
+            }
+          }, 50);
+        }
+      } catch (error) {
+        console.log('見出し設定エラー:', error);
+      }
     }
-  }, [editor]);
+  }, [editor, editorState?.headingLevel]);
 
-  // 段落（プレーンテキスト）ボタンのハンドラ
+  // 段落（プレーンテキスト）ボタンのハンドラ（見出しからプレーンテキストに変換）
   const handleParagraph = useCallback(() => {
-    if (editor && editor.setParagraph) {
-      editor.setParagraph();
-    }
-  }, [editor]);
-
-  // インライン数式挿入ハンドラ
-  const handleInlineMath = useCallback(() => {
-    if (editor && editor.commands) {
-      // インライン数式のテンプレートを挿入
-      editor.commands.insertContent('$$');
-      // カーソルを$マークの間に配置
-      setTimeout(() => {
-        try {
-          const editorView = (editor as any).view;
-          if (editorView && editorView.state) {
-            const { state } = editorView;
-            const { selection } = state;
-            const pos = selection.from - 1; // $記号の間に配置
-            const resolvedPos = state.doc.resolve(Math.max(1, pos));
-            const newSelection = state.selection.constructor.near(resolvedPos);
-            const tr = state.tr.setSelection(newSelection);
-            editorView.dispatch(tr);
+    if (editor) {
+      try {
+        const currentLevel = editorState?.headingLevel;
+        
+        if (currentLevel) {
+          console.log('見出しから本文への変換開始, 現在のレベル:', currentLevel);
+          
+          // 複数の変換方法を順番に試行
+          let success = false;
+          
+          // 方法1: TenTapエディタのsetParagraph
+          if ('setParagraph' in editor && typeof editor.setParagraph === 'function') {
+            try {
+              editor.setParagraph();
+              success = true;
+              console.log('setParagraphによる変換成功');
+            } catch (e) {
+              console.log('setParagraph失敗:', e);
+            }
           }
-        } catch (error) {
-          console.log('数式カーソル位置設定エラー:', error);
-        }
-      }, 50);
-    }
-  }, [editor]);
-
-  // インラインコード挿入ハンドラ
-  const handleInlineCode = useCallback(() => {
-    if (editor && editor.commands) {
-      // インラインコードのテンプレートを挿入
-      editor.commands.insertContent('``');
-      // カーソルを`マークの間に配置
-      setTimeout(() => {
-        try {
-          const editorView = (editor as any).view;
-          if (editorView && editorView.state) {
-            const { state } = editorView;
-            const { selection } = state;
-            const pos = selection.from - 1; // `記号の間に配置
-            const resolvedPos = state.doc.resolve(Math.max(1, pos));
-            const newSelection = state.selection.constructor.near(resolvedPos);
-            const tr = state.tr.setSelection(newSelection);
-            editorView.dispatch(tr);
+          
+          // 方法2: chainを使ったclearNodes
+          if (!success && (editor as any).chain) {
+            try {
+              (editor as any).chain().clearNodes().run();
+              success = true;
+              console.log('clearNodesによる変換成功');
+            } catch (e) {
+              console.log('clearNodes失敗:', e);
+            }
           }
-        } catch (error) {
-          console.log('コードカーソル位置設定エラー:', error);
+          
+          // 方法3: toggleHeadingでfalseを設定
+          if (!success && editor.toggleHeading) {
+            try {
+              // 現在の見出しレベルをfalseでトグル（段落に戻す）
+              editor.toggleHeading(currentLevel as 1 | 2 | 3 | 4 | 5 | 6);
+              success = true;
+              console.log('toggleHeadingによる変換成功');
+            } catch (e) {
+              console.log('toggleHeading失敗:', e);
+            }
+          }
+          
+          // 方法4: 直接的なコマンド実行
+          if (!success && (editor as any).commands) {
+            try {
+              (editor as any).commands.setParagraph();
+              success = true;
+              console.log('commands.setParagraphによる変換成功');
+            } catch (e) {
+              console.log('commands.setParagraph失敗:', e);
+            }
+          }
+          
+          // 方法5: setNodeを使用
+          if (!success && (editor as any).chain) {
+            try {
+              (editor as any).chain().setNode('paragraph').run();
+              success = true;
+              console.log('setNodeによる変換成功');
+            } catch (e) {
+              console.log('setNode失敗:', e);
+            }
+          }
+          
+          // 方法6: liftを使用（最後の手段）
+          if (!success && (editor as any).chain) {
+            try {
+              (editor as any).chain().lift('heading').run();
+              success = true;
+              console.log('liftによる変換成功');
+            } catch (e) {
+              console.log('lift失敗:', e);
+            }
+          }
+          
+          if (!success) {
+            console.log('すべての変換方法が失敗しました');
+          } else {
+            // 成功した場合は少し遅延してから状態を確認
+            setTimeout(() => {
+              // 強制的にエディタの状態を更新
+              try {
+                (editor as any).updateState?.();
+              } catch (e) {
+                console.log('状態更新エラー:', e);
+              }
+            }, 50);
+          }
+        } else {
+          console.log('既に本文（段落）形式です');
         }
-      }, 50);
+      } catch (error) {
+        console.log('段落設定エラー:', error);
+      }
     }
-  }, [editor]);
-
-  // インラインコメント挿入ハンドラ
-  const handleInlineComment = useCallback(() => {
-    if (editor && editor.commands) {
-      // HTMLコメント形式を挿入
-      editor.commands.insertContent('<!-- comment -->');
-    }
-  }, [editor]);
-
-  // 水平線挿入ハンドラ
-  const handleInsertDivider = useCallback(() => {
-    if (editor && editor.commands) {
-      // TenTap Editorの水平線挿入コマンドを使用
-      editor.commands.setHorizontalRule();
-    }
-  }, [editor]);
-
-  // コードブロック挿入ハンドラ
-  const handleInsertCodeBlock = useCallback(() => {
-    if (editor && editor.commands) {
-      // TenTap Editorのコードブロック挿入コマンドを使用
-      editor.commands.setCodeBlock();
-    }
-  }, [editor]);
-
-  // 数学ブロック挿入ハンドラ
-  const handleInsertMathBlock = useCallback(() => {
-    if (editor && editor.commands) {
-      // 数学ブロック用のテンプレートを挿入（段落として挿入してから数式記号を追加）
-      editor.commands.insertContent('$$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$');
-    }
-  }, [editor]);
-
-  // 拡張ツールバーボタン
-  const ExtendedToolbarButton = ({ 
-    title, 
-    icon, 
-    onPress 
-  }: { 
-    title: string; 
-    icon: React.ReactNode;
-    onPress: () => void;
-  }) => (
-    <TouchableOpacity
-      style={[
-        styles.extendedButton,
-        { 
-          backgroundColor: isDarkMode ? '#21262d' : '#f6f8fa',
-          borderColor: isDarkMode ? '#30363d' : '#d0d7de'
-        }
-      ]}
-      onPress={onPress}
-    >
-      {icon}
-      <Text 
-        style={[
-          styles.extendedButtonText,
-          { color: isDarkMode ? '#c9d1d9' : '#24292f' }
-        ]}
-        numberOfLines={1}
-      >
-        {title}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  // インライン機能ツールバー
-  const InlineToolbar = () => (
-    <View style={[styles.inlineToolbar, { 
-      backgroundColor: isDarkMode ? '#161b22' : '#f8f9fa',
-      borderTopColor: isDarkMode ? '#30363d' : '#d0d7de',
-      borderBottomColor: isDarkMode ? '#30363d' : '#d0d7de'
-    }]}>
-      <View style={styles.inlineRow}>
-        <ExtendedToolbarButton
-          title="数式"
-          icon={<Calculator size={16} color={isDarkMode ? '#c9d1d9' : '#24292f'} />}
-          onPress={handleInlineMath}
-        />
-        <ExtendedToolbarButton
-          title="コード"
-          icon={<Hash size={16} color={isDarkMode ? '#c9d1d9' : '#24292f'} />}
-          onPress={handleInlineCode}
-        />
-        <ExtendedToolbarButton
-          title="コメント"
-          icon={<MessageCircle size={16} color={isDarkMode ? '#c9d1d9' : '#24292f'} />}
-          onPress={handleInlineComment}
-        />
-      </View>
-    </View>
-  );
-
-  // 拡張ツールバー（水平線・コードブロック・数学ブロック）
-  const ExtendedToolbar = () => (
-    <View style={[styles.extendedToolbar, { 
-      backgroundColor: isDarkMode ? '#161b22' : '#f8f9fa',
-      borderTopColor: isDarkMode ? '#30363d' : '#d0d7de'
-    }]}>
-      <View style={styles.extendedRow}>
-        <ExtendedToolbarButton
-          title="水平線"
-          icon={<Minus size={16} color={isDarkMode ? '#c9d1d9' : '#24292f'} />}
-          onPress={handleInsertDivider}
-        />
-        <ExtendedToolbarButton
-          title="コードブロック"
-          icon={<Code size={16} color={isDarkMode ? '#c9d1d9' : '#24292f'} />}
-          onPress={handleInsertCodeBlock}
-        />
-        <ExtendedToolbarButton
-          title="数学ブロック"
-          icon={<Calculator size={16} color={isDarkMode ? '#c9d1d9' : '#24292f'} />}
-          onPress={handleInsertMathBlock}
-        />
-      </View>
-    </View>
-  );
+  }, [editor, editorState?.headingLevel]);
 
   // 見出し選択ツールバーコンポーネント
+  // 新しい仕様: 見出しボタンは二回押してもプレーンテキストにならない
+  // プレーンテキストにするには「本文」ボタンを使用する
   const HeadingToolbar = () => {
+    // 現在の見出しレベルを取得（より確実な方法）
+    const currentHeadingLevel = editorState?.headingLevel;
+    
     return (
       <View style={[styles.headingToolbar, { 
         backgroundColor: isDarkMode ? '#161b22' : '#f8f9fa',
@@ -752,28 +719,28 @@ const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditor
             title="本文"
             fontSize={14}
             fontWeight="400"
-            active={!editorState?.headingLevel}
+            active={!currentHeadingLevel || currentHeadingLevel === 0}
             onPress={handleParagraph}
           />
           <HeadingToolbarButton
             title="大見出し"
             fontSize={18}
             fontWeight="600"
-            active={editorState?.headingLevel === 1}
+            active={currentHeadingLevel === 1}
             onPress={() => handleHeading(1)}
           />
           <HeadingToolbarButton
             title="中見出し"
             fontSize={16}
             fontWeight="600"
-            active={editorState?.headingLevel === 2}
+            active={currentHeadingLevel === 2}
             onPress={() => handleHeading(2)}
           />
           <HeadingToolbarButton
             title="小見出し"
             fontSize={14}
             fontWeight="600"
-            active={editorState?.headingLevel === 3}
+            active={currentHeadingLevel === 3}
             onPress={() => handleHeading(3)}
           />
         </View>
@@ -781,96 +748,124 @@ const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditor
     );
   };
 
-  // 親コンポーネントから参照できるようにする
+  // refの実装
   useImperativeHandle(ref, () => ({
     editor,
     undo: () => {
-      editor.undo();
+      if (editor?.undo) {
+        editor.undo();
+      }
     },
     redo: () => {
-      editor.redo();
+      if (editor?.redo) {
+        editor.redo();
+      }
+    },
+    insertTable: () => {
+      if (editor) {
+        // TenTap Editorでサポートされている方法で表を挿入
+        try {
+          (editor as any).insertTable?.({ rows: 3, cols: 3, withHeaderRow: true }) ||
+          (editor as any).insertContent?.('<table><tr><th>Header 1</th><th>Header 2</th><th>Header 3</th></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr></table>');
+        } catch (error) {
+          console.log('表挿入エラー:', error);
+        }
+      }
+    },
+    insertImage: () => {
+      if (editor) {
+        // カメラロールから画像を選択
+        ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.8,
+          base64: true,
+        }).then((result) => {
+          if (!result.canceled && result.assets && result.assets.length > 0) {
+            const asset = result.assets[0];
+            if (asset.base64) {
+              const imageUrl = `data:image/jpeg;base64,${asset.base64}`;
+              (editor as any).setImage?.(imageUrl) || 
+              (editor as any).insertContent?.(`<img src="${imageUrl}" alt="Image" style="max-width: 100%; height: auto;" />`);
+            } else if (asset.uri) {
+              (editor as any).setImage?.(asset.uri) || 
+              (editor as any).insertContent?.(`<img src="${asset.uri}" alt="Image" style="max-width: 100%; height: auto;" />`);
+            }
+          }
+        }).catch((error) => {
+          console.error('画像選択エラー:', error);
+          Alert.alert('エラー', '画像の選択に失敗しました');
+        });
+      }
     },
   }));
 
-  // 新規ノート選択処理完了フラグ
-  const [newNoteSelectionDone, setNewNoteSelectionDone] = useState(false);
+  // 新規ノートの初期化処理 - 簡素化版
+  useEffect(() => {
+    if (isNewNote && editor && !isInitialized.current) {
+      isInitialized.current = true;
+      
+      // 新規ノート用の簡単な初期化
+      const initializeNewNote = async () => {
+        try {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          // フォーカスのみ設定
+          if (autoFocus) {
+            editor.focus();
+          }
+        } catch (error) {
+          console.log('新規ノート初期化エラー:', error);
+        }
+      };
+      
+      initializeNewNote();
+    }
+  }, [isNewNote, editor, autoFocus]);
 
-  // コンテンツが外部から変更された場合の同期
+  // コンテンツが外部から変更された場合の同期 - 安定化版
   useEffect(() => {
     if (editor && content !== lastInternalContent.current) {
-      setIsUpdatingFromExternal(true);
+      // 新規ノートの初期化中はスキップ
+      if (isNewNote && !isInitialized.current) {
+        return;
+      }
       
-      editor.getHTML().then((currentHTML) => {
-        const contentToSet = content || '<p></p>';
-        if (currentHTML !== contentToSet) {
-          editor.setContent(contentToSet);
-          lastInternalContent.current = contentToSet;
+      setIsUpdatingFromExternal(true);
+      ignoreNextChange.current = true;
+      
+      const updateContent = async () => {
+        try {
+          const contentToSet = content || '<h1></h1>';
+          const currentHTML = await editor.getHTML();
           
-          // 新規ノートの場合はカーソルをH1テキストの末尾に配置（一度だけ実行）
-          if (isNewNote && !newNoteSelectionDone && contentToSet.includes('<h1>無題のノート</h1>')) {
-            setNewNoteSelectionDone(true);
-            setTimeout(() => {
-              try {
-                // エディタにフォーカスしてH1要素の末尾にカーソルを配置
-                editor.focus();
-                
-                // H1内の「無題のノート」テキストの末尾にカーソルを移動
-                setTimeout(() => {
-                  try {
-                    // ProseMirrorのビューを直接操作してカーソル位置を設定
-                    const editorView = (editor as any).view;
-                    if (editorView && editorView.state) {
-                      const { state } = editorView;
-                      const { doc } = state;
-                      
-                      // H1要素の終端を検索
-                      let targetPos = 7; // 「無題のノート」のテキスト長 + 1
-                      doc.descendants((node, pos) => {
-                        if (node.type.name === 'heading' && node.attrs.level === 1) {
-                          // H1ノードの内容の終端を計算
-                          targetPos = pos + node.nodeSize - 1;
-                          return false;
-                        }
-                        return true;
-                      });
-                      
-                      // カーソルを設定
-                      const resolvedPos = doc.resolve(Math.max(1, Math.min(targetPos, doc.content.size - 1)));
-                      const selection = state.selection.constructor.near(resolvedPos);
-                      const tr = state.tr.setSelection(selection);
-                      editorView.dispatch(tr);
-                      console.log('新規ノート: H1テキスト末尾にカーソル配置完了');
-                      
-                      // lastInternalContent を現在のコンテンツで更新して同期を保つ
-                      lastInternalContent.current = contentToSet;
-                    } else {
-                      console.log('エディタビューが利用できません');
-                    }
-                  } catch (positionError) {
-                    console.log('カーソル位置設定エラー:', positionError);
-                  }
-                }, 200);
-              } catch (focusError) {
-                console.log('エディタフォーカスエラー:', focusError);
-              }
-            }, 400);
+          if (currentHTML !== contentToSet) {
+            await editor.setContent(contentToSet);
+            lastInternalContent.current = contentToSet;
           }
+        } catch (error) {
+          console.log('コンテンツ更新エラー:', error);
+          // フォールバック処理
+          try {
+            const contentToSet = content || '<h1></h1>';
+            await editor.setContent(contentToSet);
+            lastInternalContent.current = contentToSet;
+          } catch (fallbackError) {
+            console.log('フォールバック更新エラー:', fallbackError);
+          }
+        } finally {
+          // 確実にフラグをリセット
+          setTimeout(() => {
+            setIsUpdatingFromExternal(false);
+            ignoreNextChange.current = false;
+          }, 100);
         }
-        // 短い遅延後に外部更新フラグをリセット
-        setTimeout(() => {
-          setIsUpdatingFromExternal(false);
-        }, 150);
-      }).catch(() => {
-        // エラーが発生した場合は直接設定
-        const contentToSet = content || '<p></p>';
-        editor.setContent(contentToSet);
-        lastInternalContent.current = contentToSet;
-        setTimeout(() => {
-          setIsUpdatingFromExternal(false);
-        }, 150);
-      });
+      };
+      
+      updateContent();
     }
-  }, [content, editor, isNewNote, newNoteSelectionDone]);
+  }, [content, editor, isNewNote]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#0d1117' : '#ffffff' }]}>
@@ -887,9 +882,6 @@ const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditor
           {/* 見出し選択ツールバー */}
           <HeadingToolbar />
           
-          {/* インライン機能ツールバー */}
-          <InlineToolbar />
-          
           {/* 標準ツールバー */}
           <View style={[styles.standardToolbar, { 
             backgroundColor: isDarkMode ? '#21262d' : '#f6f8fa',
@@ -901,9 +893,6 @@ const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditor
               shouldHideDisabledToolbarItems={true}
             />
           </View>
-
-          {/* 拡張ツールバー（水平線・コードブロック・数学ブロック） */}
-          <ExtendedToolbar />
         </KeyboardAvoidingView>
       )}
     </SafeAreaView>
