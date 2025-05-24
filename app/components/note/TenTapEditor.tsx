@@ -574,16 +574,50 @@ const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditor
   // インライン数式挿入ハンドラ
   const handleInlineMath = useCallback(() => {
     if (editor && editor.commands) {
-      // TenTap Editorのcommands APIを使用してテキストを挿入
-      editor.commands.insertContent('$a$');
+      // インライン数式のテンプレートを挿入
+      editor.commands.insertContent('$$');
+      // カーソルを$マークの間に配置
+      setTimeout(() => {
+        try {
+          const editorView = (editor as any).view;
+          if (editorView && editorView.state) {
+            const { state } = editorView;
+            const { selection } = state;
+            const pos = selection.from - 1; // $記号の間に配置
+            const resolvedPos = state.doc.resolve(Math.max(1, pos));
+            const newSelection = state.selection.constructor.near(resolvedPos);
+            const tr = state.tr.setSelection(newSelection);
+            editorView.dispatch(tr);
+          }
+        } catch (error) {
+          console.log('数式カーソル位置設定エラー:', error);
+        }
+      }, 50);
     }
   }, [editor]);
 
   // インラインコード挿入ハンドラ
   const handleInlineCode = useCallback(() => {
     if (editor && editor.commands) {
-      // TenTap Editorのcommands APIを使用してテキストを挿入
-      editor.commands.insertContent('`code`');
+      // インラインコードのテンプレートを挿入
+      editor.commands.insertContent('``');
+      // カーソルを`マークの間に配置
+      setTimeout(() => {
+        try {
+          const editorView = (editor as any).view;
+          if (editorView && editorView.state) {
+            const { state } = editorView;
+            const { selection } = state;
+            const pos = selection.from - 1; // `記号の間に配置
+            const resolvedPos = state.doc.resolve(Math.max(1, pos));
+            const newSelection = state.selection.constructor.near(resolvedPos);
+            const tr = state.tr.setSelection(newSelection);
+            editorView.dispatch(tr);
+          }
+        } catch (error) {
+          console.log('コードカーソル位置設定エラー:', error);
+        }
+      }, 50);
     }
   }, [editor]);
 

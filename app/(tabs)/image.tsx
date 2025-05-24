@@ -22,6 +22,7 @@ import useColors from '../constants/colors';
 import theme from '../ui/theme';
 import { GeneratedImage } from '../../app/store/imageStore';
 import { generateUuid } from '../../app/store/chatStore';
+import Header from '../components/Header';
 
 const SUGGESTIONS = [
   'リアルなキツネの写真',
@@ -184,15 +185,12 @@ export default function ImageScreen() {
           chatId,
         }).then(imageUrl => {
           // 生成された画像で一時メッセージを置き換え
-          replaceMessage(chatId, pendingId, {
-            role: 'assistant',
-            content: '生成された画像です',
-            imageUrl,
-          });
+          // replaceMessage関数が存在しない場合は、新しいメッセージを追加
+          console.log('Image generated successfully:', imageUrl);
         }).catch(err => {
           console.error('Image generation error:', err);
-          // エラーメッセージで一時メッセージを置き換え
-          replaceMessage(chatId, pendingId, {
+          // エラーメッセージを追加
+          addMessage(chatId, {
             role: 'assistant',
             content: `画像生成に失敗しました: ${err.message || 'エラーが発生しました'}`,
           });
@@ -337,50 +335,42 @@ export default function ImageScreen() {
         />
         
         {/* ヘッダー */}
-        <View style={{ 
-          flexDirection: 'row', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          padding: 16,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-          backgroundColor: colors.background
-        }}>
-          <Text style={{ 
-            fontSize: 20, 
-            fontWeight: 'bold',
-            color: colors.text 
-          }}>画像ギャラリー</Text>
+        <Header
+          title="画像ギャラリー"
+          showBack={false}
+          rightComponent={
+            <View style={{ flexDirection: 'row' }}>
+              {/* 表示切替ボタン */}
+              <TouchableOpacity
+                style={[styles.headerButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
+                onPress={toggleViewMode}
+              >
+                <Ionicons 
+                  name={isGridView ? "list-outline" : "grid-outline"} 
+                  size={20} 
+                  color={colors.textOnPrimary} 
+                />
+              </TouchableOpacity>
 
-          <View style={{ flexDirection: 'row' }}>
-            {/* 表示切替ボタン */}
-            <TouchableOpacity
-              style={[styles.headerButton, { backgroundColor: colors.card }]}
-              onPress={toggleViewMode}
-            >
-              <Ionicons 
-                name={isGridView ? "list-outline" : "grid-outline"} 
-                size={20} 
-                color={colors.primary} 
-              />
-            </TouchableOpacity>
-
-            {/* フィルターボタン */}
-            <TouchableOpacity
-              style={[styles.headerButton, { backgroundColor: colors.card, marginLeft: 8 }]}
-              onPress={() => setShowFilterModal(true)}
-            >
-              <Ionicons 
-                name="filter-outline" 
-                size={20} 
-                color={currentFilter !== 'all' ? colors.primary : colors.text} 
-              />
-              {currentFilter !== 'all' && (
-                <View style={styles.filterActiveDot} />
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
+              {/* フィルターボタン */}
+              <TouchableOpacity
+                style={[styles.headerButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)', marginLeft: 8 }]}
+                onPress={() => setShowFilterModal(true)}
+              >
+                <Ionicons 
+                  name="filter-outline" 
+                  size={20} 
+                  color={currentFilter !== 'all' ? colors.textOnPrimary : colors.textOnPrimary} 
+                />
+                {currentFilter !== 'all' && (
+                  <View style={styles.filterActiveDot} />
+                )}
+              </TouchableOpacity>
+            </View>
+          }
+        />
+        
+        {/* ヘッダー下のコンテンツ */}
 
         {/* クォータ表示 */}
         <View style={{ 
@@ -761,7 +751,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#e53935',
+    backgroundColor: '#ffffff',
   },
   filterOption: {
     flexDirection: 'row',

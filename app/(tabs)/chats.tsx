@@ -215,7 +215,7 @@ export default function ChatsScreen() {
       {/* 通常のヘッダー */}
       {!isSelectionMode && (
         <Header
-          title="Home"
+          title="チャット一覧"
           showBack={false}
           rightComponent={
             <TouchableOpacity onPress={toggleSelectionMode}>

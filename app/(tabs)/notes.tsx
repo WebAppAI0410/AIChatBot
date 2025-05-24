@@ -229,6 +229,7 @@ export default function NotesScreen() {
     if (item.type === 'folder') {
       if (newFolderId === item.id) {
         handleFolderNameSubmit();
+        return;
       }
       if (searchQuery.trim()) {
         setSearchQuery('');
@@ -237,7 +238,18 @@ export default function NotesScreen() {
     } else {
       router.push(`/notes/${item.id}`);
     }
-  }, [navigateToFolder, router, newFolderId, searchQuery, isSelectionMode]);
+  }, [navigateToFolder, router, newFolderId, searchQuery, isSelectionMode, handleFolderNameSubmit]);
+
+  // フォルダ長押し処理（編集モード開始）
+  const handleFolderLongPress = useCallback((folderId: string, folderName: string) => {
+    setNewFolderId(folderId);
+    setEditingFolderName(folderName);
+    setTimeout(() => {
+      if (newFolderInputRef.current) {
+        newFolderInputRef.current.focus();
+      }
+    }, 100);
+  }, []);
   
   // 選択モード切り替え
   const toggleSelectionMode = useCallback(() => {
@@ -414,17 +426,23 @@ export default function NotesScreen() {
   const renderGridItem = ({ item }: { item: any }) => {
     if (item.type === 'folder') {
       return (
-        <FolderCard
-          folder={item}
-          isEditing={newFolderId === item.id}
-          editingName={editingFolderName}
+        <TouchableOpacity
           onPress={() => handleItemPress(item)}
-          onEdit={setEditingFolderName}
-          onSubmitEdit={handleFolderNameSubmit}
-          onBlurEdit={handleFolderNameSubmit}
-          noteCount={getFolderNoteCount(item.id)}
-          folderPath={getFolderPath(item.id)}
-        />
+          onLongPress={() => handleFolderLongPress(item.id, item.name)}
+          activeOpacity={0.7}
+        >
+          <FolderCard
+            folder={item}
+            isEditing={newFolderId === item.id}
+            editingName={editingFolderName}
+            onPress={() => {}} // FolderCard内では無効化
+            onEdit={setEditingFolderName}
+            onSubmitEdit={handleFolderNameSubmit}
+            onBlurEdit={handleFolderNameSubmit}
+            noteCount={getFolderNoteCount(item.id)}
+            folderPath={getFolderPath(item.id)}
+          />
+        </TouchableOpacity>
       );
     } else {
       return (
@@ -462,6 +480,7 @@ export default function NotesScreen() {
             isSelectionMode && item.type === 'note' && selectedNoteIds.has(item.id) && styles.selectedItem
           ]} 
           onPress={() => handleItemPress(item)}
+          onLongPress={item.type === 'folder' ? () => handleFolderLongPress(item.id, item.name) : undefined}
         >
           <XStack alignItems="center" space="$3" flex={1}>
             {/* 選択モード時のチェックボックス（ノートのみ） */}
@@ -541,7 +560,7 @@ export default function NotesScreen() {
         <Header
           title={currentFolderName()}
           showBack={currentFolder !== null || !!searchQuery.trim()}
-          onBack={handleBack}
+          onBackPress={handleBack}
         />
       )}
 
