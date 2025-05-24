@@ -801,19 +801,36 @@ const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditor
     },
   }));
 
-  // 新規ノートの初期化処理 - 簡素化版
+  // 新規ノートの初期化処理 - 根本的問題修正版
   useEffect(() => {
     if (isNewNote && editor && !isInitialized.current) {
       isInitialized.current = true;
       
-      // 新規ノート用の簡単な初期化
+      // 新規ノート用の安定初期化
       const initializeNewNote = async () => {
         try {
-          await new Promise(resolve => setTimeout(resolve, 200));
+          // エディタの準備完了を待つ
+          await new Promise(resolve => setTimeout(resolve, 300));
           
-          // フォーカスのみ設定
+          // 初期コンテンツを確実に設定
+          if (content === '<h1></h1>') {
+            try {
+              await editor.setContent('<h1></h1>');
+              lastInternalContent.current = '<h1></h1>';
+            } catch (e) {
+              console.log('初期コンテンツ設定エラー:', e);
+            }
+          }
+          
+          // フォーカス設定（少し遅延）
           if (autoFocus) {
-            editor.focus();
+            setTimeout(() => {
+              try {
+                editor.focus();
+              } catch (e) {
+                console.log('フォーカス設定エラー:', e);
+              }
+            }, 100);
           }
         } catch (error) {
           console.log('新規ノート初期化エラー:', error);
@@ -822,7 +839,7 @@ const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditor
       
       initializeNewNote();
     }
-  }, [isNewNote, editor, autoFocus]);
+  }, [isNewNote, editor, autoFocus, content]);
 
   // コンテンツが外部から変更された場合の同期 - 安定化版
   useEffect(() => {

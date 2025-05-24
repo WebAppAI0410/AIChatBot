@@ -83,6 +83,12 @@ const AIAssistChat: React.FC<AIAssistChatProps> = ({
   const handleSendMessage = useCallback(async () => {
     if (!inputText.trim() || isLoading) return;
     
+    // ノートコンテンツが空または不安定な場合はエラー表示
+    if (!noteContent || noteContent.trim() === '' || noteContent === '<h1></h1>') {
+      Alert.alert('エラー', 'ノートの内容が読み込まれていません。しばらく待ってから再度お試しください。');
+      return;
+    }
+    
     const userMessage: ChatMessage = {
       id: `msg_${Date.now()}`,
       role: 'user',
@@ -136,7 +142,7 @@ const AIAssistChat: React.FC<AIAssistChatProps> = ({
         }
       } else {
         // 編集モード: ノートを自動編集
-        const editPrompt = noteContent 
+        const editPrompt = noteContent && noteContent.trim() !== '' && noteContent !== '<h1></h1>'
           ? `以下のノート内容を、ユーザーの要求に基づいて編集してください：\n\n現在のノート内容：\n${noteContent}\n\n編集要求：${userMessage.content}\n\n編集されたノート内容のみを返してください。説明や前置きは不要です。`
           : `以下の要求に基づいてノートを作成してください：\n\n${userMessage.content}`;
         
@@ -148,8 +154,9 @@ const AIAssistChat: React.FC<AIAssistChatProps> = ({
         
         if (editResponse.success && editResponse.result) {
           // 編集内容の説明を取得
+          const originalContent = noteContent && noteContent.trim() !== '' && noteContent !== '<h1></h1>' ? noteContent : '(空のノート)';
           const explanationResponse = await aiAssistService.processWithCustomPrompt(
-            `元のノート：\n${noteContent}\n\n編集後のノート：\n${editResponse.result}`,
+            `元のノート：\n${originalContent}\n\n編集後のノート：\n${editResponse.result}`,
             'ノートにどのような変更を加えたかを簡潔に説明してください。',
             selectedModelId
           );

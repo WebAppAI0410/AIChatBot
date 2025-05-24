@@ -113,7 +113,10 @@ export default function NoteScreen() {
     }
   }, [id, isNewNote, getNoteById, router]);
 
-  // 新規ノートの作成 - 安定化改良版
+  // 新規ノートの作成完了状態
+  const [isNewNoteCreated, setIsNewNoteCreated] = useState(false);
+  
+  // 新規ノートの作成 - 根本的問題修正版
   const createNewNote = useCallback(async () => {
     // 既にノートIDが設定されている場合は重複作成を防ぐ
     if (noteId) {
@@ -121,6 +124,11 @@ export default function NoteScreen() {
     }
     
     try {
+      console.log('新規ノート作成開始');
+      
+      // AI操作中フラグを設定して競合を防ぐ
+      setIsAIEditing(true);
+      
       const newNoteId = await createNote({
         title: '',
         content: '<h1></h1>',
@@ -128,6 +136,7 @@ export default function NoteScreen() {
       });
       
       setNoteId(newNoteId);
+      setIsNewNoteCreated(true); // 作成完了フラグを設定
       
       // URLを新しいノートIDに更新
       if (typeof window !== 'undefined' && window.history) {
@@ -137,8 +146,16 @@ export default function NoteScreen() {
           window.location.pathname.replace('/new', `/${newNoteId}`)
         );
       }
+      
+      console.log('新規ノート作成完了:', newNoteId);
+      
+      // 少し遅延してAI編集フラグをリセット
+      setTimeout(() => {
+        setIsAIEditing(false);
+      }, 500);
     } catch (error) {
       console.error('新規ノート作成エラー:', error);
+      setIsAIEditing(false); // エラー時もフラグをリセット
       throw error;
     }
   }, [createNote, currentFolder, noteId]);
@@ -147,10 +164,10 @@ export default function NoteScreen() {
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isAIEditing, setIsAIEditing] = useState(false);
   
-  // 内容の変更ハンドラ - 安定化改良版
+  // 内容の変更ハンドラ - 根本的問題修正版
   const handleContentChange = useCallback((newContent: string) => {
-    // 空のコンテンツや無効なコンテンツをスキップ
-    if (!newContent || newContent.trim() === '' || newContent === '<h1></h1>') {
+    // 完全に空のコンテンツのみスキップ（新規ノートの初期コンテンツは許可）
+    if (!newContent || newContent.trim() === '') {
       return;
     }
     
@@ -229,8 +246,20 @@ export default function NoteScreen() {
     }
   }, [showAiAssist]);
 
-  // AI校正チャットモードトグル（新機能）
+  // AI校正チャットモードトグル（新機能） - 新規ノート作成中は無効化
   const toggleAIChatMode = useCallback(() => {
+    // 新規ノートで作成が完了していない場合はAIチャットを無効化
+    if (isNewNote && (!noteId || !isNewNoteCreated)) {
+      console.log('新規ノート作成中のため、AIチャットモードは利用できません');
+      return;
+    }
+    
+    // AI編集中はモード切り替えを無効化
+    if (isAIEditing) {
+      console.log('AI編集中のため、AIチャットモードの切り替えは利用できません');
+      return;
+    }
+    
     setAiChatMode(prev => !prev);
     // チャットモードを閉じる時は、従来のドロワーも閉じる
     if (aiChatMode) {
@@ -239,7 +268,7 @@ export default function NoteScreen() {
       setIsAIEditing(false);  // AI編集状態もリセット
       setDiffChanges([]);     // 差分変更もクリア
     }
-  }, [aiChatMode]);
+  }, [aiChatMode, isNewNote, noteId, isNewNoteCreated, isAIEditing]);
 
   // モデル選択ハンドラ
   const handleSelectModel = useCallback((modelId: string) => {
@@ -293,15 +322,27 @@ export default function NoteScreen() {
     console.log('[NoteScreen] handleApplyAIChanges が呼ばれました');
     console.log('[NoteScreen] 新しいコンテンツ:', newContent);
     
+    // 新規ノート作成中は変更を無効化
+    if (isNewNote && (!noteId || !isNewNoteCreated)) {
+      console.log('[NoteScreen] 新規ノート作成中のため変更を無視');
+      return;
+    }
+    
     // 空のコンテンツは無視
     if (!newContent || newContent.trim() === '') {
       return;
     }
     
-    setContent(newContent);
+    // 既存のタイマーをクリア
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
     
     // AI編集フラグを一時的に設定して自動保存を防ぐ
     setIsAIEditing(true);
+    
+    setContent(newContent);
     
     // タイトルをH1から抽出
     const h1Match = newContent.match(/<h1[^>]*>(.*?)<\/h1>/);
@@ -310,11 +351,24 @@ export default function NoteScreen() {
       : '';
     setTitle(extractedTitle);
     
+    // 手動保存を実行（AI編集時は自動保存の代わりに）
+    try {
+      const targetId = isNewNote ? noteId : id;
+      if (targetId) {
+        updateNote(targetId, { 
+          content: newContent,
+          title: extractedTitle
+        });
+      }
+    } catch (error) {
+      console.error('AI変更の保存エラー:', error);
+    }
+    
     // 少し遅延してAI編集フラグをリセット
     setTimeout(() => {
       setIsAIEditing(false);
     }, 500);
-  }, []);
+  }, [isNewNote, noteId, isNewNoteCreated, id, updateNote]);
 
   // AIチャットからの自動編集処理（編集モード用）
   const handleAutoEdit = useCallback((newContent: string, explanation: string) => {
@@ -322,18 +376,22 @@ export default function NoteScreen() {
     console.log('[NoteScreen] 編集説明:', explanation);
     console.log('[NoteScreen] 新しいコンテンツ:', newContent);
     
+    // 新規ノート作成中は編集を無効化
+    if (isNewNote && (!noteId || !isNewNoteCreated)) {
+      console.log('[NoteScreen] 新規ノート作成中のため自動編集を無視');
+      return;
+    }
+    
     // AI編集状態を開始
     setIsAIEditing(true);
     
     // 自動保存タイマーをクリア（AI編集中は自動保存を停止）
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
     }
     
-    // 一時的にコンテンツを変更（差分表示用）
-    handleContentChange(newContent);
-    
-    // 差分表示のための変更データを作成
+    // 差分表示のための変更データを作成（handleContentChangeを使わない）
     const changes = [{
       id: `auto_edit_${Date.now()}`,
       original: content,
@@ -346,7 +404,7 @@ export default function NoteScreen() {
     
     setDiffChanges(changes);
     setShowDiffViewer(true);
-  }, [content, handleContentChange]);
+  }, [content, isNewNote, noteId, isNewNoteCreated]);
 
   // 最後の変更を取り消し
   const handleUndoLastChange = useCallback(() => {
@@ -586,9 +644,12 @@ export default function NoteScreen() {
           <TouchableOpacity
             style={[
               styles.editButton,
-              aiChatMode && { backgroundColor: 'rgba(33, 150, 243, 0.8)' }
+              aiChatMode && { backgroundColor: 'rgba(33, 150, 243, 0.8)' },
+              // 新規ノート作成中またはAI編集中は無効化表示
+              ((isNewNote && (!noteId || !isNewNoteCreated)) || isAIEditing) && { opacity: 0.5 }
             ]}
             onPress={toggleAIChatMode}
+            disabled={isNewNote && (!noteId || !isNewNoteCreated) || isAIEditing}
             accessibilityLabel="AI校正チャット"
           >
             <MessageSquare size={20} color={colors.textOnPrimary} />
@@ -822,7 +883,6 @@ export default function NoteScreen() {
                 autoFocus={isNewNote}
                 isNewNote={isNewNote}
                 placeholder="ここに内容を入力してください"
-                key={`editor-${shouldUseSplitView ? 'split' : 'full'}`}
               />
             </View>
           )}
@@ -840,7 +900,7 @@ export default function NoteScreen() {
             ]}>
               <AIAssistChat
                 visible={aiChatMode}
-                noteContent={content}
+                noteContent={content || '<h1></h1>'}
                 onSuggestChanges={handleSuggestChanges}
                 onApplyChanges={handleApplyAIChanges}
                 onUndoLastChange={handleUndoLastChange}
