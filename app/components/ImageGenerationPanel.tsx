@@ -1,5 +1,5 @@
 import React, { useState, forwardRef, useImperativeHandle, useCallback, useEffect } from 'react';
-import { View } from 'react-native';
+import { View, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { 
   YStack, 
@@ -7,17 +7,20 @@ import {
   XStack, 
   Button, 
   styled,
+  ScrollView,
 } from 'tamagui';
 import useStore from '../store';
 import useColors from '../constants/colors';
+import { generateTextToImage, generateImageToImage, upscaleImage } from '../services/api';
 
-export type ImageSize = '512x512' | '768x768' | '1024x1024' | '1024x1792' | '1792x1024';
-export type ImageQuality = 'standard' | 'hd';
-export type ImageModel = 'sdxl' | 'dalle';
+export type FalImageSize = 'square_hd' | 'square' | 'portrait_4_3' | 'portrait_16_9' | 'landscape_4_3' | 'landscape_16_9';
+export type FalOperationType = 'text-to-image' | 'image-to-image' | 'upscaler';
+export type UpscaleModel = 'RealESRGAN_x4plus' | 'RealESRGAN_x2plus' | 'RealESRGAN_x4plus_anime_6B' | 'RealESRGAN_x4_v3';
 
 export type ImageGenerationPanelProps = {
   prompt: string;
-  onImageGenerated: (imageUrl: string, prompt: string, model: ImageModel) => void;
+  sourceImageUrl?: string; // For image-to-image and upscaler
+  onImageGenerated: (imageUrl: string, prompt: string, operation: FalOperationType) => void;
   onClose: () => void;
   chatId?: string | null;
 };
@@ -26,128 +29,240 @@ export type ImageGenerationPanelHandle = {
   generateImage: () => Promise<boolean>;
   canGenerate: () => boolean;
   getSettings: () => {
-    size: ImageSize;
-    quality: ImageQuality;
-    model: ImageModel;
+    size: FalImageSize;
+    operation: FalOperationType;
+    model: UpscaleModel;
   };
+};
+
+// Daily limits for free usage
+const DAILY_LIMITS = {
+  'text-to-image': 10,
+  'image-to-image': 5,
+  'upscaler': 5
 };
 
 export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, ImageGenerationPanelProps>(({
   prompt,
+  sourceImageUrl,
   onImageGenerated,
   onClose,
   chatId,
 }, ref) => {
-  const {
-    sdxlQuota,
-    dalleQuota,
-    generateImage: generateImageFromStore,
-    isGenerating: storeIsGenerating,
-    generationError
-  } = useStore();
-
   const colors = useColors();
-  const [size, setSize] = useState<ImageSize>('768x768');
-  const [quality, setQuality] = useState<ImageQuality>('standard');
-  const [model, setModel] = useState<ImageModel>('sdxl');
+  
+  // Settings state
+  const [operation, setOperation] = useState<FalOperationType>('text-to-image');
+  const [size, setSize] = useState<FalImageSize>('landscape_4_3');
+  const [upscaleModel, setUpscaleModel] = useState<UpscaleModel>('RealESRGAN_x4plus');
+  const [scale, setScale] = useState(2);
+  const [strength, setStrength] = useState(0.8);
+  
+  // UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [usageCount, setUsageCount] = useState({
+    'text-to-image': 0,
+    'image-to-image': 0,
+    'upscaler': 0
+  });
 
-  // ユーザープランからDALL-E使用可能か判定（仮実装）
-  const canUseDalle = dalleQuota.total > 0;
-  
-  // 選択中のモデルのクォータを取得
-  const currentQuota = model === 'dalle' ? dalleQuota : sdxlQuota;
+  // Check if we can use the current operation
+  const canUseOperation = usageCount[operation] < DAILY_LIMITS[operation];
 
-  // モデルが変更されたときにサイズを適切な値に調整する
+  // Auto-select operation based on available inputs
   useEffect(() => {
-    // DALL-E 3が選択された場合、サポートされているサイズに変更
-    if (model === 'dalle') {
-      // 現在のサイズがDALL-E 3でサポートされていない場合は1024x1024に変更
-      if (size !== '1024x1024' && size !== '1024x1792' && size !== '1792x1024') {
-        setSize('1024x1024');
-      }
-    }
-  }, [model]);
-
-  // モデル切り替え - SDXLとDALL-Eのトグル
-  const toggleModel = () => {
-    // 常に切り替え可能にする。ただし実際に使用する時はクォータをチェック
-    const nextModel = model === 'sdxl' ? 'dalle' : 'sdxl';
-    setModel(nextModel);
-    
-    // DALL-Eが使えない場合は警告を表示
-    if (nextModel === 'dalle' && !canUseDalle) {
-      console.warn('DALL-E 3はプレミアムプランでのみ利用可能です');
-      // ここで警告表示を出すこともできます
-    }
-  };
-
-  // サイズ切り替え - モデルに応じて異なるサイズを切り替え
-  const toggleSize = () => {
-    if (model === 'dalle') {
-      // DALL-E 3用のサイズ：1024x1024 → 1024x1792 → 1792x1024 → 1024x1024
-      const dalleSizes: ImageSize[] = ['1024x1024', '1024x1792', '1792x1024'];
-      const currentIndex = dalleSizes.indexOf(size as any);
-      // 現在のサイズがリストにない場合は最初の要素から開始
-      const nextIndex = (currentIndex === -1) ? 0 : (currentIndex + 1) % dalleSizes.length;
-      setSize(dalleSizes[nextIndex]);
+    if (sourceImageUrl && !prompt.trim()) {
+      setOperation('upscaler');
+    } else if (sourceImageUrl && prompt.trim()) {
+      setOperation('image-to-image');
     } else {
-      // SDXL用のサイズ：512x512 → 768x768 → 1024x1024 → 512x512
-      const sdxlSizes: ImageSize[] = ['512x512', '768x768', '1024x1024'];
-      const currentIndex = sdxlSizes.indexOf(size as any);
-      // 現在のサイズがリストにない場合は最初の要素から開始
-      const nextIndex = (currentIndex === -1) ? 0 : (currentIndex + 1) % sdxlSizes.length;
-      setSize(sdxlSizes[nextIndex]);
+      setOperation('text-to-image');
+    }
+  }, [sourceImageUrl, prompt]);
+
+  // Operation toggle
+  const toggleOperation = () => {
+    const operations: FalOperationType[] = ['text-to-image', 'image-to-image', 'upscaler'];
+    const currentIndex = operations.indexOf(operation);
+    const nextIndex = (currentIndex + 1) % operations.length;
+    setOperation(operations[nextIndex]);
+  };
+
+  // Size toggle
+  const toggleSize = () => {
+    const sizes: FalImageSize[] = ['landscape_4_3', 'portrait_4_3', 'square', 'square_hd', 'landscape_16_9', 'portrait_16_9'];
+    const currentIndex = sizes.indexOf(size);
+    const nextIndex = (currentIndex + 1) % sizes.length;
+    setSize(sizes[nextIndex]);
+  };
+
+  // Upscale model toggle
+  const toggleUpscaleModel = () => {
+    const models: UpscaleModel[] = ['RealESRGAN_x4plus', 'RealESRGAN_x2plus', 'RealESRGAN_x4plus_anime_6B', 'RealESRGAN_x4_v3'];
+    const currentIndex = models.indexOf(upscaleModel);
+    const nextIndex = (currentIndex + 1) % models.length;
+    setUpscaleModel(models[nextIndex]);
+  };
+
+  // Scale toggle
+  const toggleScale = () => {
+    const scales = [2, 3, 4];
+    const currentIndex = scales.indexOf(scale);
+    const nextIndex = (currentIndex + 1) % scales.length;
+    setScale(scales[nextIndex]);
+  };
+
+  // Strength toggle
+  const toggleStrength = () => {
+    const strengths = [0.5, 0.6, 0.7, 0.8, 0.9];
+    const currentIndex = strengths.indexOf(strength);
+    const nextIndex = (currentIndex + 1) % strengths.length;
+    setStrength(strengths[nextIndex]);
+  };
+
+  // Get operation display info
+  const getOperationInfo = () => {
+    switch (operation) {
+      case 'text-to-image':
+        return {
+          icon: 'create-outline',
+          label: 'テキスト→画像',
+          color: '$blue9',
+          description: 'FLUX Schnell（高速）'
+        };
+      case 'image-to-image':
+        return {
+          icon: 'swap-horizontal-outline',
+          label: '画像→画像',
+          color: '$purple9',
+          description: 'FLUX Redux（高品質）'
+        };
+      case 'upscaler':
+        return {
+          icon: 'expand-outline',
+          label: 'アップスケール',
+          color: '$green9',
+          description: 'Real-ESRGAN（高解像度化）'
+        };
     }
   };
 
-  // 品質切り替え - 標準 ↔ 高品質
-  const toggleQuality = () => {
-    setQuality(quality === 'standard' ? 'hd' : 'standard');
+  // Get size display
+  const getSizeDisplay = () => {
+    switch (size) {
+      case 'landscape_4_3': return '横長4:3';
+      case 'portrait_4_3': return '縦長4:3';
+      case 'landscape_16_9': return '横長16:9';
+      case 'portrait_16_9': return '縦長16:9';
+      case 'square': return '正方形';
+      case 'square_hd': return '正方形HD';
+      default: return size;
+    }
   };
 
-  // 画像生成ハンドラ - 親コンポーネントから呼び出されるように変更
+  // Get upscale model display
+  const getUpscaleModelDisplay = () => {
+    switch (upscaleModel) {
+      case 'RealESRGAN_x4plus': return '汎用4x';
+      case 'RealESRGAN_x2plus': return '汎用2x';
+      case 'RealESRGAN_x4plus_anime_6B': return 'アニメ4x';
+      case 'RealESRGAN_x4_v3': return '改良4x';
+      default: return upscaleModel;
+    }
+  };
+
+  // Main generation handler
   const handleGenerate = useCallback(async () => {
-    if (!prompt || loading) return null;
+    if (loading) return null;
+    
+    // Validation
+    if (operation === 'text-to-image' && !prompt.trim()) {
+      setError('プロンプトを入力してください');
+      return null;
+    }
+    
+    if ((operation === 'image-to-image' || operation === 'upscaler') && !sourceImageUrl) {
+      setError('ソース画像が必要です');
+      return null;
+    }
+    
+    if (operation === 'image-to-image' && !prompt.trim()) {
+      setError('画像変換にはプロンプトが必要です');
+      return null;
+    }
+
+    if (!canUseOperation) {
+      setError(`本日の${getOperationInfo().label}制限（${DAILY_LIMITS[operation]}回）に達しました`);
+      return null;
+    }
     
     try {
       setLoading(true);
       setError(null);
       
-      console.log(`画像生成リクエスト開始: ${prompt.substring(0, 30)}...`);
-      const imageUrl = await generateImageFromStore({
-        prompt,
-        size,
-        quality,
-        // 実際の使用時はクォータをチェック
-        model: canUseDalle && model === 'dalle' ? 'dalle' : 'sdxl',
-        chatId, // chatIDを渡す
-      });
+      console.log(`${operation} generation request:`, { prompt: prompt.substring(0, 30), operation });
       
-      console.log('画像生成成功:', imageUrl.substring(0, 50) + '...');
+      let imageUrl: string;
+      const userId = 'anonymous'; // Replace with actual user ID if available
+
+      switch (operation) {
+        case 'text-to-image':
+          imageUrl = await generateTextToImage({
+            prompt,
+            imageSize: size,
+            numInferenceSteps: 4,
+            userId
+          });
+          break;
+          
+        case 'image-to-image':
+          imageUrl = await generateImageToImage({
+            prompt,
+            imageUrl: sourceImageUrl!,
+            strength,
+            userId
+          });
+          break;
+          
+        case 'upscaler':
+          imageUrl = await upscaleImage({
+            imageUrl: sourceImageUrl!,
+            scale,
+            model: upscaleModel,
+            userId
+          });
+          break;
+          
+        default:
+          throw new Error('Invalid operation type');
+      }
+      
+      console.log('Image generation success:', imageUrl.substring(0, 50) + '...');
       setGeneratedImage(imageUrl);
       
-      // ここでは画像生成のみ行い、親コンポーネントへの通知は行わない
-      // onImageGenerated呼び出しを削除
+      // Update usage count
+      setUsageCount(prev => ({
+        ...prev,
+        [operation]: prev[operation] + 1
+      }));
       
       return imageUrl;
     } catch (err: any) {
       console.error('Image generation error:', err);
       
-      // エラーメッセージの改善
       let errorMessage = '画像の生成に失敗しました。';
       
       if (err.message) {
         if (err.message.includes('Network request failed')) {
-          errorMessage = 'ネットワークエラー: サーバーに接続できませんでした。インターネット接続を確認して再試行してください。';
-        } else if (err.message.includes('timeout') || err.message.includes('timed out')) {
-          errorMessage = 'タイムアウト: サーバーからの応答が遅すぎます。後でもう一度お試しください。';
-        } else if (err.message.includes('quota') || err.message.includes('limit')) {
-          errorMessage = '利用制限: 画像生成の利用上限に達しました。プレミアムプランへのアップグレードをご検討ください。';
-        } else if (err.message.includes('content policy') || err.message.includes('safety')) {
-          errorMessage = 'コンテンツポリシー違反: プロンプトが安全ポリシーに違反している可能性があります。別の表現を試してください。';
+          errorMessage = 'ネットワークエラー: サーバーに接続できませんでした。';
+        } else if (err.message.includes('timeout')) {
+          errorMessage = 'タイムアウト: サーバーからの応答が遅すぎます。';
+        } else if (err.message.includes('limit') || err.message.includes('quota')) {
+          errorMessage = err.message;
+        } else if (err.message.includes('safety')) {
+          errorMessage = 'コンテンツポリシー違反: プロンプトを変更してください。';
         } else {
           errorMessage = `エラー: ${err.message}`;
         }
@@ -158,123 +273,153 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
     } finally {
       setLoading(false);
     }
-  }, [prompt, size, quality, model, canUseDalle, generateImageFromStore, loading, chatId]);
+  }, [operation, prompt, sourceImageUrl, size, scale, upscaleModel, strength, loading, canUseOperation]);
 
-  // 親コンポーネントの送信ボタンが押されたときに呼び出される関数を公開
+  // Expose methods to parent component
   useImperativeHandle(
     ref,
     () => ({
       generateImage: async () => {
         const imageUrl = await handleGenerate();
         if (imageUrl) {
-          // 実際に使用されるモデルを渡す
-          const usedModel = canUseDalle && model === 'dalle' ? 'dalle' : 'sdxl';
-          // ここで一度だけonImageGeneratedを呼び出す
-          onImageGenerated(imageUrl, prompt, usedModel);
+          onImageGenerated(imageUrl, prompt, operation);
           return true;
         }
         return false;
       },
-      canGenerate: () => currentQuota.remaining > 0 && Boolean(prompt.trim()),
+      canGenerate: () => canUseOperation && (operation === 'upscaler' || Boolean(prompt.trim())),
       getSettings: () => ({
         size,
-        quality,
-        model,
+        operation,
+        model: upscaleModel,
       })
     }),
-    [handleGenerate, onImageGenerated, model, canUseDalle, currentQuota.remaining, prompt, size, quality]
+    [handleGenerate, onImageGenerated, operation, prompt, canUseOperation, size, upscaleModel]
   );
 
-  // 現在選択されているサイズを表示用にフォーマット
-  const displaySize = () => {
-    const [width, height] = size.split('x');
-    // 大きすぎる値やダブルのxを避けるため簡略表示
-    if (width === height) {
-      return width; // 正方形の場合は一辺の長さだけ表示
-    } else {
-      return `${width}x${height}`; // 切り捨てをやめて完全表示
-    }
-  };
+  const operationInfo = getOperationInfo();
 
   return (
     <Container style={{ backgroundColor: colors.background, borderTopColor: colors.border }}>
-      {/* トグルボタン群と残り枚数を同じ行に配置 */}
-      <OptionsContainer style={{ backgroundColor: colors.lightGray }}>
-        {/* モデル選択トグル */}
-        <ToggleButton 
-          backgroundColor={model === 'sdxl' ? '$blue9' : '$purple9'}
-          borderColor={!canUseDalle && model === 'dalle' ? '$red10' : undefined}
-          borderWidth={!canUseDalle && model === 'dalle' ? 1 : 0}
-          onPress={toggleModel}
-          flex={1}
-          disabled={storeIsGenerating}
-        >
-          <ToggleButtonContent>
-            <Ionicons 
-              name={model === 'sdxl' ? 'color-palette' : 'flask'} 
-              size={20} 
-              color="white" 
-              style={{ marginRight: 4 }}
-            />
-            <ToggleButtonText>
-              {model === 'sdxl' ? 'SDXL' : 'DALL-E'}
-            </ToggleButtonText>
-            <Ionicons name="chevron-forward" size={16} color="white" style={{ marginLeft: 2 }} />
-          </ToggleButtonContent>
-        </ToggleButton>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <OptionsContainer style={{ backgroundColor: colors.lightGray }}>
+          {/* Operation toggle */}
+          <ToggleButton 
+            backgroundColor={operationInfo.color}
+            onPress={toggleOperation}
+            disabled={loading}
+          >
+            <ToggleButtonContent>
+              <Ionicons 
+                name={operationInfo.icon as any} 
+                size={20} 
+                color="white" 
+                style={{ marginRight: 4 }}
+              />
+              <ToggleButtonText>
+                {operationInfo.label}
+              </ToggleButtonText>
+              <Ionicons name="chevron-forward" size={16} color="white" style={{ marginLeft: 2 }} />
+            </ToggleButtonContent>
+          </ToggleButton>
 
-        {/* サイズ選択トグル */}
-        <ToggleButton
-          backgroundColor="$green9"
-          onPress={toggleSize}
-          flex={1}
-          disabled={storeIsGenerating}
-        >
-          <ToggleButtonContent>
-            <Ionicons name="resize-outline" size={20} color="white" style={{ marginRight: 4 }} />
-            <ToggleButtonText>
-              {displaySize()}
-            </ToggleButtonText>
-            <Ionicons name="chevron-forward" size={16} color="white" style={{ marginLeft: 2 }} />
-          </ToggleButtonContent>
-        </ToggleButton>
-
-        {/* 品質選択トグル */}
-        <ToggleButton
-          backgroundColor={quality === 'standard' ? '$amber9' : '$orange9'}
-          onPress={toggleQuality}
-          flex={1}
-          disabled={storeIsGenerating}
-        >
-          <ToggleButtonContent>
-            <Ionicons 
-              name={quality === 'standard' ? 'speedometer-outline' : 'diamond-outline'} 
-              size={20} 
-              color="white" 
-              style={{ marginRight: 4 }}
-            />
-            <ToggleButtonText>
-              {quality === 'standard' ? '標準' : '高品質'}
-            </ToggleButtonText>
-            <Ionicons name="swap-horizontal" size={16} color="white" style={{ marginLeft: 2 }} />
-          </ToggleButtonContent>
-        </ToggleButton>
-
-        {/* 残り回数表示 */}
-        <QuotaDisplay style={{ backgroundColor: colors.lightGray }}>
-          {storeIsGenerating ? (
-            <Text color="$blue10" fontSize="$2" fontWeight="500">
-              生成中...
-            </Text>
-          ) : (
-            <Text color={colors.text} fontSize="$2" fontWeight="500">
-              残り: {currentQuota.remaining}/{currentQuota.total}
-            </Text>
+          {/* Size toggle (only for text-to-image and image-to-image) */}
+          {(operation === 'text-to-image' || operation === 'image-to-image') && (
+            <ToggleButton
+              backgroundColor="$orange9"
+              onPress={toggleSize}
+              disabled={loading}
+            >
+              <ToggleButtonContent>
+                <Ionicons name="resize-outline" size={20} color="white" style={{ marginRight: 4 }} />
+                <ToggleButtonText>
+                  {getSizeDisplay()}
+                </ToggleButtonText>
+                <Ionicons name="chevron-forward" size={16} color="white" style={{ marginLeft: 2 }} />
+              </ToggleButtonContent>
+            </ToggleButton>
           )}
-        </QuotaDisplay>
-      </OptionsContainer>
 
-      {/* エラー表示 */}
+          {/* Upscale-specific controls */}
+          {operation === 'upscaler' && (
+            <>
+              <ToggleButton
+                backgroundColor="$green10"
+                onPress={toggleScale}
+                disabled={loading}
+              >
+                <ToggleButtonContent>
+                  <Ionicons name="expand-outline" size={20} color="white" style={{ marginRight: 4 }} />
+                  <ToggleButtonText>
+                    {scale}x
+                  </ToggleButtonText>
+                  <Ionicons name="chevron-forward" size={16} color="white" style={{ marginLeft: 2 }} />
+                </ToggleButtonContent>
+              </ToggleButton>
+
+              <ToggleButton
+                backgroundColor="$teal9"
+                onPress={toggleUpscaleModel}
+                disabled={loading}
+              >
+                <ToggleButtonContent>
+                  <Ionicons name="settings-outline" size={20} color="white" style={{ marginRight: 4 }} />
+                  <ToggleButtonText>
+                    {getUpscaleModelDisplay()}
+                  </ToggleButtonText>
+                  <Ionicons name="chevron-forward" size={16} color="white" style={{ marginLeft: 2 }} />
+                </ToggleButtonContent>
+              </ToggleButton>
+            </>
+          )}
+
+          {/* Strength control (only for image-to-image) */}
+          {operation === 'image-to-image' && (
+            <ToggleButton
+              backgroundColor="$indigo9"
+              onPress={toggleStrength}
+              disabled={loading}
+            >
+              <ToggleButtonContent>
+                <Ionicons name="options-outline" size={20} color="white" style={{ marginRight: 4 }} />
+                <ToggleButtonText>
+                  強度 {Math.round(strength * 100)}%
+                </ToggleButtonText>
+                <Ionicons name="swap-horizontal" size={16} color="white" style={{ marginLeft: 2 }} />
+              </ToggleButtonContent>
+            </ToggleButton>
+          )}
+
+          {/* Usage count display */}
+          <QuotaDisplay style={{ backgroundColor: colors.lightGray }}>
+            {loading ? (
+              <Text color="$blue10" fontSize="$2" fontWeight="500">
+                生成中...
+              </Text>
+            ) : (
+              <Text color={colors.text} fontSize="$2" fontWeight="500">
+                残り: {DAILY_LIMITS[operation] - usageCount[operation]}/{DAILY_LIMITS[operation]}
+              </Text>
+            )}
+          </QuotaDisplay>
+        </OptionsContainer>
+      </ScrollView>
+
+      {/* Description */}
+      <DescriptionText>
+        <Ionicons name="information-circle" size={14} color="#2196f3" style={{marginRight: 4}} />
+        {operationInfo.description}
+      </DescriptionText>
+
+      {/* Source image preview (for image-to-image and upscaler) */}
+      {sourceImageUrl && (operation === 'image-to-image' || operation === 'upscaler') && (
+        <SourceImageContainer>
+          <Text fontSize="$2" color={colors.text} marginBottom="$2">ソース画像:</Text>
+          <SourceImage source={{ uri: sourceImageUrl }} />
+        </SourceImageContainer>
+      )}
+
+      {/* Error display */}
       {error && (
         <ErrorText>
           <Ionicons name="alert-circle" size={14} color="#e53935" style={{marginRight: 4}} />
@@ -282,28 +427,20 @@ export const ImageGenerationPanel = forwardRef<ImageGenerationPanelHandle, Image
         </ErrorText>
       )}
 
-      {/* DALL-E利用不可の警告 */}
-      {model === 'dalle' && !canUseDalle && (
+      {/* Limit warning */}
+      {!canUseOperation && (
         <WarningText>
           <Ionicons name="warning" size={14} color="#f57c00" style={{marginRight: 4}} />
-          DALL-E 3はプレミアムプランでのみ利用可能です
+          本日の{operationInfo.label}制限に達しました（{DAILY_LIMITS[operation]}回/日）
         </WarningText>
-      )}
-
-      {/* DALL-Eサイズ情報 */}
-      {model === 'dalle' && (
-        <InfoText>
-          <Ionicons name="information-circle" size={14} color="#2196f3" style={{marginRight: 4}} />
-          DALL-E 3は特定のサイズ比率のみサポートしています
-        </InfoText>
       )}
     </Container>
   );
 });
 
 const Container = styled(YStack, {
-  padding: '$2',
-  paddingVertical: '$2',
+  padding: '$3',
+  paddingVertical: '$3',
   borderTopWidth: 1,
   borderTopColor: '$borderColor',
   backgroundColor: '$background',
@@ -317,23 +454,26 @@ const Container = styled(YStack, {
 const OptionsContainer = styled(XStack, {
   space: "$2",
   alignItems: "center",
-  justifyContent: "space-between",
+  paddingHorizontal: '$2',
+  paddingVertical: '$2',
   borderRadius: '$4',
   backgroundColor: '$backgroundHover',
 });
 
 const QuotaDisplay = styled(View, {
-  paddingHorizontal: '$2',
+  paddingHorizontal: '$3',
   backgroundColor: '$backgroundHover',
-  borderRadius: '$2',
-  paddingVertical: '$1',
+  borderRadius: '$3',
+  paddingVertical: '$2',
+  minWidth: 80,
+  alignItems: 'center',
 });
 
 const ToggleButton = styled(Button, {
   paddingHorizontal: '$3',
-  paddingVertical: '$3',
-  height: 50,
-  minHeight: 50,
+  paddingVertical: '$2',
+  height: 48,
+  minHeight: 48,
   borderRadius: '$4',
   fontSize: '$3',
   color: 'white',
@@ -350,28 +490,28 @@ const ToggleButton = styled(Button, {
 const ToggleButtonContent = styled(XStack, {
   alignItems: 'center',
   justifyContent: 'center',
-  space: '$2',
+  space: '$1',
 });
 
 const ToggleButtonText = styled(Text, {
   color: 'white',
-  fontSize: '$3',
+  fontSize: '$2',
   fontWeight: 'bold',
 }); 
 
-const ErrorText = styled(Text, {
-  color: '$red10',
+const DescriptionText = styled(Text, {
+  color: '$blue10',
   fontSize: '$2',
-  mt: '$2',
+  marginTop: '$2',
   flexDirection: 'row',
   alignItems: 'center',
   display: 'flex',
 });
 
-const InfoText = styled(Text, {
-  color: '$blue10',
+const ErrorText = styled(Text, {
+  color: '$red10',
   fontSize: '$2',
-  mt: '$2',
+  marginTop: '$2',
   flexDirection: 'row',
   alignItems: 'center',
   display: 'flex',
@@ -380,8 +520,22 @@ const InfoText = styled(Text, {
 const WarningText = styled(Text, {
   color: '$orange10',
   fontSize: '$2',
-  mt: '$2',
+  marginTop: '$2',
   flexDirection: 'row',
   alignItems: 'center',
   display: 'flex',
+});
+
+const SourceImageContainer = styled(YStack, {
+  marginTop: '$3',
+  padding: '$2',
+  backgroundColor: '$gray2',
+  borderRadius: '$3',
+});
+
+const SourceImage = styled(Image, {
+  width: 100,
+  height: 100,
+  borderRadius: '$2',
+  backgroundColor: '$gray5',
 }); 

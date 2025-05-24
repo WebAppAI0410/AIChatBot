@@ -5,7 +5,7 @@ import Constants from 'expo-constants';
 // Supabase Edge FunctionのURL
 const SUPABASE_URL = Constants.expoConfig?.extra?.supabaseUrl!;
 const SUPABASE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/openrouter-proxy`;
-const SUPABASE_IMAGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/image-generator`;
+const SUPABASE_IMAGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/fal-image-generator`;
 const SUPABASE_ANON_KEY = Constants.expoConfig?.extra?.supabaseAnonKey!;
 
 // 画像生成API用のエンドポイント
@@ -60,6 +60,21 @@ export type ImageGenerationResponse = {
   url?: string;
   dataUrl?: string;
   contentType?: string;
+  images?: Array<{
+    url: string;
+    width: number;
+    height: number;
+    content_type: string;
+  }>;
+  image?: {
+    url: string;
+    width: number;
+    height: number;
+    content_type: string;
+  };
+  stored?: boolean;
+  expiry?: number;
+  expiryDate?: string;
 };
 
 /**
@@ -381,62 +396,50 @@ export const fetchChatCompletion = async (
 };
 
 /**
- * 画像生成API
- * DALL-E 3またはStability AI SDXL経由で画像を生成
+ * 画像生成API - fal.ai FLUX経由
+ * Text to Image、Image to Image、Upscalerの3つの機能を提供
  * 
  * すべてのAPIキー処理はSupabase Edge Function側で行い
- * クライアント側ではAPIキーを保持しない安全な実装に変更
+ * クライアント側ではAPIキーを保持しない安全な実装
  */
-export const generateImage = async ({
+
+// Text to Image generation using FLUX.1 [schnell]
+export const generateTextToImage = async ({
   prompt,
-  size = '768x768',
-  quality = 'standard',
-  model = 'sdxl',
-  returnType = 'url', // 'url'または'base64'
+  imageSize = 'landscape_4_3',
+  numInferenceSteps = 4,
+  seed,
+  userId
 }: {
   prompt: string;
-  size?: string;
-  quality?: string;
-  model?: 'sdxl' | 'dalle';
-  returnType?: 'url' | 'base64';
+  imageSize?: 'square_hd' | 'square' | 'portrait_4_3' | 'portrait_16_9' | 'landscape_4_3' | 'landscape_16_9';
+  numInferenceSteps?: number;
+  seed?: number;
+  userId?: string;
 }): Promise<string> => {
   try {
-    console.log(`画像生成リクエスト - モデル: ${model}, サイズ: ${size}, 品質: ${quality}, 返却形式: ${returnType}`);
+    console.log(`Text-to-Image generation request - Size: ${imageSize}, Steps: ${numInferenceSteps}`);
 
-    // DALL-E 3の場合はサイズをサポートされている値に変換
-    let adjustedSize = size;
-    if (model === 'dalle') {
-      const supportedDalleSizes = ['1024x1024', '1024x1792', '1792x1024'];
-      if (!supportedDalleSizes.includes(size)) {
-        // デフォルトで正方形サイズを使用
-        adjustedSize = '1024x1024';
-        console.log(`DALL-E 3はサイズ "${size}" をサポートしていません。代わりに "${adjustedSize}" を使用します。`);
-      }
-    }
-
-    // ネットワークリトライロジックを適用
     return await withNetworkRetry(async () => {
-      // Edge Function経由で画像生成を行う
       const response = await fetch(SUPABASE_IMAGE_FUNCTION_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          // キャッシュ制御ヘッダーの追加
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         },
         body: JSON.stringify({
+          operation: 'text-to-image',
           prompt,
-          size: adjustedSize,
-          quality,
-          model,
-          returnType
+          user_id: userId,
+          image_size: imageSize,
+          num_inference_steps: numInferenceSteps,
+          seed
         }),
       });
 
-      // レスポンスステータスを確認
-      console.log(`画像生成APIレスポンスステータス: ${response.status}`);
+      console.log(`Text-to-Image API response status: ${response.status}`);
       
       if (!response.ok) {
         let errorText = '';
@@ -446,10 +449,9 @@ export const generateImage = async ({
           errorText = 'レスポンステキスト取得エラー';
         }
         
-        console.error('画像生成API Error:', errorText);
+        console.error('Text-to-Image API Error:', errorText);
         
-        // エラーオブジェクトを作成
-        const error: any = new Error(`画像生成に失敗しました (${response.status})`);
+        const error: any = new Error(`Text-to-Image generation failed (${response.status})`);
         error.status = response.status;
         error.body = errorText;
         
@@ -457,6 +459,9 @@ export const generateImage = async ({
           const errorJson = JSON.parse(errorText);
           if (errorJson.error) {
             error.message = errorJson.error;
+          }
+          if (errorJson.limit && response.status === 429) {
+            error.message = `1日の制限枚数（${errorJson.limit}枚）に達しました。明日再度お試しください。`;
           }
         } catch (jsonError) {
           // JSON解析エラー - テキストをそのまま使用
@@ -467,25 +472,254 @@ export const generateImage = async ({
 
       const data = await response.json() as ImageGenerationResponse;
       
-      if (!data || (!data.url && !data.dataUrl)) {
+      if (!data || !data.images || data.images.length === 0) {
         console.error('Invalid API response format:', data);
         throw new Error('APIからの応答が無効です');
       }
       
-      // URLまたはデータURLを返す
-      const result = data.url || data.dataUrl || '';
+      const result = data.images[0].url;
       if (__DEV__) {
-        console.log('画像生成成功:', (result.length > 80 ? result.slice(0, 80) + '...' : result));
+        console.log('Text-to-Image generation success:', (result.length > 80 ? result.slice(0, 80) + '...' : result));
       }
       return result;
     }, 3);
   } catch (error: unknown) {
-    console.error('Image generation final error:', error);
+    console.error('Text-to-Image generation final error:', error);
     if (error instanceof Error) {
-      throw new Error(error.message || '画像生成に失敗しました');
+      throw new Error(error.message || 'Text-to-Image generation failed');
     }
-    throw new Error('画像生成に失敗しました');
+    throw new Error('Text-to-Image generation failed');
   }
 };
 
-export default { fetchChatCompletion, generateImage };
+// Image to Image generation using FLUX.1 [dev] Redux
+export const generateImageToImage = async ({
+  prompt,
+  imageUrl,
+  strength = 0.8,
+  numInferenceSteps = 28,
+  guidanceScale = 3.5,
+  seed,
+  userId
+}: {
+  prompt: string;
+  imageUrl: string;
+  strength?: number;
+  numInferenceSteps?: number;
+  guidanceScale?: number;
+  seed?: number;
+  userId?: string;
+}): Promise<string> => {
+  try {
+    console.log(`Image-to-Image generation request - Strength: ${strength}, Steps: ${numInferenceSteps}`);
+
+    return await withNetworkRetry(async () => {
+      const response = await fetch(SUPABASE_IMAGE_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        body: JSON.stringify({
+          operation: 'image-to-image',
+          prompt,
+          image_url: imageUrl,
+          user_id: userId,
+          strength,
+          num_inference_steps: numInferenceSteps,
+          guidance_scale: guidanceScale,
+          seed
+        }),
+      });
+
+      console.log(`Image-to-Image API response status: ${response.status}`);
+      
+      if (!response.ok) {
+        let errorText = '';
+        try {
+          errorText = await response.text();
+        } catch (e) {
+          errorText = 'レスポンステキスト取得エラー';
+        }
+        
+        console.error('Image-to-Image API Error:', errorText);
+        
+        const error: any = new Error(`Image-to-Image generation failed (${response.status})`);
+        error.status = response.status;
+        error.body = errorText;
+        
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.error) {
+            error.message = errorJson.error;
+          }
+          if (errorJson.limit && response.status === 429) {
+            error.message = `1日の制限枚数（${errorJson.limit}枚）に達しました。明日再度お試しください。`;
+          }
+        } catch (jsonError) {
+          // JSON解析エラー - テキストをそのまま使用
+        }
+        
+        throw error;
+      }
+
+      const data = await response.json() as ImageGenerationResponse;
+      
+      if (!data || !data.images || data.images.length === 0) {
+        console.error('Invalid API response format:', data);
+        throw new Error('APIからの応答が無効です');
+      }
+      
+      const result = data.images[0].url;
+      if (__DEV__) {
+        console.log('Image-to-Image generation success:', (result.length > 80 ? result.slice(0, 80) + '...' : result));
+      }
+      return result;
+    }, 3);
+  } catch (error: unknown) {
+    console.error('Image-to-Image generation final error:', error);
+    if (error instanceof Error) {
+      throw new Error(error.message || 'Image-to-Image generation failed');
+    }
+    throw new Error('Image-to-Image generation failed');
+  }
+};
+
+// Image upscaling using Real-ESRGAN
+export const upscaleImage = async ({
+  imageUrl,
+  scale = 2,
+  model = 'RealESRGAN_x4plus',
+  face = false,
+  userId
+}: {
+  imageUrl: string;
+  scale?: number;
+  model?: 'RealESRGAN_x4plus' | 'RealESRGAN_x2plus' | 'RealESRGAN_x4plus_anime_6B' | 'RealESRGAN_x4_v3' | 'RealESRGAN_x4_wdn_v3' | 'RealESRGAN_x4_anime_v3';
+  face?: boolean;
+  userId?: string;
+}): Promise<string> => {
+  try {
+    console.log(`Image upscaling request - Scale: ${scale}, Model: ${model}, Face: ${face}`);
+
+    return await withNetworkRetry(async () => {
+      const response = await fetch(SUPABASE_IMAGE_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        body: JSON.stringify({
+          operation: 'upscaler',
+          image_url: imageUrl,
+          user_id: userId,
+          scale,
+          model,
+          face
+        }),
+      });
+
+      console.log(`Upscaler API response status: ${response.status}`);
+      
+      if (!response.ok) {
+        let errorText = '';
+        try {
+          errorText = await response.text();
+        } catch (e) {
+          errorText = 'レスポンステキスト取得エラー';
+        }
+        
+        console.error('Upscaler API Error:', errorText);
+        
+        const error: any = new Error(`Image upscaling failed (${response.status})`);
+        error.status = response.status;
+        error.body = errorText;
+        
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.error) {
+            error.message = errorJson.error;
+          }
+          if (errorJson.limit && response.status === 429) {
+            error.message = `1日の制限枚数（${errorJson.limit}枚）に達しました。明日再度お試しください。`;
+          }
+        } catch (jsonError) {
+          // JSON解析エラー - テキストをそのまま使用
+        }
+        
+        throw error;
+      }
+
+      const data = await response.json() as ImageGenerationResponse;
+      
+      if (!data || !data.image) {
+        console.error('Invalid API response format:', data);
+        throw new Error('APIからの応答が無効です');
+      }
+      
+      const result = data.image.url;
+      if (__DEV__) {
+        console.log('Image upscaling success:', (result.length > 80 ? result.slice(0, 80) + '...' : result));
+      }
+      return result;
+    }, 3);
+  } catch (error: unknown) {
+    console.error('Image upscaling final error:', error);
+    if (error instanceof Error) {
+      throw new Error(error.message || 'Image upscaling failed');
+    }
+    throw new Error('Image upscaling failed');
+  }
+};
+
+// Legacy function for backward compatibility - now uses Text-to-Image
+export const generateImage = async ({
+  prompt,
+  size = '768x768',
+  quality = 'standard',
+  model = 'flux', // Changed default to 'flux'
+  returnType = 'url',
+  userId
+}: {
+  prompt: string;
+  size?: string;
+  quality?: string;
+  model?: 'flux' | 'dalle';
+  returnType?: 'url' | 'base64';
+  userId?: string;
+}): Promise<string> => {
+  // Map legacy size format to new format
+  const sizeMapping: Record<string, any> = {
+    '768x768': 'square',
+    '1024x1024': 'square_hd',
+    '512x512': 'square',
+    '1024x1792': 'portrait_16_9',
+    '1792x1024': 'landscape_16_9'
+  };
+
+  const imageSize = sizeMapping[size] || 'landscape_4_3';
+  
+  if (model === 'flux') {
+    return await generateTextToImage({
+      prompt,
+      imageSize,
+      userId
+    });
+  } else {
+    // For DALL-E, fall back to the old implementation temporarily
+    console.warn('DALL-E support is deprecated. Please migrate to FLUX.');
+    throw new Error('DALL-E support has been discontinued. Please use FLUX models.');
+  }
+};
+
+export default { 
+  fetchChatCompletion, 
+  generateImage, 
+  generateTextToImage, 
+  generateImageToImage, 
+  upscaleImage 
+};

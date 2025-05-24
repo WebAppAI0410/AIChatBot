@@ -405,15 +405,22 @@ export default function ChatScreen() {
   };
 
   // 画像生成完了時の処理
-  const handleImageGenerated = (imageUrl: string, promptText: string, model: 'sdxl' | 'dalle' = 'sdxl') => {
+  const handleImageGenerated = (imageUrl: string, promptText: string, operation: 'text-to-image' | 'image-to-image' | 'upscaler') => {
     if (!chat) return;
 
-    // モデル情報をログに出力
-    if (__DEV__) console.log(`Image generated with model: ${model}`);
+    // 操作タイプをログに出力
+    if (__DEV__) console.log(`Image generated with operation: ${operation}`);
+
+    // 操作タイプに応じたメッセージを作成
+    const operationMessages = {
+      'text-to-image': 'テキストから画像を生成しました',
+      'image-to-image': '画像から画像を変換しました', 
+      'upscaler': '画像をアップスケールしました'
+    };
 
     // 画像をアシスタントからの返信として追加
     addImageMessage(chat.id, {
-      content: '生成された画像です',
+      content: operationMessages[operation],
       imageUrl,
       role: 'assistant'
     });
