@@ -18,6 +18,28 @@ import { CentralToast } from './components/CentralToast';
 import { View } from 'react-native';
 import { SQLiteProvider } from 'expo-sqlite';
 import { setDatabase, initDatabase } from './services/sqlite';
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+
+// i18nextの初期化
+i18n
+  .use(initReactI18next)
+  .init({
+    resources: {
+      ja: {
+        translation: {
+          // 基本的な翻訳を追加
+          welcome: 'ようこそ',
+          loading: '読み込み中...',
+        }
+      }
+    },
+    lng: 'ja',
+    fallbackLng: 'ja',
+    interpolation: {
+      escapeValue: false,
+    },
+  });
 
 // ColorsType型を定義
 type ColorsType = typeof lightColors;

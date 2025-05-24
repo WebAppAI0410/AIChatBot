@@ -1,5 +1,6 @@
 import React, { forwardRef, useImperativeHandle, useEffect, useState, useCallback, useRef } from 'react';
 import { StyleSheet, View, Platform, SafeAreaView, KeyboardAvoidingView, TouchableOpacity, Text, useWindowDimensions } from 'react-native';
+import { Calculator, Minus, Code, Hash, MessageCircle } from 'lucide-react-native';
 import { 
   RichText, 
   Toolbar, 
@@ -22,13 +23,16 @@ export type TenTapEditorProps = {
   onTextSelection?: (selectedText: string) => void;
   isDarkMode?: boolean;
   themeColors?: any;
+  isNewNote?: boolean;
 };
 
-const TenTapEditor = forwardRef<{ 
-  editor: any,
-  undo: () => void, 
-  redo: () => void,
-}, TenTapEditorProps>((props, ref) => {
+interface TenTapEditorRef {
+  editor: any;
+  undo: () => void;
+  redo: () => void;
+}
+
+const TenTapEditor: React.ForwardRefRenderFunction<TenTapEditorRef, TenTapEditorProps> = (props, ref) => {
   const {
     content,
     onContentChange,
@@ -38,6 +42,7 @@ const TenTapEditor = forwardRef<{
     isDarkMode = false,
     themeColors,
     onTextSelection,
+    isNewNote = false,
   } = props;
 
   const colors = useColors();
@@ -89,12 +94,53 @@ const TenTapEditor = forwardRef<{
       textAlign: 'center',
       flexShrink: 1,
     },
+    inlineToolbar: {
+      paddingVertical: isTablet ? 8 : 6,
+      paddingHorizontal: isTablet ? 12 : 8,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+    },
+    extendedToolbar: {
+      paddingVertical: isTablet ? 8 : 6,
+      paddingHorizontal: isTablet ? 12 : 8,
+      borderTopWidth: 1,
+    },
+    inlineRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: isTablet ? 6 : 3,
+      justifyContent: 'space-around',
+    },
+    extendedRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: isTablet ? 8 : 4,
+      justifyContent: 'space-around',
+    },
+    extendedButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: isTablet ? 8 : 6,
+      paddingVertical: isTablet ? 8 : 6,
+      borderRadius: isTablet ? 6 : 4,
+      borderWidth: 1,
+      flex: 1,
+      marginHorizontal: isTablet ? 2 : 1,
+      minHeight: isTablet ? 36 : 32,
+      gap: 4,
+    },
+    extendedButtonText: {
+      fontSize: isTablet ? 12 : 10,
+      fontWeight: '500',
+      textAlign: 'center',
+      flexShrink: 1,
+    },
   });
 
   // ダークモード対応のカスタムCSS
   const customCSS = `
     * {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
       line-height: 1.6;
       box-sizing: border-box;
     }
@@ -186,7 +232,7 @@ const TenTapEditor = forwardRef<{
       background-color: ${isDarkMode ? '#262c36' : '#f6f8fa'} !important;
       color: ${isDarkMode ? '#e6edf3' : '#24292f'} !important;
       border-radius: 6px;
-      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     }
     
     pre {
@@ -262,15 +308,110 @@ const TenTapEditor = forwardRef<{
       background-color: ${isDarkMode ? '#30363d' : '#d0d7de'} !important;
       border: 0;
     }
+
+    /* 数学ブロックのスタイル */
+    .math-block {
+      background-color: ${isDarkMode ? '#0d1117' : '#ffffff'} !important;
+      border: 2px solid ${isDarkMode ? '#30363d' : '#d0d7de'} !important;
+      border-radius: 6px;
+      padding: 12px;
+      margin: 8px 0;
+      font-family: "Courier New", monospace;
+      font-size: 16px;
+      color: ${isDarkMode ? '#c9d1d9' : '#24292f'} !important;
+      text-align: center;
+      position: relative;
+    }
+
+    .math-block:before {
+      content: 'LaTeX';
+      position: absolute;
+      top: 4px;
+      right: 8px;
+      font-size: 10px;
+      color: ${isDarkMode ? '#8b949e' : '#656d76'} !important;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+
+    /* インライン数式のスタイル */
+    .math-inline {
+      background-color: ${isDarkMode ? '#21262d' : '#f6f8fa'} !important;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-family: "Courier New", monospace;
+      border: 1px solid ${isDarkMode ? '#30363d' : '#d0d7de'};
+    }
+
+    /* インラインコードのスタイル */
+    .code-inline {
+      background-color: ${isDarkMode ? '#262c36' : '#f6f8fa'} !important;
+      color: ${isDarkMode ? '#e6edf3' : '#24292f'} !important;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-family: "Courier New", monospace;
+      border: 1px solid ${isDarkMode ? '#30363d' : '#d0d7de'};
+    }
+
+    /* インラインコメントのスタイル */
+    .comment-inline {
+      background-color: ${isDarkMode ? '#1a1f2e' : '#fff8e1'} !important;
+      color: ${isDarkMode ? '#8b949e' : '#9e6a03'} !important;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-style: italic;
+      border: 1px solid ${isDarkMode ? '#30363d' : '#d0d7de'};
+    }
+
+    /* コードブロックのスタイル（編集時） */
+    .code-block-editing {
+      background-color: ${isDarkMode ? '#161b22' : '#f6f8fa'} !important;
+      border: 2px solid ${isDarkMode ? '#30363d' : '#d0d7de'} !important;
+      border-radius: 6px;
+      padding: 12px;
+      margin: 8px 0;
+      font-family: "Courier New", monospace;
+      position: relative;
+    }
+
+    .code-block-editing:before {
+      content: '\\\`\\\`\\\`';
+      position: absolute;
+      top: 4px;
+      left: 8px;
+      font-size: 10px;
+      color: ${isDarkMode ? '#8b949e' : '#656d76'} !important;
+      font-weight: bold;
+    }
+
+    .code-block-editing:after {
+      content: '\\\`\\\`\\\`';
+      position: absolute;
+      bottom: 4px;
+      right: 8px;
+      font-size: 10px;
+      color: ${isDarkMode ? '#8b949e' : '#656d76'} !important;
+      font-weight: bold;
+    }
   `;
 
   // ダークモード対応のカスタムテーマ
   const customTheme = {
     toolbar: {
       toolbarBody: {
-        backgroundColor: isDarkMode ? '#21262d' : '#f6f8fa',
+        backgroundColor: isDarkMode ? '#0d1117' : '#ffffff',
         borderTopColor: isDarkMode ? '#30363d' : '#d0d7de',
         borderBottomColor: isDarkMode ? '#30363d' : '#d0d7de',
+      },
+      toolbarButton: {
+        backgroundColor: isDarkMode ? '#21262d' : '#f6f8fa',
+        borderColor: isDarkMode ? '#30363d' : '#d0d7de',
+        color: isDarkMode ? '#ffffff' : '#24292f',
+      },
+      toolbarButtonSelected: {
+        backgroundColor: isDarkMode ? colors.primary : colors.primary,
+        borderColor: isDarkMode ? colors.primary : colors.primary,
+        color: '#ffffff',
       },
     },
     webview: {
@@ -300,9 +441,24 @@ const TenTapEditor = forwardRef<{
     avoidIosKeyboard: true,
     editable: !readOnly,
     theme: customTheme,
+    onUpdate: ({ editor }) => {
+      // コンテンツ更新時にMathJax処理を実行
+      if (typeof window !== 'undefined' && window.MathJax) {
+        setTimeout(() => {
+          window.MathJax.typesetPromise().catch((err: any) => {
+            console.log('MathJax typeset error:', err);
+          });
+        }, 100);
+      }
+    },
     onChange: () => {
       // 外部からの更新中は onChange を無視
       if (isUpdatingFromExternal) {
+        return;
+      }
+      
+      // 新規ノートの初期選択処理中は onChange を無視
+      if (isNewNote && !newNoteSelectionDone) {
         return;
       }
       
@@ -313,18 +469,52 @@ const TenTapEditor = forwardRef<{
         }
       });
     },
+    onKeyDown: (event) => {
+      // Enterキーが押された時の処理
+      if (event.key === 'Enter') {
+        // 現在の選択範囲の情報を取得
+        editor.getActiveNodeType().then((nodeType) => {
+          // 見出し要素からの改行時は段落に変換
+          if (nodeType && ['heading1', 'heading2', 'heading3', 'blockquote'].includes(nodeType)) {
+            setTimeout(() => {
+              editor.setParagraph();
+            }, 50);
+          }
+        }).catch(() => {
+          // エラーが発生した場合は何もしない
+        });
+      }
+    },
   });
 
   // エディタの状態を取得
   const editorState = useBridgeState(editor);
 
-  // Undo/RedoとHeading（Aa）ボタンを除外したカスタムツールバーアイテム
-  const customToolbarItems: ToolbarItem[] = DEFAULT_TOOLBAR_ITEMS.filter(
-    (item, index) => {
-      // 最後の2つ（Undo/Redo）と見出し選択（Heading）を除外
-      return index < DEFAULT_TOOLBAR_ITEMS.length - 2 && index !== 4; // インデックス4が見出し選択
-    }
-  );
+  // Undo/RedoとHeading（Aa）ボタンを除外し、リスト系を最後に配置したカスタムツールバーアイテム
+  const customToolbarItems: ToolbarItem[] = (() => {
+    const filteredItems = DEFAULT_TOOLBAR_ITEMS.filter(
+      (item, index) => {
+        // 最後の2つ（Undo/Redo）と見出し選択（Heading）を除外
+        return index < DEFAULT_TOOLBAR_ITEMS.length - 2 && index !== 4; // インデックス4が見出し選択
+      }
+    );
+    
+    // リスト系のボタンを識別して最後に移動
+    const listItems: ToolbarItem[] = [];
+    const nonListItems: ToolbarItem[] = [];
+    
+    filteredItems.forEach(item => {
+      // リスト系アクションかどうかを判断
+      if (item === 'orderedList' || item === 'bulletList' || item === 'taskList') {
+        listItems.push(item);
+      } else {
+        nonListItems.push(item);
+      }
+    });
+    
+    // リスト系以外のアイテム + リスト系アイテムの順で結合
+    return [...nonListItems, ...listItems];
+  })();
 
   // カスタムツールバーボタン（見出し用）
   const HeadingToolbarButton = ({ 
@@ -381,6 +571,140 @@ const TenTapEditor = forwardRef<{
     }
   }, [editor]);
 
+  // インライン数式挿入ハンドラ
+  const handleInlineMath = useCallback(() => {
+    if (editor && editor.commands) {
+      // TenTap Editorのcommands APIを使用してテキストを挿入
+      editor.commands.insertContent('$a$');
+    }
+  }, [editor]);
+
+  // インラインコード挿入ハンドラ
+  const handleInlineCode = useCallback(() => {
+    if (editor && editor.commands) {
+      // TenTap Editorのcommands APIを使用してテキストを挿入
+      editor.commands.insertContent('`code`');
+    }
+  }, [editor]);
+
+  // インラインコメント挿入ハンドラ
+  const handleInlineComment = useCallback(() => {
+    if (editor && editor.commands) {
+      // HTMLコメント形式を挿入
+      editor.commands.insertContent('<!-- comment -->');
+    }
+  }, [editor]);
+
+  // 水平線挿入ハンドラ
+  const handleInsertDivider = useCallback(() => {
+    if (editor && editor.commands) {
+      // TenTap Editorの水平線挿入コマンドを使用
+      editor.commands.setHorizontalRule();
+    }
+  }, [editor]);
+
+  // コードブロック挿入ハンドラ
+  const handleInsertCodeBlock = useCallback(() => {
+    if (editor && editor.commands) {
+      // TenTap Editorのコードブロック挿入コマンドを使用
+      editor.commands.setCodeBlock();
+    }
+  }, [editor]);
+
+  // 数学ブロック挿入ハンドラ
+  const handleInsertMathBlock = useCallback(() => {
+    if (editor && editor.commands) {
+      // 数学ブロック用のテンプレートを挿入（段落として挿入してから数式記号を追加）
+      editor.commands.insertContent('$$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$');
+    }
+  }, [editor]);
+
+  // 拡張ツールバーボタン
+  const ExtendedToolbarButton = ({ 
+    title, 
+    icon, 
+    onPress 
+  }: { 
+    title: string; 
+    icon: React.ReactNode;
+    onPress: () => void;
+  }) => (
+    <TouchableOpacity
+      style={[
+        styles.extendedButton,
+        { 
+          backgroundColor: isDarkMode ? '#21262d' : '#f6f8fa',
+          borderColor: isDarkMode ? '#30363d' : '#d0d7de'
+        }
+      ]}
+      onPress={onPress}
+    >
+      {icon}
+      <Text 
+        style={[
+          styles.extendedButtonText,
+          { color: isDarkMode ? '#c9d1d9' : '#24292f' }
+        ]}
+        numberOfLines={1}
+      >
+        {title}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  // インライン機能ツールバー
+  const InlineToolbar = () => (
+    <View style={[styles.inlineToolbar, { 
+      backgroundColor: isDarkMode ? '#161b22' : '#f8f9fa',
+      borderTopColor: isDarkMode ? '#30363d' : '#d0d7de',
+      borderBottomColor: isDarkMode ? '#30363d' : '#d0d7de'
+    }]}>
+      <View style={styles.inlineRow}>
+        <ExtendedToolbarButton
+          title="数式"
+          icon={<Calculator size={16} color={isDarkMode ? '#c9d1d9' : '#24292f'} />}
+          onPress={handleInlineMath}
+        />
+        <ExtendedToolbarButton
+          title="コード"
+          icon={<Hash size={16} color={isDarkMode ? '#c9d1d9' : '#24292f'} />}
+          onPress={handleInlineCode}
+        />
+        <ExtendedToolbarButton
+          title="コメント"
+          icon={<MessageCircle size={16} color={isDarkMode ? '#c9d1d9' : '#24292f'} />}
+          onPress={handleInlineComment}
+        />
+      </View>
+    </View>
+  );
+
+  // 拡張ツールバー（水平線・コードブロック・数学ブロック）
+  const ExtendedToolbar = () => (
+    <View style={[styles.extendedToolbar, { 
+      backgroundColor: isDarkMode ? '#161b22' : '#f8f9fa',
+      borderTopColor: isDarkMode ? '#30363d' : '#d0d7de'
+    }]}>
+      <View style={styles.extendedRow}>
+        <ExtendedToolbarButton
+          title="水平線"
+          icon={<Minus size={16} color={isDarkMode ? '#c9d1d9' : '#24292f'} />}
+          onPress={handleInsertDivider}
+        />
+        <ExtendedToolbarButton
+          title="コードブロック"
+          icon={<Code size={16} color={isDarkMode ? '#c9d1d9' : '#24292f'} />}
+          onPress={handleInsertCodeBlock}
+        />
+        <ExtendedToolbarButton
+          title="数学ブロック"
+          icon={<Calculator size={16} color={isDarkMode ? '#c9d1d9' : '#24292f'} />}
+          onPress={handleInsertMathBlock}
+        />
+      </View>
+    </View>
+  );
+
   // 見出し選択ツールバーコンポーネント
   const HeadingToolbar = () => {
     return (
@@ -434,23 +758,85 @@ const TenTapEditor = forwardRef<{
     },
   }));
 
+  // 新規ノート選択処理完了フラグ
+  const [newNoteSelectionDone, setNewNoteSelectionDone] = useState(false);
+
   // コンテンツが外部から変更された場合の同期
   useEffect(() => {
-    if (content && editor && content !== lastInternalContent.current) {
+    if (editor && content !== lastInternalContent.current) {
       setIsUpdatingFromExternal(true);
       
       editor.getHTML().then((currentHTML) => {
-        if (currentHTML !== content) {
-          editor.setContent(content);
-          lastInternalContent.current = content;
+        const contentToSet = content || '<p></p>';
+        if (currentHTML !== contentToSet) {
+          editor.setContent(contentToSet);
+          lastInternalContent.current = contentToSet;
+          
+          // 新規ノートの場合はカーソルをH1テキストの末尾に配置（一度だけ実行）
+          if (isNewNote && !newNoteSelectionDone && contentToSet.includes('<h1>無題のノート</h1>')) {
+            setNewNoteSelectionDone(true);
+            setTimeout(() => {
+              try {
+                // エディタにフォーカスしてH1要素の末尾にカーソルを配置
+                editor.focus();
+                
+                // H1内の「無題のノート」テキストの末尾にカーソルを移動
+                setTimeout(() => {
+                  try {
+                    // ProseMirrorのビューを直接操作してカーソル位置を設定
+                    const editorView = (editor as any).view;
+                    if (editorView && editorView.state) {
+                      const { state } = editorView;
+                      const { doc } = state;
+                      
+                      // H1要素の終端を検索
+                      let targetPos = 7; // 「無題のノート」のテキスト長 + 1
+                      doc.descendants((node, pos) => {
+                        if (node.type.name === 'heading' && node.attrs.level === 1) {
+                          // H1ノードの内容の終端を計算
+                          targetPos = pos + node.nodeSize - 1;
+                          return false;
+                        }
+                        return true;
+                      });
+                      
+                      // カーソルを設定
+                      const resolvedPos = doc.resolve(Math.max(1, Math.min(targetPos, doc.content.size - 1)));
+                      const selection = state.selection.constructor.near(resolvedPos);
+                      const tr = state.tr.setSelection(selection);
+                      editorView.dispatch(tr);
+                      console.log('新規ノート: H1テキスト末尾にカーソル配置完了');
+                      
+                      // lastInternalContent を現在のコンテンツで更新して同期を保つ
+                      lastInternalContent.current = contentToSet;
+                    } else {
+                      console.log('エディタビューが利用できません');
+                    }
+                  } catch (positionError) {
+                    console.log('カーソル位置設定エラー:', positionError);
+                  }
+                }, 200);
+              } catch (focusError) {
+                console.log('エディタフォーカスエラー:', focusError);
+              }
+            }, 400);
+          }
         }
         // 短い遅延後に外部更新フラグをリセット
         setTimeout(() => {
           setIsUpdatingFromExternal(false);
-        }, 100);
+        }, 150);
+      }).catch(() => {
+        // エラーが発生した場合は直接設定
+        const contentToSet = content || '<p></p>';
+        editor.setContent(contentToSet);
+        lastInternalContent.current = contentToSet;
+        setTimeout(() => {
+          setIsUpdatingFromExternal(false);
+        }, 150);
       });
     }
-  }, [content, editor]);
+  }, [content, editor, isNewNote, newNoteSelectionDone]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#0d1117' : '#ffffff' }]}>
@@ -467,6 +853,9 @@ const TenTapEditor = forwardRef<{
           {/* 見出し選択ツールバー */}
           <HeadingToolbar />
           
+          {/* インライン機能ツールバー */}
+          <InlineToolbar />
+          
           {/* 標準ツールバー */}
           <View style={[styles.standardToolbar, { 
             backgroundColor: isDarkMode ? '#21262d' : '#f6f8fa',
@@ -478,12 +867,16 @@ const TenTapEditor = forwardRef<{
               shouldHideDisabledToolbarItems={true}
             />
           </View>
+
+          {/* 拡張ツールバー（水平線・コードブロック・数学ブロック） */}
+          <ExtendedToolbar />
         </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   );
-});
+};
 
-TenTapEditor.displayName = 'TenTapEditor';
+const TenTapEditorWithRef = React.forwardRef(TenTapEditor);
+TenTapEditorWithRef.displayName = 'TenTapEditor';
 
-export default TenTapEditor; 
+export default TenTapEditorWithRef; 

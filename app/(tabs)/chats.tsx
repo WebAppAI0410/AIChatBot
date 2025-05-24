@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View, Image, TextInput, Keyboard } from 'react-native';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View, Image, TextInput, Keyboard, Alert } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store';
@@ -12,7 +12,8 @@ import IconSelectModal from '../components/IconSelectModal';
 import Header from '../components/Header';
 import SharedLayout from '../components/SharedLayout';
 import useResponsive from '../hooks/useResponsive';
-import { SearchBar, SearchBarRef } from '../components/SearchComponents';
+import SelectionHeader from '../components/SelectionHeader';
+import PullToSearchContainer from '../components/PullToSearchContainer';
 
 export default function ChatsScreen() {
   const router = useRouter();
@@ -36,9 +37,10 @@ export default function ChatsScreen() {
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const searchBarRef = useRef<SearchBarRef>(null);
-  const pendingSearchRef = useRef<string | null>(null); // 保留中の検索テキスト
+  
+  // 一括削除機能の状態
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedChatIds, setSelectedChatIds] = useState<Set<string>>(new Set());
   
   // 検索結果に基づいたチャットリスト
   const filteredChats = searchQuery 
@@ -56,21 +58,6 @@ export default function ChatsScreen() {
     if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
-  
-  // キーボードイベント監視
-  useEffect(() => {
-    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
-      // 保留中の検索があれば実行
-      if (pendingSearchRef.current !== null) {
-        setSearchQuery(pendingSearchRef.current);
-        pendingSearchRef.current = null;
-      }
-    });
-
-    return () => {
-      keyboardDidHideListener.remove();
-    };
-  }, []);
   
   const handleOpenChat = (chatId: string) => {
     if (layout.twoColumn) {
@@ -142,29 +129,13 @@ export default function ChatsScreen() {
   const selectedChat = chats.find(chat => chat.id === selectedChatId);
   const iconEditChat = chats.find(chat => chat.id === iconEditChatId);
   
-  // 検索用コールバック - IME対応
-  const handleSearch = (text: string) => {
-    if (__DEV__) {
-      console.log('Search triggered with:', text);
-    }
-    
-    // 入力テキストを保持
-    pendingSearchRef.current = text;
-    
-    // テキストが空の場合は初期状態に戻す
-    if (!text) {
-      setSearchQuery('');
-      pendingSearchRef.current = null;
-      return;
-    }
-    
-    // テキスト入力中にフォーカスを維持
-    if (searchBarRef.current?.getValue() !== text) {
-      searchBarRef.current?.focus();
-    }
-    
-    // 検索実行（キーボードは閉じない）
-    setSearchQuery(text);
+  // 新しい検索ハンドラー
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const handleCancelSearch = () => {
+    setSearchQuery('');
   };
   
   // チャットを開く処理
@@ -172,55 +143,97 @@ export default function ChatsScreen() {
     handleOpenChat(chatId);
   };
   
-  // キャンセルボタン処理
-  const handleSearchCancel = () => {
-    setSearchQuery('');
-    pendingSearchRef.current = null;
-    searchBarRef.current?.blur();
+  
+  // 選択モード切り替え
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode);
+    setSelectedChatIds(new Set());
   };
   
-  // 検索バーをフォーカスする
-  const focusSearchBar = () => {
-    searchBarRef.current?.focus();
-    setIsSearchFocused(true);
-  };
-  
-  // フォーカス変更ハンドラ
-  const handleSearchFocus = () => {
-    setIsSearchFocused(true);
-  };
-  
-  const handleSearchBlur = () => {
-    setIsSearchFocused(false);
-    // ブラー時に保留中の検索を実行
-    if (pendingSearchRef.current !== null) {
-      setSearchQuery(pendingSearchRef.current);
-      pendingSearchRef.current = null;
+  // チャット選択切り替え
+  const toggleChatSelection = (chatId: string) => {
+    const newSelection = new Set(selectedChatIds);
+    if (newSelection.has(chatId)) {
+      newSelection.delete(chatId);
+    } else {
+      newSelection.add(chatId);
     }
+    setSelectedChatIds(newSelection);
+  };
+  
+  // 全選択/全解除
+  const toggleSelectAll = () => {
+    if (selectedChatIds.size === sortedChats.length) {
+      setSelectedChatIds(new Set());
+    } else {
+      setSelectedChatIds(new Set(sortedChats.map(chat => chat.id)));
+    }
+  };
+  
+  // 選択したチャットを一括削除
+  const handleBulkDelete = () => {
+    if (selectedChatIds.size === 0) return;
     
-    // フォーカス解除時は必ずキーボードを閉じる
-    Keyboard.dismiss();
+    Alert.alert(
+      '一括削除の確認',
+      `選択した ${selectedChatIds.size} 件のチャットを削除しますか？`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        { 
+          text: '削除', 
+          style: 'destructive',
+          onPress: () => {
+            selectedChatIds.forEach(chatId => {
+              deleteChat(chatId);
+            });
+            setSelectedChatIds(new Set());
+            setIsSelectionMode(false);
+            if (selectedChatIds.has(selectedChatId || '')) {
+              setSelectedChatId(null);
+            }
+          }
+        }
+      ]
+    );
   };
   
   // チャットリスト表示用コンポーネント
   const ChatsList = () => (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* 固定位置の検索バーコンテナ */}
-      <View style={styles.searchBarWrapper}>
-        <SearchBar 
-          ref={searchBarRef}
-          placeholder="チャットを検索..."
-          onSearch={handleSearch}
-          onCancel={handleSearchCancel}
-          onCustomFocus={handleSearchFocus}
-          onCustomBlur={handleSearchBlur}
-          delayMs={300}
-          showCancelButton={searchQuery.length > 0}
-          containerStyle={styles.searchBarContainer}
+      {/* 選択モードヘッダー */}
+      {isSelectionMode && (
+        <SelectionHeader
+          selectedCount={selectedChatIds.size}
+          totalCount={sortedChats.length}
+          onCancel={toggleSelectionMode}
+          onSelectAll={toggleSelectAll}
+          onDelete={handleBulkDelete}
+          itemType="チャット"
         />
-      </View>
+      )}
+
+      {/* 通常のヘッダー */}
+      {!isSelectionMode && (
+        <Header
+          title="Home"
+          showBack={false}
+          rightComponent={
+            <TouchableOpacity onPress={toggleSelectionMode}>
+              <Ionicons name="checkmark-circle-outline" size={24} color={colors.textOnPrimary} />
+            </TouchableOpacity>
+          }
+        />
+      )}
+
+      {/* プルツーサーチコンテナー */}
+      <PullToSearchContainer
+        onSearch={handleSearch}
+        searchValue={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="チャットを検索..."
+      >
       
-      {/* チャットリスト - 検索バー分の余白を上部に追加 */}
+      {/* チャットリスト */}
       <View style={styles.listWrapper}>
         {sortedChats.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -242,6 +255,11 @@ export default function ChatsScreen() {
             data={sortedChats}
             keyExtractor={item => item.id}
             contentContainerStyle={styles.listContent}
+            maintainVisibleContentPosition={{
+              minIndexForVisible: 0,
+              autoscrollToTopThreshold: 10,
+            }}
+            removeClippedSubviews={false}
             renderItem={({ item }) => (
               <SwipeableRow
                 onDelete={() => {
@@ -253,11 +271,22 @@ export default function ChatsScreen() {
                   style={[
                     styles.chatItem, 
                     { backgroundColor: colors.card },
-                    selectedChatId === item.id && styles.selectedChatItem
+                    selectedChatId === item.id && styles.selectedChatItem,
+                    selectedChatIds.has(item.id) && styles.bulkSelectedChatItem
                   ]}
-                  onPress={() => handleOpenChat(item.id)}
+                  onPress={() => isSelectionMode ? toggleChatSelection(item.id) : handleOpenChat(item.id)}
                   activeOpacity={0.7}
                 >
+                  {/* 選択モード時のチェックボックス */}
+                  {isSelectionMode && (
+                    <View style={styles.checkboxContainer}>
+                      <Ionicons 
+                        name={selectedChatIds.has(item.id) ? "checkmark-circle" : "radio-button-off"} 
+                        size={24} 
+                        color={selectedChatIds.has(item.id) ? colors.primary : colors.gray} 
+                      />
+                    </View>
+                  )}
                   <TouchableOpacity 
                     style={styles.chatIconContainer}
                     onPress={() => openIconEditor(item.id)}
@@ -336,6 +365,7 @@ export default function ChatsScreen() {
           />
         )}
       </View>
+      </PullToSearchContainer>
     </View>
   );
   
@@ -447,32 +477,8 @@ export default function ChatsScreen() {
       flex: 1,
       backgroundColor: colors.background,
     },
-    searchBarWrapper: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      zIndex: 10,
-      backgroundColor: colors.card,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      height: 65, // 検索バーの高さ（固定）
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 2,
-      elevation: 2,
-    },
-    searchBarContainer: {
-      paddingVertical: theme.spacing.xs,
-      paddingHorizontal: theme.spacing.md,
-      height: 48, // 内部の検索バーの高さを固定
-      marginTop: 8, // 上部に少しスペースを追加
-      marginBottom: 8, // 下部にも少しスペースを追加
-    },
     listWrapper: {
       flex: 1,
-      paddingTop: 65, // 検索バーの高さと同じ
     },
     listContent: {
       paddingBottom: 20,
@@ -485,6 +491,15 @@ export default function ChatsScreen() {
     },
     selectedChatItem: {
       backgroundColor: `${colors.primary}10`,
+    },
+    bulkSelectedChatItem: {
+      backgroundColor: `${colors.primary}15`,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.primary,
+    },
+    checkboxContainer: {
+      paddingRight: 12,
+      justifyContent: 'center',
     },
     chatIconContainer: {
       width: 40,
@@ -571,6 +586,20 @@ export default function ChatsScreen() {
       marginLeft: 8,
       fontSize: 16,
       fontWeight: '500',
+    },
+    // 選択モード用スタイル
+    checkboxContainer: {
+      paddingRight: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    bulkSelectedChatItem: {
+      backgroundColor: `${colors.primary}15`,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.primary,
+    },
+    selectedChatItem: {
+      backgroundColor: `${colors.primary}10`,
     },
     // 2カラムレイアウト用のスタイル
     noChatSelected: {
@@ -694,7 +723,6 @@ export default function ChatsScreen() {
           ) : (
             <>
               <Stack.Screen options={{ headerShown: false }} />
-              <Header title="Home" showBack={false} />
               <ChatsList />
             </>
           )

@@ -4,7 +4,19 @@
       "WebFetch(domain:10play.github.io)",
       "WebFetch(domain:github.com)",
       "Bash(find:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(rg:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run:*)",
+      "Bash(npm start)",
+      "Bash(npx expo start:*)",
+      "Bash(npx expo:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm update:*)",
+      "Bash(npm install:*)",
+      "Bash(npm ls:*)"
     ],
     "deny": []
   }

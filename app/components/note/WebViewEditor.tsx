@@ -4,7 +4,7 @@ import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor'
 import { useTheme } from '../../ui/ThemeProvider';
 import { useColors } from '../../constants/colors';
 import { useStore } from '../../store';
-import { Bold, Italic, Underline, Strikethrough, List, ListOrdered, Heading1, Heading2, Heading3, Quote, Link, Image, ListChecks, Highlighter, RotateCcw, RotateCw } from 'lucide-react-native';
+import { Bold, Italic, Underline, Strikethrough, List, ListOrdered, Heading1, Heading2, Heading3, Quote, Link, Image, ListChecks, Highlighter, RotateCcw, RotateCw, Minus, Code, Calculator } from 'lucide-react-native';
       
 // WebViewとRichEditorの型定義
 type DataDetectorTypes = 'phoneNumber' | 'link' | 'address' | 'calendarEvent' | 'none' | 'trackingNumber' | 'flightNumber';
@@ -864,8 +864,10 @@ const WebViewEditor = forwardRef<{
     actions.heading1, actions.heading2, actions.heading3, actions.blockquote,
     actions.setBold, actions.setItalic, actions.setUnderline, actions.setStrikethrough,
     'highlight', 
-    actions.insertOrderedList, actions.insertBulletsList, actions.checkboxList,
+    actions.insertOrderedList, actions.insertBulletsList,
     actions.insertLink,
+    'divider', 'codeBlock', 'mathBlock',
+    actions.checkboxList,
   ];
 
   const customIconMap = {
@@ -889,12 +891,165 @@ const WebViewEditor = forwardRef<{
     ['redo']: ({ tintColor }: { tintColor?: string }) => (
       <RotateCw size={20} color={canRedo ? (tintColor || colors.text) : colors.gray} opacity={canRedo ? 1 : 0.5} />
     ),
+    ['divider']: ({ tintColor }: { tintColor?: string }) => <Minus size={20} color={tintColor || colors.text} />,
+    ['codeBlock']: ({ tintColor }: { tintColor?: string }) => <Code size={20} color={tintColor || colors.text} />,
+    ['mathBlock']: ({ tintColor }: { tintColor?: string }) => <Calculator size={20} color={tintColor || colors.text} />,
+  };
+
+  // 水平線挿入ハンドラー
+  const handleInsertDivider = () => {
+    if (richText.current) {
+      const script = `
+        (function() {
+          try {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return false;
+            
+            // 現在の位置に水平線を挿入
+            const hr = document.createElement('hr');
+            hr.style.border = 'none';
+            hr.style.borderTop = '2px solid ${calculatedIsDarkMode ? '#30363d' : '#d0d7de'}';
+            hr.style.margin = '16px 0';
+            hr.style.width = '100%';
+            
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(hr);
+            
+            // カーソルを水平線の後に移動
+            const newParagraph = document.createElement('p');
+            newParagraph.innerHTML = '<br>';
+            hr.parentNode.insertBefore(newParagraph, hr.nextSibling);
+            
+            range.setStart(newParagraph, 0);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            console.log('水平線挿入完了');
+          } catch (e) {
+            console.error('水平線挿入エラー:', e);
+          }
+          return true;
+        })();
+      `;
+      richText.current.commandDOM(script);
+    }
+  };
+
+  // コードブロック挿入ハンドラー
+  const handleInsertCodeBlock = () => {
+    if (richText.current) {
+      const script = `
+        (function() {
+          try {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return false;
+            
+            // コードブロック用のpre要素を作成
+            const pre = document.createElement('pre');
+            const code = document.createElement('code');
+            code.textContent = 'コードをここに入力';
+            code.style.fontFamily = 'Courier New, monospace';
+            code.style.fontSize = '14px';
+            code.style.lineHeight = '1.5';
+            
+            pre.appendChild(code);
+            pre.style.backgroundColor = '${calculatedIsDarkMode ? '#161b22' : '#f6f8fa'}';
+            pre.style.border = '1px solid ${calculatedIsDarkMode ? '#30363d' : '#d0d7de'}';
+            pre.style.borderRadius = '6px';
+            pre.style.padding = '12px';
+            pre.style.margin = '8px 0';
+            pre.style.overflow = 'auto';
+            pre.style.color = '${calculatedIsDarkMode ? '#e6edf3' : '#24292f'}';
+            
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(pre);
+            
+            // カーソルをコードブロック内に移動
+            range.setStart(code, 0);
+            range.setEnd(code, code.childNodes.length);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            console.log('コードブロック挿入完了');
+          } catch (e) {
+            console.error('コードブロック挿入エラー:', e);
+          }
+          return true;
+        })();
+      `;
+      richText.current.commandDOM(script);
+    }
+  };
+
+  // 数学ブロック挿入ハンドラー
+  const handleInsertMathBlock = () => {
+    if (richText.current) {
+      const script = `
+        (function() {
+          try {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return false;
+            
+            // 数学ブロック用のdiv要素を作成
+            const mathDiv = document.createElement('div');
+            mathDiv.className = 'math-block';
+            mathDiv.contentEditable = 'true';
+            mathDiv.textContent = 'x = \\\\frac{-b \\\\pm \\\\sqrt{b^2 - 4ac}}{2a}';
+            
+            mathDiv.style.backgroundColor = '${calculatedIsDarkMode ? '#0d1117' : '#ffffff'}';
+            mathDiv.style.border = '2px solid ${calculatedIsDarkMode ? '#30363d' : '#d0d7de'}';
+            mathDiv.style.borderRadius = '6px';
+            mathDiv.style.padding = '12px';
+            mathDiv.style.margin = '8px 0';
+            mathDiv.style.fontFamily = 'Courier New, monospace';
+            mathDiv.style.fontSize = '16px';
+            mathDiv.style.color = '${calculatedIsDarkMode ? '#c9d1d9' : '#24292f'}';
+            mathDiv.style.textAlign = 'center';
+            mathDiv.style.position = 'relative';
+            
+            // ラベルを追加
+            const label = document.createElement('div');
+            label.textContent = 'LaTeX';
+            label.style.position = 'absolute';
+            label.style.top = '4px';
+            label.style.right = '8px';
+            label.style.fontSize = '10px';
+            label.style.color = '${calculatedIsDarkMode ? '#8b949e' : '#656d76'}';
+            label.style.fontWeight = 'bold';
+            label.style.textTransform = 'uppercase';
+            mathDiv.appendChild(label);
+            
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(mathDiv);
+            
+            // カーソルを数学ブロック内に移動
+            range.setStart(mathDiv, 0);
+            range.setEnd(mathDiv, 1);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            console.log('数学ブロック挿入完了');
+          } catch (e) {
+            console.error('数学ブロック挿入エラー:', e);
+          }
+          return true;
+        })();
+      `;
+      richText.current.commandDOM(script);
+    }
   };
 
   const customActions = {
     highlight: handleHighlight,
     undo: handleUndo,
     redo: handleRedo,
+    divider: handleInsertDivider,
+    codeBlock: handleInsertCodeBlock,
+    mathBlock: handleInsertMathBlock,
     [actions.checkboxList]: handleCustomCheckboxList
   };
   
@@ -932,6 +1087,28 @@ const WebViewEditor = forwardRef<{
                   user-select: none;
                   margin-right: 0.5em;
                   font-size: 1.2em;
+                }
+                .math-block {
+                  background-color: ${calculatedIsDarkMode ? '#0d1117' : '#ffffff'};
+                  border: 2px solid ${calculatedIsDarkMode ? '#30363d' : '#d0d7de'};
+                  border-radius: 6px;
+                  padding: 12px;
+                  margin: 8px 0;
+                  font-family: 'Courier New', monospace;
+                  font-size: 16px;
+                  color: ${calculatedIsDarkMode ? '#c9d1d9' : '#24292f'};
+                  text-align: center;
+                  position: relative;
+                }
+                .math-block:before {
+                  content: 'LaTeX';
+                  position: absolute;
+                  top: 4px;
+                  right: 8px;
+                  font-size: 10px;
+                  color: ${calculatedIsDarkMode ? '#8b949e' : '#656d76'};
+                  font-weight: bold;
+                  text-transform: uppercase;
                 }
               \`;
               document.head.appendChild(style);
@@ -1155,12 +1332,44 @@ const WebViewEditor = forwardRef<{
                 }
               };
               
-              // Enterキーのイベントリスナーを追加（チェックリスト用）
+              // Enterキーのイベントリスナーを追加（チェックリスト用と見出し処理）
               document.addEventListener('keydown', function(event) {
                 if (event.key === 'Enter') {
                   // チェックボックスリスト内の空の項目に対する特別処理
                   if (window.editorFunctions.handleEmptyListItem(event)) {
                     console.log('空のチェックボックスリスト項目で改行: 特別処理実行');
+                    return;
+                  }
+                  
+                  // 見出し要素からの改行処理
+                  const selection = window.getSelection();
+                  if (selection && selection.rangeCount > 0) {
+                    let node = selection.anchorNode;
+                    if (node.nodeType === 3) node = node.parentNode;
+                    
+                    // 見出し要素の中にいるかチェック
+                    while (node && node !== document.body) {
+                      const nodeName = node.nodeName.toLowerCase();
+                      if (['h1', 'h2', 'h3', 'blockquote'].includes(nodeName)) {
+                        // 改行後に段落要素を挿入するよう調整
+                        setTimeout(function() {
+                          const newSelection = window.getSelection();
+                          if (newSelection && newSelection.rangeCount > 0) {
+                            let currentNode = newSelection.anchorNode;
+                            if (currentNode.nodeType === 3) currentNode = currentNode.parentNode;
+                            
+                            // 新しく作成された要素が見出しの場合は段落に変換
+                            const currentNodeName = currentNode.nodeName.toLowerCase();
+                            if (['h1', 'h2', 'h3', 'blockquote'].includes(currentNodeName)) {
+                              document.execCommand('formatBlock', false, '<p>');
+                              console.log('見出しから改行: 段落に変換完了');
+                            }
+                          }
+                        }, 10);
+                        break;
+                      }
+                      node = node.parentNode;
+                    }
                   }
                 }
               });
@@ -1354,6 +1563,47 @@ const WebViewEditor = forwardRef<{
       `;
       richText.current.commandDOM(script);
       
+      // MathJaxの初期化スクリプトを追加
+      const mathJaxInitScript = `
+        (function() {
+          try {
+            // MathJax設定
+            if (!window.MathJax) {
+              window.MathJax = {
+                tex: {
+                  inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
+                  displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']],
+                  processEscapes: true,
+                  processEnvironments: true
+                },
+                options: {
+                  ignoreHtmlClass: 'tex2jax_ignore',
+                  processHtmlClass: 'tex2jax_process math-block'
+                },
+                startup: {
+                  ready: () => {
+                    MathJax.startup.defaultReady();
+                    console.log('MathJax ready for math rendering');
+                  }
+                }
+              };
+              
+              // MathJaxライブラリを動的に読み込み
+              const script = document.createElement('script');
+              script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+              script.async = true;
+              document.head.appendChild(script);
+              
+              console.log('MathJax script added to document');
+            }
+          } catch (e) {
+            console.error('MathJax initialization error:', e);
+          }
+          return true;
+        })();
+      `;
+      richText.current.commandDOM(mathJaxInitScript);
+      
       // ハイライトスタイルの初期化
       initializeHighlightStyles();
       
@@ -1450,10 +1700,18 @@ const WebViewEditor = forwardRef<{
           iconMap={customIconMap}
           customAction={customActions}
           selectedIconTint={colors.primary}
-          unselectedIconTint={colors.text}
-          disabledIconTint={colors.gray}
-          style={[styles.toolbar, { backgroundColor: calculatedIsDarkMode ? colors.card : colors.lightGray }]}
-          itemStyle={{ paddingHorizontal: 10 }}
+          unselectedIconTint={calculatedIsDarkMode ? '#ffffff' : '#24292f'}
+          disabledIconTint={calculatedIsDarkMode ? '#6e7681' : '#8c959f'}
+          style={[styles.toolbar, { 
+            backgroundColor: calculatedIsDarkMode ? '#21262d' : '#f6f8fa',
+            borderBottomColor: calculatedIsDarkMode ? '#30363d' : '#d0d7de',
+          }]}
+          itemStyle={{ 
+            paddingHorizontal: 12, 
+            paddingVertical: 8,
+            marginHorizontal: 2,
+            borderRadius: 6,
+          }}
           iconSize={20}
           onPressAddImage={() => { console.log("WebViewEditor: onPressAddImage"); }} 
           onInsertLink={() => { console.log("WebViewEditor: onInsertLink"); }} 
@@ -1499,8 +1757,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   toolbar: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#c6c6c8',
+    borderBottomWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
   },
   editor: {
     flex: 1,

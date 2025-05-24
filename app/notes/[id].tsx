@@ -24,7 +24,8 @@ export default function NoteScreen() {
   const colors = useColors();
   const { theme } = useTheme();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const storeTheme = useStore(state => state.theme);
+  const isDark = storeTheme === 'dark' || (storeTheme === 'system' && colorScheme === 'dark');
   const { width } = useWindowDimensions();
   
   // Store からプランとローカルモデル状態を取得
@@ -84,9 +85,9 @@ export default function NoteScreen() {
   // 初期データロード
   useEffect(() => {
     if (isNewNote) {
-      // 新規ノートの場合、デフォルトでH1タイトルを設定
-      setTitle('');
-      setContent('<h1>新しいノート</h1><p></p>');
+      // 新規ノートの場合、H1タイトルを設定
+      setTitle('無題のノート');
+      setContent('<h1>無題のノート</h1><p></p>');
       createNewNote();
       return;
     }
@@ -94,7 +95,7 @@ export default function NoteScreen() {
     const note = getNoteById(id);
     if (note) {
       setTitle(note.title);
-      setContent(note.content);
+      setContent(note.content || '<p>ここに内容を入力してください</p>');
     } else {
       // ノートが見つからない場合は一覧に戻る
       router.replace('/notes');
@@ -105,8 +106,8 @@ export default function NoteScreen() {
   const createNewNote = useCallback(async () => {
     try {
       const newNoteId = await createNote({
-        title: '新しいノート',
-        content: '<h1>新しいノート</h1><p></p>',
+        title: '無題のノート',
+        content: '<h1>無題のノート</h1><p></p>',
         folder_id: currentFolder
       });
       setNoteId(newNoteId);
@@ -760,6 +761,7 @@ export default function NoteScreen() {
                 isDarkMode={isDark}
                 themeColors={colors}
                 autoFocus={isNewNote}
+                isNewNote={isNewNote}
                 placeholder="ここに内容を入力してください"
                 key={`editor-${shouldUseSplitView ? 'split' : 'full'}`}
               />
